@@ -8,6 +8,11 @@ export { MatchingEngine } from './core/matching-engine';
 export { OrderBook } from './core/order-book';
 export { ExecutionEngine } from './core/execution-engine';
 
+// Service exports
+export { NatsService } from './services/nats-service';
+export { loadNatsConfig, NATS_TOPICS } from './config/nats-config';
+export type { NatsConfig, NatsTopic } from './config/nats-config';
+
 // Type exports
 export type {
   Order,
@@ -35,6 +40,27 @@ export {
 
 export type { Match, MatchResult, OrderBookSnapshot } from './types/matches';
 export { matchSchema } from './types/matches';
+
+export type {
+  CancelOrderMessage,
+  MatchCreatedMessage,
+  OrderStatusMessage,
+  OrderBookSnapshotMessage,
+  ErrorMessage,
+  ErrorCode,
+} from './types/messages';
+
+export {
+  cancelOrderMessageSchema,
+  matchCreatedMessageSchema,
+  orderStatusMessageSchema,
+  orderBookSnapshotMessageSchema,
+  errorMessageSchema,
+  ERROR_CODES,
+  createErrorMessage,
+  createMatchCreatedMessage,
+  createOrderStatusMessage,
+} from './types/messages';
 
 // Utility exports
 export {

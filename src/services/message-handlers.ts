@@ -1,0 +1,285 @@
+/**
+ * NATS Message Handlers
+ *
+ * Implements handler functions for processing NATS messages and interacting
+ * with the matching engine.
+ */
+
+import type { NatsConnection } from 'nats';
+import type { MatchingEngine } from '../core/matching-engine';
+import {
+  lendMarketOrderSchema,
+  lendLimitOrderSchema,
+  borrowMarketOrderSchema,
+  borrowLimitOrderSchema,
+} from '../types/orders';
+import {
+  cancelOrderMessageSchema,
+  createMatchCreatedMessage,
+  createErrorMessage,
+  ERROR_CODES,
+  type ErrorMessage,
+  type MatchCreatedMessage,
+} from '../types/messages';
+import { NATS_TOPICS } from '../config/nats-config';
+
+/**
+ * Handler context containing dependencies
+ */
+export interface HandlerContext {
+  /**
+   * NATS connection instance
+   */
+  nc: NatsConnection;
+
+  /**
+   * Matching engine instance
+   */
+  engine: MatchingEngine;
+}
+
+/**
+ * Parse and validate a JSON message
+ *
+ * @param data - Raw message data
+ * @param schema - Zod schema to validate against
+ * @returns Parsed and validated data
+ * @throws {Error} If parsing or validation fails
+ */
+function parseMessage<T>(data: Uint8Array, schema: { parse: (data: unknown) => T }): T {
+  try {
+    const text = new TextDecoder().decode(data);
+    const json = JSON.parse(text);
+    return schema.parse(json);
+  } catch (error) {
+    if (error instanceof Error) {
+      throw new Error(`Message parse error: ${error.message}`);
+    }
+    throw new Error('Unknown message parse error');
+  }
+}
+
+/**
+ * Publish an error message to the errors topic
+ *
+ * @param ctx - Handler context
+ * @param error - Error message object
+ */
+function publishError(ctx: HandlerContext, error: ErrorMessage): void {
+  try {
+    const message = JSON.stringify(error);
+    ctx.nc.publish(NATS_TOPICS.ERRORS, message);
+  } catch (err) {
+    console.error('Failed to publish error message:', err);
+  }
+}
+
+/**
+ * Publish a match result to the matches topic
+ *
+ * @param ctx - Handler context
+ * @param message - Match created message
+ */
+function publishMatchResult(ctx: HandlerContext, message: MatchCreatedMessage): void {
+  try {
+    const data = JSON.stringify(message);
+    ctx.nc.publish(NATS_TOPICS.MATCHES_CREATED, data);
+  } catch (err) {
+    console.error('Failed to publish match result:', err);
+    publishError(
+      ctx,
+      createErrorMessage(
+        ERROR_CODES.INTERNAL_ERROR,
+        'Failed to publish match result',
+        message.orderId
+      )
+    );
+  }
+}
+
+/**
+ * Handle lend market order messages
+ *
+ * @param ctx - Handler context
+ * @param data - Raw message data
+ */
+export function handleLendMarketOrder(ctx: HandlerContext, data: Uint8Array): void {
+  try {
+    // Parse and validate the order
+    const order = parseMessage(data, lendMarketOrderSchema);
+
+    console.log(`Processing lend market order: ${order.orderId}`);
+
+    // Submit to matching engine
+    const result = ctx.engine.submitOrder(order);
+
+    // Publish result
+    const message = createMatchCreatedMessage(order.orderId, result);
+    publishMatchResult(ctx, message);
+
+    console.log(
+      `Lend market order ${order.orderId} processed: ${result.matches.length} matches`
+    );
+  } catch (error) {
+    console.error('Error handling lend market order:', error);
+    const errorMsg =
+      error instanceof Error ? error.message : 'Unknown error';
+    publishError(
+      ctx,
+      createErrorMessage(ERROR_CODES.INVALID_ORDER, errorMsg)
+    );
+  }
+}
+
+/**
+ * Handle lend limit order messages
+ *
+ * @param ctx - Handler context
+ * @param data - Raw message data
+ */
+export function handleLendLimitOrder(ctx: HandlerContext, data: Uint8Array): void {
+  try {
+    // Parse and validate the order
+    const order = parseMessage(data, lendLimitOrderSchema);
+
+    console.log(`Processing lend limit order: ${order.orderId} at rate ${order.rate}`);
+
+    // Submit to matching engine
+    const result = ctx.engine.submitOrder(order);
+
+    // Publish result
+    const message = createMatchCreatedMessage(order.orderId, result);
+    publishMatchResult(ctx, message);
+
+    console.log(
+      `Lend limit order ${order.orderId} processed: ${result.matches.length} matches`
+    );
+  } catch (error) {
+    console.error('Error handling lend limit order:', error);
+    const errorMsg =
+      error instanceof Error ? error.message : 'Unknown error';
+    publishError(
+      ctx,
+      createErrorMessage(ERROR_CODES.INVALID_ORDER, errorMsg)
+    );
+  }
+}
+
+/**
+ * Handle borrow market order messages
+ *
+ * @param ctx - Handler context
+ * @param data - Raw message data
+ */
+export function handleBorrowMarketOrder(ctx: HandlerContext, data: Uint8Array): void {
+  try {
+    // Parse and validate the order
+    const order = parseMessage(data, borrowMarketOrderSchema);
+
+    console.log(`Processing borrow market order: ${order.orderId}`);
+
+    // Submit to matching engine
+    const result = ctx.engine.submitOrder(order);
+
+    // Publish result
+    const message = createMatchCreatedMessage(order.orderId, result);
+    publishMatchResult(ctx, message);
+
+    console.log(
+      `Borrow market order ${order.orderId} processed: ${result.matches.length} matches`
+    );
+  } catch (error) {
+    console.error('Error handling borrow market order:', error);
+    const errorMsg =
+      error instanceof Error ? error.message : 'Unknown error';
+    publishError(
+      ctx,
+      createErrorMessage(ERROR_CODES.INVALID_ORDER, errorMsg)
+    );
+  }
+}
+
+/**
+ * Handle borrow limit order messages
+ *
+ * @param ctx - Handler context
+ * @param data - Raw message data
+ */
+export function handleBorrowLimitOrder(ctx: HandlerContext, data: Uint8Array): void {
+  try {
+    // Parse and validate the order
+    const order = parseMessage(data, borrowLimitOrderSchema);
+
+    console.log(`Processing borrow limit order: ${order.orderId} at rate ${order.rate}`);
+
+    // Submit to matching engine
+    const result = ctx.engine.submitOrder(order);
+
+    // Publish result
+    const message = createMatchCreatedMessage(order.orderId, result);
+    publishMatchResult(ctx, message);
+
+    console.log(
+      `Borrow limit order ${order.orderId} processed: ${result.matches.length} matches`
+    );
+  } catch (error) {
+    console.error('Error handling borrow limit order:', error);
+    const errorMsg =
+      error instanceof Error ? error.message : 'Unknown error';
+    publishError(
+      ctx,
+      createErrorMessage(ERROR_CODES.INVALID_ORDER, errorMsg)
+    );
+  }
+}
+
+/**
+ * Handle order cancellation messages
+ *
+ * @param ctx - Handler context
+ * @param data - Raw message data
+ */
+export function handleCancelOrder(ctx: HandlerContext, data: Uint8Array): void {
+  try {
+    // Parse and validate the cancellation request
+    const request = parseMessage(data, cancelOrderMessageSchema);
+
+    console.log(`Processing cancel request for order: ${request.orderId}`);
+
+    // Cancel order in matching engine
+    const success = ctx.engine.cancelOrder(request.orderId);
+
+    if (success) {
+      console.log(`Order ${request.orderId} cancelled successfully`);
+      
+      // Publish status update
+      ctx.nc.publish(
+        NATS_TOPICS.ORDERS_STATUS,
+        JSON.stringify({
+          orderId: request.orderId,
+          status: 'CANCELLED',
+          timestamp: Date.now(),
+        })
+      );
+    } else {
+      console.warn(`Order ${request.orderId} not found for cancellation`);
+      publishError(
+        ctx,
+        createErrorMessage(
+          ERROR_CODES.ORDER_NOT_FOUND,
+          `Order ${request.orderId} not found`,
+          request.orderId
+        )
+      );
+    }
+  } catch (error) {
+    console.error('Error handling cancel order:', error);
+    const errorMsg =
+      error instanceof Error ? error.message : 'Unknown error';
+    publishError(
+      ctx,
+      createErrorMessage(ERROR_CODES.INVALID_ORDER, errorMsg)
+    );
+  }
+}
+
