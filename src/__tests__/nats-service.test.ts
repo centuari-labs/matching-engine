@@ -368,6 +368,7 @@ describe('NatsService Integration (requires NATS server)', () => {
       const testOrder = {
         orderId: '123e4567-e89b-12d3-a456-426614174000',
         loanToken: '0x1234567890123456789012345678901234567890',
+        walletAddress: '0x1111111111111111111111111111111111111111',
         maturities: [Date.now() + 86400000],
         timestamp: Date.now(),
         side: OrderSide.Lend,

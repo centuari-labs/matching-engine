@@ -7,6 +7,8 @@ describe('Partial Fills', () => {
   let engine: MatchingEngine;
   const loanToken = '0x1234567890123456789012345678901234567890';
   const collateralToken = '0xabcdefabcdefabcdefabcdefabcdefabcdefabcd';
+  const walletAddress1 = '0x1111111111111111111111111111111111111111';
+  const walletAddress2 = '0x2222222222222222222222222222222222222222';
   const maturity = 1704067200;
 
   beforeEach(() => {
@@ -17,6 +19,7 @@ describe('Partial Fills', () => {
     // Add three small lend orders
     const lendOrder1: LendLimitOrder = {
       orderId: generateOrderId(),
+      walletAddress: walletAddress1,
       loanToken,
       maturities: [maturity],
       timestamp: Date.now(),
@@ -30,6 +33,7 @@ describe('Partial Fills', () => {
 
     const lendOrder2: LendLimitOrder = {
       orderId: generateOrderId(),
+      walletAddress: walletAddress1,
       loanToken,
       maturities: [maturity],
       timestamp: Date.now() + 1,
@@ -43,6 +47,7 @@ describe('Partial Fills', () => {
 
     const lendOrder3: LendLimitOrder = {
       orderId: generateOrderId(),
+      walletAddress: walletAddress1,
       loanToken,
       maturities: [maturity],
       timestamp: Date.now() + 2,
@@ -61,6 +66,7 @@ describe('Partial Fills', () => {
     // Submit large borrow order
     const borrowOrder: BorrowLimitOrder = {
       orderId: generateOrderId(),
+      walletAddress: walletAddress2,
       loanToken,
       maturities: [maturity],
       timestamp: Date.now() + 3,
@@ -90,6 +96,7 @@ describe('Partial Fills', () => {
     // Large lend order
     const lendOrder: LendLimitOrder = {
       orderId: generateOrderId(),
+      walletAddress: walletAddress1,
       loanToken,
       maturities: [maturity],
       timestamp: Date.now(),
@@ -106,6 +113,7 @@ describe('Partial Fills', () => {
     // Small borrow order
     const borrowOrder: BorrowLimitOrder = {
       orderId: generateOrderId(),
+      walletAddress: walletAddress2,
       loanToken,
       maturities: [maturity],
       timestamp: Date.now() + 1,
@@ -135,6 +143,7 @@ describe('Partial Fills', () => {
     // Submit a large lend order
     const lendOrder: LendLimitOrder = {
       orderId: generateOrderId(),
+      walletAddress: walletAddress1,
       loanToken,
       maturities: [maturity],
       timestamp: Date.now(),
@@ -151,6 +160,7 @@ describe('Partial Fills', () => {
     // First partial fill
     const borrowOrder1: BorrowLimitOrder = {
       orderId: generateOrderId(),
+      walletAddress: walletAddress2,
       loanToken,
       maturities: [maturity],
       timestamp: Date.now() + 1,
@@ -170,6 +180,7 @@ describe('Partial Fills', () => {
     // Second partial fill
     const borrowOrder2: BorrowLimitOrder = {
       orderId: generateOrderId(),
+      walletAddress: walletAddress2,
       loanToken,
       maturities: [maturity],
       timestamp: Date.now() + 2,
@@ -189,6 +200,7 @@ describe('Partial Fills', () => {
     // Third partial fill - complete the order
     const borrowOrder3: BorrowLimitOrder = {
       orderId: generateOrderId(),
+      walletAddress: walletAddress2,
       loanToken,
       maturities: [maturity],
       timestamp: Date.now() + 3,
@@ -225,6 +237,7 @@ describe('Partial Fills', () => {
 
     const lendOrder: LendLimitOrder = {
       orderId: generateOrderId(),
+      walletAddress: walletAddress1,
       loanToken,
       maturities: [maturity],
       timestamp: Date.now(),
@@ -238,6 +251,7 @@ describe('Partial Fills', () => {
 
     const borrowOrder: BorrowLimitOrder = {
       orderId: generateOrderId(),
+      walletAddress: walletAddress2,
       loanToken,
       maturities: [maturity],
       timestamp: Date.now() + 1,
@@ -268,6 +282,7 @@ describe('Partial Fills', () => {
 
     const lendOrder: LendLimitOrder = {
       orderId: generateOrderId(),
+      walletAddress: walletAddress1,
       loanToken,
       maturities: [maturity],
       timestamp: Date.now(),
@@ -281,6 +296,7 @@ describe('Partial Fills', () => {
 
     const borrowOrder: BorrowLimitOrder = {
       orderId: generateOrderId(),
+      walletAddress: walletAddress2,
       loanToken,
       maturities: [maturity],
       timestamp: Date.now() + 1,

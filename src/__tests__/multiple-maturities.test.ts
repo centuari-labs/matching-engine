@@ -7,6 +7,8 @@ describe('Multiple Maturities Matching', () => {
   let engine: MatchingEngine;
   const loanToken = '0x1234567890123456789012345678901234567890';
   const collateralToken = '0xabcdefabcdefabcdefabcdefabcdefabcdefabcd';
+  const walletAddress1 = '0x1111111111111111111111111111111111111111';
+  const walletAddress2 = '0x2222222222222222222222222222222222222222';
   const maturity1 = 1704067200; // Jan 1, 2024
   const maturity2 = 1735689600; // Jan 1, 2025
   const maturity3 = 1767225600; // Jan 1, 2026
@@ -19,6 +21,7 @@ describe('Multiple Maturities Matching', () => {
     // Lend order with single maturity
     const lendOrder: LendLimitOrder = {
       orderId: generateOrderId(),
+      walletAddress: walletAddress1,
       loanToken,
       maturities: [maturity1],
       timestamp: Date.now(),
@@ -35,6 +38,7 @@ describe('Multiple Maturities Matching', () => {
     // Borrow order with multiple maturities including maturity1
     const borrowOrder: BorrowLimitOrder = {
       orderId: generateOrderId(),
+      walletAddress: walletAddress2,
       loanToken,
       maturities: [maturity1, maturity2, maturity3],
       timestamp: Date.now() + 1,
@@ -60,6 +64,7 @@ describe('Multiple Maturities Matching', () => {
     // Add lend orders at different maturities
     const lendOrder1: LendLimitOrder = {
       orderId: generateOrderId(),
+      walletAddress: walletAddress1,
       loanToken,
       maturities: [maturity1],
       timestamp: Date.now(),
@@ -73,6 +78,7 @@ describe('Multiple Maturities Matching', () => {
 
     const lendOrder2: LendLimitOrder = {
       orderId: generateOrderId(),
+      walletAddress: walletAddress1,
       loanToken,
       maturities: [maturity2],
       timestamp: Date.now() + 1,
@@ -86,6 +92,7 @@ describe('Multiple Maturities Matching', () => {
 
     const lendOrder3: LendLimitOrder = {
       orderId: generateOrderId(),
+      walletAddress: walletAddress1,
       loanToken,
       maturities: [maturity3],
       timestamp: Date.now() + 2,
@@ -104,6 +111,7 @@ describe('Multiple Maturities Matching', () => {
     // Borrow order matching all three maturities
     const borrowOrder: BorrowLimitOrder = {
       orderId: generateOrderId(),
+      walletAddress: walletAddress2,
       loanToken,
       maturities: [maturity1, maturity2, maturity3],
       timestamp: Date.now() + 3,
@@ -138,6 +146,7 @@ describe('Multiple Maturities Matching', () => {
     // Lend order for maturity1 and maturity2
     const lendOrder: LendLimitOrder = {
       orderId: generateOrderId(),
+      walletAddress: walletAddress1,
       loanToken,
       maturities: [maturity1, maturity2],
       timestamp: Date.now(),
@@ -154,6 +163,7 @@ describe('Multiple Maturities Matching', () => {
     // Borrow order only for maturity2 and maturity3
     const borrowOrder: BorrowLimitOrder = {
       orderId: generateOrderId(),
+      walletAddress: walletAddress2,
       loanToken,
       maturities: [maturity2, maturity3],
       timestamp: Date.now() + 1,
@@ -177,6 +187,7 @@ describe('Multiple Maturities Matching', () => {
     // Lend order for maturity1
     const lendOrder: LendLimitOrder = {
       orderId: generateOrderId(),
+      walletAddress: walletAddress1,
       loanToken,
       maturities: [maturity1],
       timestamp: Date.now(),
@@ -193,6 +204,7 @@ describe('Multiple Maturities Matching', () => {
     // Borrow order for maturity2 (no overlap)
     const borrowOrder: BorrowLimitOrder = {
       orderId: generateOrderId(),
+      walletAddress: walletAddress2,
       loanToken,
       maturities: [maturity2],
       timestamp: Date.now() + 1,
@@ -217,6 +229,7 @@ describe('Multiple Maturities Matching', () => {
     // Add multiple lend orders at maturity1
     const lendOrder1: LendLimitOrder = {
       orderId: generateOrderId(),
+      walletAddress: walletAddress1,
       loanToken,
       maturities: [maturity1],
       timestamp: Date.now(),
@@ -230,6 +243,7 @@ describe('Multiple Maturities Matching', () => {
 
     const lendOrder2: LendLimitOrder = {
       orderId: generateOrderId(),
+      walletAddress: walletAddress1,
       loanToken,
       maturities: [maturity1],
       timestamp: Date.now() + 1,
@@ -247,6 +261,7 @@ describe('Multiple Maturities Matching', () => {
     // Borrow order with multiple maturities including maturity1
     const borrowOrder: BorrowLimitOrder = {
       orderId: generateOrderId(),
+      walletAddress: walletAddress2,
       loanToken,
       maturities: [maturity1, maturity2],
       timestamp: Date.now() + 2,
@@ -270,6 +285,7 @@ describe('Multiple Maturities Matching', () => {
   it('should create separate order book entries for each maturity', () => {
     const order: LendLimitOrder = {
       orderId: generateOrderId(),
+      walletAddress: walletAddress1,
       loanToken,
       maturities: [maturity1, maturity2, maturity3],
       timestamp: Date.now(),

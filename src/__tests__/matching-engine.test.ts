@@ -7,6 +7,8 @@ describe('MatchingEngine', () => {
   let engine: MatchingEngine;
   const loanToken = '0x1234567890123456789012345678901234567890';
   const collateralToken = '0xabcdefabcdefabcdefabcdefabcdefabcdefabcd';
+  const walletAddress1 = '0x1111111111111111111111111111111111111111';
+  const walletAddress2 = '0x2222222222222222222222222222222222222222';
   const maturity = 1704067200;
 
   beforeEach(() => {
@@ -18,6 +20,7 @@ describe('MatchingEngine', () => {
       // Create lend order at 500 bps (5%)
       const lendOrder: LendLimitOrder = {
         orderId: generateOrderId(),
+        walletAddress: walletAddress1,
         loanToken,
         maturities: [maturity],
         timestamp: Date.now(),
@@ -32,6 +35,7 @@ describe('MatchingEngine', () => {
       // Create borrow order at 600 bps (6%) - willing to pay more
       const borrowOrder: BorrowLimitOrder = {
         orderId: generateOrderId(),
+        walletAddress: walletAddress2,
         loanToken,
         maturities: [maturity],
         timestamp: Date.now() + 1,
@@ -61,6 +65,7 @@ describe('MatchingEngine', () => {
       // Lender wants 800 bps
       const lendOrder: LendLimitOrder = {
         orderId: generateOrderId(),
+        walletAddress: walletAddress1,
         loanToken,
         maturities: [maturity],
         timestamp: Date.now(),
@@ -75,6 +80,7 @@ describe('MatchingEngine', () => {
       // Borrower only willing to pay 600 bps
       const borrowOrder: BorrowLimitOrder = {
         orderId: generateOrderId(),
+        walletAddress: walletAddress2,
         loanToken,
         maturities: [maturity],
         timestamp: Date.now() + 1,
@@ -99,6 +105,7 @@ describe('MatchingEngine', () => {
 
       const lendOrder: LendLimitOrder = {
         orderId: generateOrderId(),
+        walletAddress: walletAddress1,
         loanToken,
         maturities: [maturity],
         timestamp: Date.now(),
@@ -112,6 +119,7 @@ describe('MatchingEngine', () => {
 
       const borrowOrder: BorrowLimitOrder = {
         orderId: generateOrderId(),
+        walletAddress: walletAddress2,
         loanToken,
         maturities: [maturity],
         timestamp: Date.now() + 1,
@@ -137,6 +145,7 @@ describe('MatchingEngine', () => {
       // Borrower willing to pay 700 bps
       const borrowOrder: BorrowLimitOrder = {
         orderId: generateOrderId(),
+        walletAddress: walletAddress2,
         loanToken,
         maturities: [maturity],
         timestamp: Date.now(),
@@ -152,6 +161,7 @@ describe('MatchingEngine', () => {
       // Lender wants 500 bps
       const lendOrder: LendLimitOrder = {
         orderId: generateOrderId(),
+        walletAddress: walletAddress1,
         loanToken,
         maturities: [maturity],
         timestamp: Date.now() + 1,
@@ -179,6 +189,7 @@ describe('MatchingEngine', () => {
       // Add multiple borrow limit orders at different rates
       const borrowOrder1: BorrowLimitOrder = {
         orderId: generateOrderId(),
+        walletAddress: walletAddress2,
         loanToken,
         maturities: [maturity],
         timestamp: Date.now(),
@@ -193,6 +204,7 @@ describe('MatchingEngine', () => {
 
       const borrowOrder2: BorrowLimitOrder = {
         orderId: generateOrderId(),
+        walletAddress: walletAddress2,
         loanToken,
         maturities: [maturity],
         timestamp: Date.now() + 1,
@@ -211,6 +223,7 @@ describe('MatchingEngine', () => {
       // Submit lend market order
       const lendMarket: LendMarketOrder = {
         orderId: generateOrderId(),
+        walletAddress: walletAddress1,
         loanToken,
         maturities: [maturity],
         timestamp: Date.now() + 2,
@@ -234,6 +247,7 @@ describe('MatchingEngine', () => {
       // Add multiple lend limit orders at different rates
       const lendOrder1: LendLimitOrder = {
         orderId: generateOrderId(),
+        walletAddress: walletAddress1,
         loanToken,
         maturities: [maturity],
         timestamp: Date.now(),
@@ -247,6 +261,7 @@ describe('MatchingEngine', () => {
 
       const lendOrder2: LendLimitOrder = {
         orderId: generateOrderId(),
+        walletAddress: walletAddress1,
         loanToken,
         maturities: [maturity],
         timestamp: Date.now() + 1,
@@ -264,6 +279,7 @@ describe('MatchingEngine', () => {
       // Submit borrow market order
       const borrowMarket: BorrowMarketOrder = {
         orderId: generateOrderId(),
+        walletAddress: walletAddress2,
         loanToken,
         maturities: [maturity],
         timestamp: Date.now() + 2,
@@ -288,6 +304,7 @@ describe('MatchingEngine', () => {
     it('should cancel an open order', () => {
       const order: LendLimitOrder = {
         orderId: generateOrderId(),
+        walletAddress: walletAddress1,
         loanToken,
         maturities: [maturity],
         timestamp: Date.now(),
@@ -316,6 +333,7 @@ describe('MatchingEngine', () => {
     it('should return order book snapshot', () => {
       const lendOrder: LendLimitOrder = {
         orderId: generateOrderId(),
+        walletAddress: walletAddress1,
         loanToken,
         maturities: [maturity],
         timestamp: Date.now(),
@@ -329,6 +347,7 @@ describe('MatchingEngine', () => {
 
       const borrowOrder: BorrowLimitOrder = {
         orderId: generateOrderId(),
+        walletAddress: walletAddress2,
         loanToken,
         maturities: [maturity],
         timestamp: Date.now(),
@@ -357,6 +376,7 @@ describe('MatchingEngine', () => {
     it('should reject lend market order with no liquidity', () => {
       const lendMarket: LendMarketOrder = {
         orderId: generateOrderId(),
+        walletAddress: walletAddress1,
         loanToken,
         maturities: [maturity],
         timestamp: Date.now(),
@@ -378,6 +398,7 @@ describe('MatchingEngine', () => {
     it('should reject borrow market order with no liquidity', () => {
       const borrowMarket: BorrowMarketOrder = {
         orderId: generateOrderId(),
+        walletAddress: walletAddress2,
         loanToken,
         maturities: [maturity],
         timestamp: Date.now(),
@@ -401,6 +422,7 @@ describe('MatchingEngine', () => {
       // Add one borrow order with less amount
       const borrowOrder: BorrowLimitOrder = {
         orderId: generateOrderId(),
+        walletAddress: walletAddress2,
         loanToken,
         maturities: [maturity],
         timestamp: Date.now(),
@@ -418,6 +440,7 @@ describe('MatchingEngine', () => {
       // Submit larger market order
       const lendMarket: LendMarketOrder = {
         orderId: generateOrderId(),
+        walletAddress: walletAddress1,
         loanToken,
         maturities: [maturity],
         timestamp: Date.now() + 1,
@@ -441,6 +464,7 @@ describe('MatchingEngine', () => {
       // Add one lend order with less amount
       const lendOrder: LendLimitOrder = {
         orderId: generateOrderId(),
+        walletAddress: walletAddress1,
         loanToken,
         maturities: [maturity],
         timestamp: Date.now(),
@@ -457,6 +481,7 @@ describe('MatchingEngine', () => {
       // Submit larger market order
       const borrowMarket: BorrowMarketOrder = {
         orderId: generateOrderId(),
+        walletAddress: walletAddress2,
         loanToken,
         maturities: [maturity],
         timestamp: Date.now() + 1,
@@ -482,6 +507,7 @@ describe('MatchingEngine', () => {
     it('should keep limit order in book after partial fill', () => {
       const lendOrder: LendLimitOrder = {
         orderId: generateOrderId(),
+        walletAddress: walletAddress1,
         loanToken,
         maturities: [maturity],
         timestamp: Date.now(),
@@ -498,6 +524,7 @@ describe('MatchingEngine', () => {
       // Partial fill
       const borrowOrder: BorrowLimitOrder = {
         orderId: generateOrderId(),
+        walletAddress: walletAddress2,
         loanToken,
         maturities: [maturity],
         timestamp: Date.now() + 1,
@@ -527,6 +554,7 @@ describe('MatchingEngine', () => {
     it('should handle multiple partial fills on same order', () => {
       const lendOrder: LendLimitOrder = {
         orderId: generateOrderId(),
+        walletAddress: walletAddress1,
         loanToken,
         maturities: [maturity],
         timestamp: Date.now(),
@@ -543,6 +571,7 @@ describe('MatchingEngine', () => {
       // First partial fill
       const borrowOrder1: BorrowLimitOrder = {
         orderId: generateOrderId(),
+        walletAddress: walletAddress2,
         loanToken,
         maturities: [maturity],
         timestamp: Date.now() + 1,
@@ -562,6 +591,7 @@ describe('MatchingEngine', () => {
       // Second partial fill
       const borrowOrder2: BorrowLimitOrder = {
         orderId: generateOrderId(),
+        walletAddress: walletAddress2,
         loanToken,
         maturities: [maturity],
         timestamp: Date.now() + 2,
@@ -581,6 +611,7 @@ describe('MatchingEngine', () => {
       // Third partial fill - completes the order
       const borrowOrder3: BorrowLimitOrder = {
         orderId: generateOrderId(),
+        walletAddress: walletAddress2,
         loanToken,
         maturities: [maturity],
         timestamp: Date.now() + 3,
@@ -605,6 +636,7 @@ describe('MatchingEngine', () => {
     it('should transition order status correctly (Open → PartiallyFilled → Filled)', () => {
       const lendOrder: LendLimitOrder = {
         orderId: generateOrderId(),
+        walletAddress: walletAddress1,
         loanToken,
         maturities: [maturity],
         timestamp: Date.now(),
@@ -622,6 +654,7 @@ describe('MatchingEngine', () => {
       // Partial fill
       const borrowOrder1: BorrowLimitOrder = {
         orderId: generateOrderId(),
+        walletAddress: walletAddress2,
         loanToken,
         maturities: [maturity],
         timestamp: Date.now() + 1,
@@ -640,6 +673,7 @@ describe('MatchingEngine', () => {
       // Complete fill
       const borrowOrder2: BorrowLimitOrder = {
         orderId: generateOrderId(),
+        walletAddress: walletAddress2,
         loanToken,
         maturities: [maturity],
         timestamp: Date.now() + 2,
@@ -662,6 +696,7 @@ describe('MatchingEngine', () => {
     it('should allow cancelling partially filled order', () => {
       const lendOrder: LendLimitOrder = {
         orderId: generateOrderId(),
+        walletAddress: walletAddress1,
         loanToken,
         maturities: [maturity],
         timestamp: Date.now(),
@@ -678,6 +713,7 @@ describe('MatchingEngine', () => {
       // Partial fill
       const borrowOrder: BorrowLimitOrder = {
         orderId: generateOrderId(),
+        walletAddress: walletAddress2,
         loanToken,
         maturities: [maturity],
         timestamp: Date.now() + 1,
@@ -702,6 +738,7 @@ describe('MatchingEngine', () => {
     it('should fail to cancel fully filled order', () => {
       const lendOrder: LendLimitOrder = {
         orderId: generateOrderId(),
+        walletAddress: walletAddress1,
         loanToken,
         maturities: [maturity],
         timestamp: Date.now(),
@@ -718,6 +755,7 @@ describe('MatchingEngine', () => {
       // Fully fill
       const borrowOrder: BorrowLimitOrder = {
         orderId: generateOrderId(),
+        walletAddress: walletAddress2,
         loanToken,
         maturities: [maturity],
         timestamp: Date.now() + 1,
@@ -742,6 +780,7 @@ describe('MatchingEngine', () => {
     it('should fail to cancel order twice', () => {
       const order: LendLimitOrder = {
         orderId: generateOrderId(),
+        walletAddress: walletAddress1,
         loanToken,
         maturities: [maturity],
         timestamp: Date.now(),
@@ -778,6 +817,7 @@ describe('MatchingEngine', () => {
     it('should reflect correct remaining amounts after partial fill', () => {
       const lendOrder: LendLimitOrder = {
         orderId: generateOrderId(),
+        walletAddress: walletAddress1,
         loanToken,
         maturities: [maturity],
         timestamp: Date.now(),
@@ -794,6 +834,7 @@ describe('MatchingEngine', () => {
       // Partial fill
       const borrowOrder: BorrowLimitOrder = {
         orderId: generateOrderId(),
+        walletAddress: walletAddress2,
         loanToken,
         maturities: [maturity],
         timestamp: Date.now() + 1,
@@ -816,6 +857,7 @@ describe('MatchingEngine', () => {
     it('should remove order from book after full fill', () => {
       const lendOrder: LendLimitOrder = {
         orderId: generateOrderId(),
+        walletAddress: walletAddress1,
         loanToken,
         maturities: [maturity],
         timestamp: Date.now(),
@@ -832,6 +874,7 @@ describe('MatchingEngine', () => {
       // Fully fill
       const borrowOrder: BorrowLimitOrder = {
         orderId: generateOrderId(),
+        walletAddress: walletAddress2,
         loanToken,
         maturities: [maturity],
         timestamp: Date.now() + 1,
@@ -855,6 +898,7 @@ describe('MatchingEngine', () => {
       for (let i = 0; i < 5; i++) {
         const lendOrder: LendLimitOrder = {
           orderId: generateOrderId(),
+          walletAddress: walletAddress1,
           loanToken,
           maturities: [maturity],
           timestamp: Date.now() + i,
@@ -879,6 +923,7 @@ describe('MatchingEngine', () => {
 
       const lendOrder1: LendLimitOrder = {
         orderId: generateOrderId(),
+        walletAddress: walletAddress1,
         loanToken,
         maturities: [maturity],
         timestamp: baseTime,
@@ -892,6 +937,7 @@ describe('MatchingEngine', () => {
 
       const lendOrder2: LendLimitOrder = {
         orderId: generateOrderId(),
+        walletAddress: walletAddress1,
         loanToken,
         maturities: [maturity],
         timestamp: baseTime, // Same timestamp
@@ -916,6 +962,7 @@ describe('MatchingEngine', () => {
 
       const lendOrder: LendLimitOrder = {
         orderId: generateOrderId(),
+        walletAddress: walletAddress1,
         loanToken,
         maturities: [maturity],
         timestamp: Date.now(),
@@ -929,6 +976,7 @@ describe('MatchingEngine', () => {
 
       const borrowOrder: BorrowLimitOrder = {
         orderId: generateOrderId(),
+        walletAddress: walletAddress2,
         loanToken,
         maturities: [maturity],
         timestamp: Date.now() + 1,
@@ -957,6 +1005,7 @@ describe('MatchingEngine', () => {
 
       const lendOrder: LendLimitOrder = {
         orderId: generateOrderId(),
+        walletAddress: walletAddress1,
         loanToken,
         maturities: [maturity],
         timestamp: Date.now(),
@@ -970,6 +1019,7 @@ describe('MatchingEngine', () => {
 
       const borrowOrder: BorrowLimitOrder = {
         orderId: generateOrderId(),
+        walletAddress: walletAddress2,
         loanToken,
         maturities: [maturity],
         timestamp: Date.now() + 1,
@@ -997,6 +1047,7 @@ describe('MatchingEngine', () => {
     it('should match one order with multiple counterparties', () => {
       const lendOrder: LendLimitOrder = {
         orderId: generateOrderId(),
+        walletAddress: walletAddress1,
         loanToken,
         maturities: [maturity],
         timestamp: Date.now(),
@@ -1013,6 +1064,7 @@ describe('MatchingEngine', () => {
       // Multiple small borrow orders
       const borrowOrder1: BorrowLimitOrder = {
         orderId: generateOrderId(),
+        walletAddress: walletAddress2,
         loanToken,
         maturities: [maturity],
         timestamp: Date.now() + 1,
@@ -1027,6 +1079,7 @@ describe('MatchingEngine', () => {
 
       const borrowOrder2: BorrowLimitOrder = {
         orderId: generateOrderId(),
+        walletAddress: walletAddress2,
         loanToken,
         maturities: [maturity],
         timestamp: Date.now() + 2,
@@ -1041,6 +1094,7 @@ describe('MatchingEngine', () => {
 
       const borrowOrder3: BorrowLimitOrder = {
         orderId: generateOrderId(),
+        walletAddress: walletAddress2,
         loanToken,
         maturities: [maturity],
         timestamp: Date.now() + 3,
@@ -1072,6 +1126,7 @@ describe('MatchingEngine', () => {
       // Add multiple small lend orders
       const lendOrder1: LendLimitOrder = {
         orderId: generateOrderId(),
+        walletAddress: walletAddress1,
         loanToken,
         maturities: [maturity],
         timestamp: Date.now(),
@@ -1085,6 +1140,7 @@ describe('MatchingEngine', () => {
 
       const lendOrder2: LendLimitOrder = {
         orderId: generateOrderId(),
+        walletAddress: walletAddress1,
         loanToken,
         maturities: [maturity],
         timestamp: Date.now() + 1,
@@ -1102,6 +1158,7 @@ describe('MatchingEngine', () => {
       // Large borrow order that exhausts all liquidity
       const borrowOrder: BorrowLimitOrder = {
         orderId: generateOrderId(),
+        walletAddress: walletAddress2,
         loanToken,
         maturities: [maturity],
         timestamp: Date.now() + 2,
@@ -1126,6 +1183,314 @@ describe('MatchingEngine', () => {
       // Borrow order should be partially filled
       expect(result.remainingOrder).not.toBeNull();
       expect(result.remainingOrder!.remainingAmount).toBe('500000'); // 1000000 - 500000
+    });
+  });
+
+  describe('Self-Matching Prevention', () => {
+    it('should not match lend limit order with borrow order from the same wallet', () => {
+      const sameWallet = '0x3333333333333333333333333333333333333333';
+
+      // Create lend order
+      const lendOrder: LendLimitOrder = {
+        orderId: generateOrderId(),
+        walletAddress: sameWallet,
+        loanToken,
+        maturities: [maturity],
+        timestamp: Date.now(),
+        side: OrderSide.Lend,
+        type: OrderType.Limit,
+        status: OrderStatus.Open,
+        originalAmount: '1000000',
+        remainingAmount: '1000000',
+        rate: 500,
+      };
+
+      // Create borrow order from the same wallet with acceptable rate
+      const borrowOrder: BorrowLimitOrder = {
+        orderId: generateOrderId(),
+        walletAddress: sameWallet,
+        loanToken,
+        maturities: [maturity],
+        timestamp: Date.now() + 1,
+        side: OrderSide.Borrow,
+        type: OrderType.Limit,
+        status: OrderStatus.Open,
+        originalAmount: '1000000',
+        remainingAmount: '1000000',
+        rate: 600, // Higher than lend rate - would normally match
+        collateralTokens: [collateralToken],
+      };
+
+      // Submit lend order first
+      engine.submitOrder(lendOrder);
+
+      // Submit borrow order from same wallet
+      const result = engine.submitOrder(borrowOrder);
+
+      // Should NOT match due to same wallet
+      expect(result.matches).toHaveLength(0);
+
+      // Both orders should remain in the book
+      expect(engine.getOrderStatus(lendOrder.orderId)).toBe(OrderStatus.Open);
+      expect(engine.getOrderStatus(borrowOrder.orderId)).toBe(OrderStatus.Open);
+    });
+
+    it('should not match borrow limit order with lend order from the same wallet', () => {
+      const sameWallet = '0x3333333333333333333333333333333333333333';
+
+      // Create borrow order first
+      const borrowOrder: BorrowLimitOrder = {
+        orderId: generateOrderId(),
+        walletAddress: sameWallet,
+        loanToken,
+        maturities: [maturity],
+        timestamp: Date.now(),
+        side: OrderSide.Borrow,
+        type: OrderType.Limit,
+        status: OrderStatus.Open,
+        originalAmount: '1000000',
+        remainingAmount: '1000000',
+        rate: 600,
+        collateralTokens: [collateralToken],
+      };
+
+      // Create lend order from the same wallet
+      const lendOrder: LendLimitOrder = {
+        orderId: generateOrderId(),
+        walletAddress: sameWallet,
+        loanToken,
+        maturities: [maturity],
+        timestamp: Date.now() + 1,
+        side: OrderSide.Lend,
+        type: OrderType.Limit,
+        status: OrderStatus.Open,
+        originalAmount: '1000000',
+        remainingAmount: '1000000',
+        rate: 500, // Lower than borrow rate - would normally match
+      };
+
+      // Submit borrow order first
+      engine.submitOrder(borrowOrder);
+
+      // Submit lend order from same wallet
+      const result = engine.submitOrder(lendOrder);
+
+      // Should NOT match due to same wallet
+      expect(result.matches).toHaveLength(0);
+
+      // Both orders should remain in the book
+      expect(engine.getOrderStatus(borrowOrder.orderId)).toBe(OrderStatus.Open);
+      expect(engine.getOrderStatus(lendOrder.orderId)).toBe(OrderStatus.Open);
+    });
+
+    it('should not match lend market order with borrow order from the same wallet', () => {
+      const sameWallet = '0x3333333333333333333333333333333333333333';
+
+      // Create borrow limit order
+      const borrowOrder: BorrowLimitOrder = {
+        orderId: generateOrderId(),
+        walletAddress: sameWallet,
+        loanToken,
+        maturities: [maturity],
+        timestamp: Date.now(),
+        side: OrderSide.Borrow,
+        type: OrderType.Limit,
+        status: OrderStatus.Open,
+        originalAmount: '1000000',
+        remainingAmount: '1000000',
+        rate: 600,
+        collateralTokens: [collateralToken],
+      };
+
+      engine.submitOrder(borrowOrder);
+
+      // Create lend market order from the same wallet
+      const lendMarket: LendMarketOrder = {
+        orderId: generateOrderId(),
+        walletAddress: sameWallet,
+        loanToken,
+        maturities: [maturity],
+        timestamp: Date.now() + 1,
+        side: OrderSide.Lend,
+        type: OrderType.Market,
+        status: OrderStatus.Open,
+        originalAmount: '1000000',
+        remainingAmount: '1000000',
+      };
+
+      const result = engine.submitOrder(lendMarket);
+
+      // Should NOT match due to same wallet
+      expect(result.matches).toHaveLength(0);
+
+      // Borrow order should still be in book
+      expect(engine.getOrderStatus(borrowOrder.orderId)).toBe(OrderStatus.Open);
+
+      // Market order should be rejected (not added to book)
+      expect(engine.getOrderStatus(lendMarket.orderId)).toBeNull();
+    });
+
+    it('should not match borrow market order with lend order from the same wallet', () => {
+      const sameWallet = '0x3333333333333333333333333333333333333333';
+
+      // Create lend limit order
+      const lendOrder: LendLimitOrder = {
+        orderId: generateOrderId(),
+        walletAddress: sameWallet,
+        loanToken,
+        maturities: [maturity],
+        timestamp: Date.now(),
+        side: OrderSide.Lend,
+        type: OrderType.Limit,
+        status: OrderStatus.Open,
+        originalAmount: '1000000',
+        remainingAmount: '1000000',
+        rate: 500,
+      };
+
+      engine.submitOrder(lendOrder);
+
+      // Create borrow market order from the same wallet
+      const borrowMarket: BorrowMarketOrder = {
+        orderId: generateOrderId(),
+        walletAddress: sameWallet,
+        loanToken,
+        maturities: [maturity],
+        timestamp: Date.now() + 1,
+        side: OrderSide.Borrow,
+        type: OrderType.Market,
+        status: OrderStatus.Open,
+        originalAmount: '1000000',
+        remainingAmount: '1000000',
+        collateralTokens: [collateralToken],
+      };
+
+      const result = engine.submitOrder(borrowMarket);
+
+      // Should NOT match due to same wallet
+      expect(result.matches).toHaveLength(0);
+
+      // Lend order should still be in book
+      expect(engine.getOrderStatus(lendOrder.orderId)).toBe(OrderStatus.Open);
+
+      // Market order should be rejected (not added to book)
+      expect(engine.getOrderStatus(borrowMarket.orderId)).toBeNull();
+    });
+
+    it('should match with other wallets while skipping same wallet orders', () => {
+      const sameWallet = '0x3333333333333333333333333333333333333333';
+      const differentWallet = '0x4444444444444444444444444444444444444444';
+
+      // Create lend order from sameWallet
+      const lendOrder: LendLimitOrder = {
+        orderId: generateOrderId(),
+        walletAddress: sameWallet,
+        loanToken,
+        maturities: [maturity],
+        timestamp: Date.now(),
+        side: OrderSide.Lend,
+        type: OrderType.Limit,
+        status: OrderStatus.Open,
+        originalAmount: '1000000',
+        remainingAmount: '1000000',
+        rate: 500,
+      };
+
+      engine.submitOrder(lendOrder);
+
+      // Create borrow order from sameWallet (should NOT match)
+      const borrowOrderSameWallet: BorrowLimitOrder = {
+        orderId: generateOrderId(),
+        walletAddress: sameWallet,
+        loanToken,
+        maturities: [maturity],
+        timestamp: Date.now() + 1,
+        side: OrderSide.Borrow,
+        type: OrderType.Limit,
+        status: OrderStatus.Open,
+        originalAmount: '500000',
+        remainingAmount: '500000',
+        rate: 600,
+        collateralTokens: [collateralToken],
+      };
+
+      const result1 = engine.submitOrder(borrowOrderSameWallet);
+      expect(result1.matches).toHaveLength(0);
+
+      // Create borrow order from differentWallet (should match)
+      const borrowOrderDiffWallet: BorrowLimitOrder = {
+        orderId: generateOrderId(),
+        walletAddress: differentWallet,
+        loanToken,
+        maturities: [maturity],
+        timestamp: Date.now() + 2,
+        side: OrderSide.Borrow,
+        type: OrderType.Limit,
+        status: OrderStatus.Open,
+        originalAmount: '500000',
+        remainingAmount: '500000',
+        rate: 600,
+        collateralTokens: [collateralToken],
+      };
+
+      const result2 = engine.submitOrder(borrowOrderDiffWallet);
+
+      // Should match with lend order since it's from a different wallet
+      expect(result2.matches).toHaveLength(1);
+      expect(result2.matches[0].matchedAmount).toBe('500000');
+
+      // Lend order should be partially filled
+      expect(engine.getOrderStatus(lendOrder.orderId)).toBe(OrderStatus.PartiallyFilled);
+
+      // Same wallet borrow order should still be in book
+      expect(engine.getOrderStatus(borrowOrderSameWallet.orderId)).toBe(OrderStatus.Open);
+    });
+
+    it('should handle case-insensitive wallet address comparison', () => {
+      const lowerCaseWallet = '0xabcdef1234567890abcdef1234567890abcdef12';
+      const mixedCaseWallet = '0xABCDEF1234567890ABCDEF1234567890ABCDEF12';
+
+      // Create lend order with lowercase wallet
+      const lendOrder: LendLimitOrder = {
+        orderId: generateOrderId(),
+        walletAddress: lowerCaseWallet,
+        loanToken,
+        maturities: [maturity],
+        timestamp: Date.now(),
+        side: OrderSide.Lend,
+        type: OrderType.Limit,
+        status: OrderStatus.Open,
+        originalAmount: '1000000',
+        remainingAmount: '1000000',
+        rate: 500,
+      };
+
+      engine.submitOrder(lendOrder);
+
+      // Create borrow order with mixed case wallet (same address)
+      const borrowOrder: BorrowLimitOrder = {
+        orderId: generateOrderId(),
+        walletAddress: mixedCaseWallet,
+        loanToken,
+        maturities: [maturity],
+        timestamp: Date.now() + 1,
+        side: OrderSide.Borrow,
+        type: OrderType.Limit,
+        status: OrderStatus.Open,
+        originalAmount: '1000000',
+        remainingAmount: '1000000',
+        rate: 600,
+        collateralTokens: [collateralToken],
+      };
+
+      const result = engine.submitOrder(borrowOrder);
+
+      // Should NOT match - same wallet despite different case
+      expect(result.matches).toHaveLength(0);
+
+      // Both orders should remain in the book
+      expect(engine.getOrderStatus(lendOrder.orderId)).toBe(OrderStatus.Open);
+      expect(engine.getOrderStatus(borrowOrder.orderId)).toBe(OrderStatus.Open);
     });
   });
 });

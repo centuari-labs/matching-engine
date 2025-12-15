@@ -7,6 +7,8 @@ describe('Price-Time Priority', () => {
   let engine: MatchingEngine;
   const loanToken = '0x1234567890123456789012345678901234567890';
   const collateralToken = '0xabcdefabcdefabcdefabcdefabcdefabcdefabcd';
+  const walletAddress1 = '0x1111111111111111111111111111111111111111';
+  const walletAddress2 = '0x2222222222222222222222222222222222222222';
   const maturity = 1704067200;
 
   beforeEach(() => {
@@ -20,6 +22,7 @@ describe('Price-Time Priority', () => {
       // Add lend orders at different rates
       const lendOrder1: LendLimitOrder = {
         orderId: generateOrderId(),
+        walletAddress: walletAddress1,
         loanToken,
         maturities: [maturity],
         timestamp: baseTime,
@@ -33,6 +36,7 @@ describe('Price-Time Priority', () => {
 
       const lendOrder2: LendLimitOrder = {
         orderId: generateOrderId(),
+        walletAddress: walletAddress1,
         loanToken,
         maturities: [maturity],
         timestamp: baseTime + 1,
@@ -46,6 +50,7 @@ describe('Price-Time Priority', () => {
 
       const lendOrder3: LendLimitOrder = {
         orderId: generateOrderId(),
+        walletAddress: walletAddress1,
         loanToken,
         maturities: [maturity],
         timestamp: baseTime + 2,
@@ -64,6 +69,7 @@ describe('Price-Time Priority', () => {
       // Submit borrow order
       const borrowOrder: BorrowLimitOrder = {
         orderId: generateOrderId(),
+        walletAddress: walletAddress2,
         loanToken,
         maturities: [maturity],
         timestamp: baseTime + 3,
@@ -94,6 +100,7 @@ describe('Price-Time Priority', () => {
       // Add borrow orders at different rates
       const borrowOrder1: BorrowLimitOrder = {
         orderId: generateOrderId(),
+        walletAddress: walletAddress2,
         loanToken,
         maturities: [maturity],
         timestamp: baseTime,
@@ -108,6 +115,7 @@ describe('Price-Time Priority', () => {
 
       const borrowOrder2: BorrowLimitOrder = {
         orderId: generateOrderId(),
+        walletAddress: walletAddress2,
         loanToken,
         maturities: [maturity],
         timestamp: baseTime + 1,
@@ -122,6 +130,7 @@ describe('Price-Time Priority', () => {
 
       const borrowOrder3: BorrowLimitOrder = {
         orderId: generateOrderId(),
+        walletAddress: walletAddress2,
         loanToken,
         maturities: [maturity],
         timestamp: baseTime + 2,
@@ -141,6 +150,7 @@ describe('Price-Time Priority', () => {
       // Submit lend order
       const lendOrder: LendLimitOrder = {
         orderId: generateOrderId(),
+        walletAddress: walletAddress1,
         loanToken,
         maturities: [maturity],
         timestamp: baseTime + 3,
@@ -173,6 +183,7 @@ describe('Price-Time Priority', () => {
       // Add three lend orders at same rate
       const lendOrder1: LendLimitOrder = {
         orderId: generateOrderId(),
+        walletAddress: walletAddress1,
         loanToken,
         maturities: [maturity],
         timestamp: baseTime,
@@ -186,6 +197,7 @@ describe('Price-Time Priority', () => {
 
       const lendOrder2: LendLimitOrder = {
         orderId: generateOrderId(),
+        walletAddress: walletAddress1,
         loanToken,
         maturities: [maturity],
         timestamp: baseTime + 1000, // 1 second later
@@ -199,6 +211,7 @@ describe('Price-Time Priority', () => {
 
       const lendOrder3: LendLimitOrder = {
         orderId: generateOrderId(),
+        walletAddress: walletAddress1,
         loanToken,
         maturities: [maturity],
         timestamp: baseTime + 2000, // 2 seconds later
@@ -217,6 +230,7 @@ describe('Price-Time Priority', () => {
       // Submit borrow order
       const borrowOrder: BorrowLimitOrder = {
         orderId: generateOrderId(),
+        walletAddress: walletAddress2,
         loanToken,
         maturities: [maturity],
         timestamp: baseTime + 3000,
@@ -245,6 +259,7 @@ describe('Price-Time Priority', () => {
       // Add lend orders
       const lendOrder1: LendLimitOrder = {
         orderId: generateOrderId(),
+        walletAddress: walletAddress1,
         loanToken,
         maturities: [maturity],
         timestamp: baseTime,
@@ -258,6 +273,7 @@ describe('Price-Time Priority', () => {
 
       const lendOrder2: LendLimitOrder = {
         orderId: generateOrderId(),
+        walletAddress: walletAddress1,
         loanToken,
         maturities: [maturity],
         timestamp: baseTime + 1000,
@@ -275,6 +291,7 @@ describe('Price-Time Priority', () => {
       // First partial fill
       const borrowOrder1: BorrowLimitOrder = {
         orderId: generateOrderId(),
+        walletAddress: walletAddress2,
         loanToken,
         maturities: [maturity],
         timestamp: baseTime + 2000,
@@ -294,6 +311,7 @@ describe('Price-Time Priority', () => {
       // Second borrow should still match with order1 first (it has earlier timestamp)
       const borrowOrder2: BorrowLimitOrder = {
         orderId: generateOrderId(),
+        walletAddress: walletAddress2,
         loanToken,
         maturities: [maturity],
         timestamp: baseTime + 3000,
@@ -331,6 +349,7 @@ describe('Price-Time Priority', () => {
       for (const { rate, time, amount } of orders) {
         const order: LendLimitOrder = {
           orderId: generateOrderId(),
+          walletAddress: walletAddress1,
           loanToken,
           maturities: [maturity],
           timestamp: time,
@@ -348,6 +367,7 @@ describe('Price-Time Priority', () => {
       // Submit borrow order to match all
       const borrowOrder: BorrowLimitOrder = {
         orderId: generateOrderId(),
+        walletAddress: walletAddress2,
         loanToken,
         maturities: [maturity],
         timestamp: baseTime + 4000,
