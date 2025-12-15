@@ -45,6 +45,7 @@ export class OrderBook {
     // Store order metadata for quick lookups
     this.orderIndex.set(order.orderId, {
       orderId: order.orderId,
+      walletAddress: order.walletAddress,
       loanToken: order.loanToken,
       maturities: order.maturities,
       side: order.side,

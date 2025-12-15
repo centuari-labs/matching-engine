@@ -38,6 +38,7 @@ const ethereumAddressSchema = z
  */
 const baseOrderSchema = z.object({
   orderId: z.string().uuid('Order ID must be a valid UUID'),
+  walletAddress: ethereumAddressSchema,
   loanToken: ethereumAddressSchema,
   maturities: z
     .array(z.number().int().positive('Maturity must be a positive integer'))
@@ -156,6 +157,7 @@ export function isLimitOrder(order: Order): order is LendLimitOrder | BorrowLimi
  */
 export interface OrderMetadata {
   orderId: string;
+  walletAddress: string;
   loanToken: string;
   maturities: number[];
   side: OrderSide;

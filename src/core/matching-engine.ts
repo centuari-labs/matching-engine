@@ -95,6 +95,11 @@ export class MatchingEngine {
       for (const borrowOrder of borrowOrders) {
         if (isZero(remainingAmount)) break;
 
+        // Skip self-matching: lend and borrow orders from the same wallet cannot match
+        if (order.walletAddress.toLowerCase() === borrowOrder.walletAddress.toLowerCase()) {
+          continue;
+        }
+
         // Only match with limit orders (market orders don't have rates)
         if (!isLimitOrder(borrowOrder)) continue;
 
@@ -159,6 +164,11 @@ export class MatchingEngine {
 
       for (const borrowOrder of borrowOrders) {
         if (isZero(remainingAmount)) break;
+
+        // Skip self-matching: lend and borrow orders from the same wallet cannot match
+        if (order.walletAddress.toLowerCase() === borrowOrder.walletAddress.toLowerCase()) {
+          continue;
+        }
 
         // Check if borrow order has acceptable rate and determine execution rate
         let executionRate: number;
@@ -246,6 +256,11 @@ export class MatchingEngine {
       for (const lendOrder of lendOrders) {
         if (isZero(remainingAmount)) break;
 
+        // Skip self-matching: lend and borrow orders from the same wallet cannot match
+        if (order.walletAddress.toLowerCase() === lendOrder.walletAddress.toLowerCase()) {
+          continue;
+        }
+
         // Only match with limit orders (market orders don't have rates)
         if (!isLimitOrder(lendOrder)) continue;
 
@@ -307,6 +322,11 @@ export class MatchingEngine {
 
       for (const lendOrder of lendOrders) {
         if (isZero(remainingAmount)) break;
+
+        // Skip self-matching: lend and borrow orders from the same wallet cannot match
+        if (order.walletAddress.toLowerCase() === lendOrder.walletAddress.toLowerCase()) {
+          continue;
+        }
 
         // Check if lend order has acceptable rate and determine execution rate
         let executionRate: number;
