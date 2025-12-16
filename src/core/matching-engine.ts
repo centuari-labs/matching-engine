@@ -390,11 +390,17 @@ export class MatchingEngine {
    * Cancel an order
    *
    * @param orderId - The ID of the order to cancel
-   * @returns True if order was cancelled, false if not found
+   * @param walletAddress - The wallet address of the order owner
+   * @returns True if order was cancelled, false if not found or wallet address doesn't match
    */
-  cancelOrder(orderId: string): boolean {
+  cancelOrder(orderId: string, walletAddress: string): boolean {
     const order = this.orderBook.getOrder(orderId);
     if (!order) {
+      return false;
+    }
+
+    // Validate wallet address matches the order owner
+    if (order.walletAddress.toLowerCase() !== walletAddress.toLowerCase()) {
       return false;
     }
 
@@ -411,6 +417,16 @@ export class MatchingEngine {
    */
   getOrderStatus(orderId: string): OrderStatus | null {
     return this.orderBook.getOrderStatus(orderId);
+  }
+
+  /**
+   * Check if an order exists
+   *
+   * @param orderId - The order ID
+   * @returns True if order exists, false otherwise
+   */
+  hasOrder(orderId: string): boolean {
+    return this.orderBook.getOrder(orderId) !== null;
   }
 
   /**

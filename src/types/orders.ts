@@ -28,8 +28,11 @@ export enum OrderType {
 
 /**
  * Ethereum address validation schema
+ *
+ * Validates Ethereum addresses in the standard format (0x followed by 40 hexadecimal characters).
+ * This schema is used across the project for validating wallet addresses, token addresses, and collateral token addresses.
  */
-const ethereumAddressSchema = z
+export const ethereumAddressSchema = z
   .string()
   .regex(/^0x[a-fA-F0-9]{40}$/, 'Invalid Ethereum address format');
 

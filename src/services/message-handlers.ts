@@ -244,10 +244,24 @@ export function handleCancelOrder(ctx: HandlerContext, data: Uint8Array): void {
     // Parse and validate the cancellation request
     const request = parseMessage(data, cancelOrderMessageSchema);
 
-    console.log(`Processing cancel request for order: ${request.orderId}`);
+    console.log(`Processing cancel request for order: ${request.orderId} from wallet: ${request.walletAddress}`);
+
+    // Check if order exists first
+    if (!ctx.engine.hasOrder(request.orderId)) {
+      console.warn(`Order ${request.orderId} not found for cancellation`);
+      publishError(
+        ctx,
+        createErrorMessage(
+          ERROR_CODES.ORDER_NOT_FOUND,
+          `Order ${request.orderId} not found`,
+          request.orderId
+        )
+      );
+      return;
+    }
 
     // Cancel order in matching engine
-    const success = ctx.engine.cancelOrder(request.orderId);
+    const success = ctx.engine.cancelOrder(request.orderId, request.walletAddress);
 
     if (success) {
       console.log(`Order ${request.orderId} cancelled successfully`);
@@ -262,12 +276,12 @@ export function handleCancelOrder(ctx: HandlerContext, data: Uint8Array): void {
         })
       );
     } else {
-      console.warn(`Order ${request.orderId} not found for cancellation`);
+      console.warn(`Wallet address mismatch for order ${request.orderId}`);
       publishError(
         ctx,
         createErrorMessage(
-          ERROR_CODES.ORDER_NOT_FOUND,
-          `Order ${request.orderId} not found`,
+          ERROR_CODES.VALIDATION_ERROR,
+          `Wallet address does not match order owner`,
           request.orderId
         )
       );

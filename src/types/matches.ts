@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { ethereumAddressSchema } from './orders';
 
 /**
  * Match schema representing a successful match between lend and borrow orders
@@ -13,10 +14,8 @@ export const matchSchema = z.object({
     .int('Rate must be an integer')
     .min(0, 'Rate must be non-negative')
     .max(100000, 'Rate must not exceed 100000 basis points (1000%)'),
-  loanToken: z.string().regex(/^0x[a-fA-F0-9]{40}$/, 'Invalid Ethereum address format'),
-  collateralTokens: z.array(
-    z.string().regex(/^0x[a-fA-F0-9]{40}$/, 'Invalid Ethereum address format')
-  ),
+  loanToken: ethereumAddressSchema,
+  collateralTokens: z.array(ethereumAddressSchema),
   maturity: z.number().int().positive('Maturity must be a positive integer'),
   timestamp: z.number().int().positive('Timestamp must be a positive integer'),
 });

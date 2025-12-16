@@ -254,6 +254,7 @@ const engine = new MatchingEngine();
 
 const order = {
   orderId: generateOrderId(),
+  walletAddress: '0x1111111111111111111111111111111111111111',
   loanToken: '0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48',
   maturities: [1704067200],
   timestamp: Date.now(),
@@ -267,8 +268,8 @@ const order = {
 
 const result = engine.submitOrder(order);
 
-// Cancel the order
-const cancelled = engine.cancelOrder(order.orderId);
+// Cancel the order (wallet address must match the order owner)
+const cancelled = engine.cancelOrder(order.orderId, order.walletAddress);
 console.log(cancelled); // true
 
 // Check order status
@@ -348,15 +349,16 @@ Submit an order to the matching engine. The order will be matched against existi
 **Returns:**
 - `MatchResult`: Object containing matches array and remaining order info
 
-#### `cancelOrder(orderId: string): boolean`
+#### `cancelOrder(orderId: string, walletAddress: string): boolean`
 
-Cancel an existing order.
+Cancel an existing order. The wallet address must match the order owner.
 
 **Parameters:**
 - `orderId`: UUID of the order to cancel
+- `walletAddress`: Ethereum address of the order owner (must match the order's wallet address)
 
 **Returns:**
-- `boolean`: True if order was cancelled, false if not found
+- `boolean`: True if order was cancelled, false if not found or wallet address doesn't match
 
 #### `getOrderStatus(orderId: string): OrderStatus | null`
 

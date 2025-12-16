@@ -317,15 +317,38 @@ describe('MatchingEngine', () => {
       };
 
       engine.submitOrder(order);
-      const cancelled = engine.cancelOrder(order.orderId);
+      const cancelled = engine.cancelOrder(order.orderId, order.walletAddress);
 
       expect(cancelled).toBe(true);
       expect(engine.getOrderStatus(order.orderId)).toBeNull();
     });
 
     it('should return false when cancelling non-existent order', () => {
-      const cancelled = engine.cancelOrder('non-existent-id');
+      const cancelled = engine.cancelOrder('non-existent-id', walletAddress1);
       expect(cancelled).toBe(false);
+    });
+
+    it('should return false when wallet address does not match', () => {
+      const order: LendLimitOrder = {
+        orderId: generateOrderId(),
+        walletAddress: walletAddress1,
+        loanToken,
+        maturities: [maturity],
+        timestamp: Date.now(),
+        side: OrderSide.Lend,
+        type: OrderType.Limit,
+        status: OrderStatus.Open,
+        originalAmount: '1000000',
+        remainingAmount: '1000000',
+        rate: 500,
+      };
+
+      engine.submitOrder(order);
+      // Try to cancel with wrong wallet address
+      const cancelled = engine.cancelOrder(order.orderId, walletAddress2);
+      expect(cancelled).toBe(false);
+      // Order should still exist
+      expect(engine.getOrderStatus(order.orderId)).toBe(OrderStatus.Open);
     });
   });
 
@@ -730,7 +753,7 @@ describe('MatchingEngine', () => {
       expect(engine.getOrderStatus(lendOrder.orderId)).toBe(OrderStatus.PartiallyFilled);
 
       // Cancel remaining
-      const cancelled = engine.cancelOrder(lendOrder.orderId);
+      const cancelled = engine.cancelOrder(lendOrder.orderId, lendOrder.walletAddress);
       expect(cancelled).toBe(true);
       expect(engine.getOrderStatus(lendOrder.orderId)).toBeNull();
     });
@@ -773,7 +796,7 @@ describe('MatchingEngine', () => {
       expect(engine.getOrderStatus(lendOrder.orderId)).toBeNull();
 
       // Try to cancel - should fail (order doesn't exist)
-      const cancelled = engine.cancelOrder(lendOrder.orderId);
+      const cancelled = engine.cancelOrder(lendOrder.orderId, lendOrder.walletAddress);
       expect(cancelled).toBe(false);
     });
 
@@ -795,11 +818,11 @@ describe('MatchingEngine', () => {
       engine.submitOrder(order);
 
       // First cancellation should succeed
-      const cancelled1 = engine.cancelOrder(order.orderId);
+      const cancelled1 = engine.cancelOrder(order.orderId, order.walletAddress);
       expect(cancelled1).toBe(true);
 
       // Second cancellation should fail
-      const cancelled2 = engine.cancelOrder(order.orderId);
+      const cancelled2 = engine.cancelOrder(order.orderId, order.walletAddress);
       expect(cancelled2).toBe(false);
     });
   });
