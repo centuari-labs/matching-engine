@@ -391,7 +391,7 @@ export class MatchingEngine {
    *
    * @param orderId - The ID of the order to cancel
    * @param walletAddress - The wallet address of the order owner
-   * @returns True if order was cancelled, false if not found or wallet address doesn't match
+   * @returns True if order was cancelled, false if not found, wallet address doesn't match, or order is not cancellable
    */
   cancelOrder(orderId: string, walletAddress: string): boolean {
     const order = this.orderBook.getOrder(orderId);
@@ -401,6 +401,11 @@ export class MatchingEngine {
 
     // Validate wallet address matches the order owner
     if (order.walletAddress.toLowerCase() !== walletAddress.toLowerCase()) {
+      return false;
+    }
+
+    // Only allow cancellation of open or partially filled orders
+    if (order.status !== OrderStatus.Open && order.status !== OrderStatus.PartiallyFilled) {
       return false;
     }
 
