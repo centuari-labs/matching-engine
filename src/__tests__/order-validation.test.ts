@@ -10,7 +10,6 @@ import {
 
 describe('Order Validation', () => {
   const validLoanToken = '0x1234567890123456789012345678901234567890';
-  const validCollateralToken = '0xabcdefabcdefabcdefabcdefabcdefabcdefabcd';
   const validWalletAddress = '0x1111111111111111111111111111111111111111';
 
   describe('Lend Market Order', () => {
@@ -170,43 +169,6 @@ describe('Order Validation', () => {
         status: OrderStatus.Open,
         originalAmount: '1000000',
         remainingAmount: '1000000',
-        collateralTokens: [validCollateralToken],
-      };
-
-      expect(() => borrowMarketOrderSchema.parse(order)).not.toThrow();
-    });
-
-    it('should reject borrow order without collateral', () => {
-      const order = {
-        orderId: '550e8400-e29b-41d4-a716-446655440000',
-        walletAddress: validWalletAddress,
-        loanToken: validLoanToken,
-        maturities: [1704067200],
-        timestamp: Date.now(),
-        side: OrderSide.Borrow,
-        type: OrderType.Market,
-        status: OrderStatus.Open,
-        originalAmount: '1000000',
-        remainingAmount: '1000000',
-        collateralTokens: [],
-      };
-
-      expect(() => borrowMarketOrderSchema.parse(order)).toThrow();
-    });
-
-    it('should allow multiple collateral tokens', () => {
-      const order = {
-        orderId: '550e8400-e29b-41d4-a716-446655440000',
-        walletAddress: validWalletAddress,
-        loanToken: validLoanToken,
-        maturities: [1704067200],
-        timestamp: Date.now(),
-        side: OrderSide.Borrow,
-        type: OrderType.Market,
-        status: OrderStatus.Open,
-        originalAmount: '1000000',
-        remainingAmount: '1000000',
-        collateralTokens: [validCollateralToken, validLoanToken],
       };
 
       expect(() => borrowMarketOrderSchema.parse(order)).not.toThrow();
@@ -227,7 +189,6 @@ describe('Order Validation', () => {
         originalAmount: '1000000',
         remainingAmount: '1000000',
         rate: 750,
-        collateralTokens: [validCollateralToken],
       };
 
       expect(() => borrowLimitOrderSchema.parse(order)).not.toThrow();
@@ -245,7 +206,6 @@ describe('Order Validation', () => {
         status: OrderStatus.Open,
         originalAmount: '1000000',
         remainingAmount: '1000000',
-        collateralTokens: [validCollateralToken],
       };
 
       expect(() => borrowLimitOrderSchema.parse(order)).toThrow();

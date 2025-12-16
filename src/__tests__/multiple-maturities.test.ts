@@ -6,7 +6,6 @@ import { generateOrderId } from '../utils/helpers';
 describe('Multiple Maturities Matching', () => {
   let engine: MatchingEngine;
   const loanToken = '0x1234567890123456789012345678901234567890';
-  const collateralToken = '0xabcdefabcdefabcdefabcdefabcdefabcdefabcd';
   const walletAddress1 = '0x1111111111111111111111111111111111111111';
   const walletAddress2 = '0x2222222222222222222222222222222222222222';
   const maturity1 = 1704067200; // Jan 1, 2024
@@ -47,8 +46,7 @@ describe('Multiple Maturities Matching', () => {
       status: OrderStatus.Open,
       originalAmount: '500000',
       remainingAmount: '500000',
-      rate: 600,
-      collateralTokens: [collateralToken],
+      rate: 600
     };
 
     const result = engine.submitOrder(borrowOrder);
@@ -120,8 +118,7 @@ describe('Multiple Maturities Matching', () => {
       status: OrderStatus.Open,
       originalAmount: '1000000',
       remainingAmount: '1000000',
-      rate: 600,
-      collateralTokens: [collateralToken],
+      rate: 600
     };
 
     const result = engine.submitOrder(borrowOrder);
@@ -172,8 +169,7 @@ describe('Multiple Maturities Matching', () => {
       status: OrderStatus.Open,
       originalAmount: '500000',
       remainingAmount: '500000',
-      rate: 600,
-      collateralTokens: [collateralToken],
+      rate: 600
     };
 
     const result = engine.submitOrder(borrowOrder);
@@ -213,8 +209,7 @@ describe('Multiple Maturities Matching', () => {
       status: OrderStatus.Open,
       originalAmount: '500000',
       remainingAmount: '500000',
-      rate: 600,
-      collateralTokens: [collateralToken],
+      rate: 600
     };
 
     const result = engine.submitOrder(borrowOrder);
@@ -270,8 +265,7 @@ describe('Multiple Maturities Matching', () => {
       status: OrderStatus.Open,
       originalAmount: '1000000',
       remainingAmount: '1000000',
-      rate: 600,
-      collateralTokens: [collateralToken],
+      rate: 600
     };
 
     const result = engine.submitOrder(borrowOrder);

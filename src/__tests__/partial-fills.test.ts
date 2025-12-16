@@ -6,7 +6,6 @@ import { generateOrderId } from '../utils/helpers';
 describe('Partial Fills', () => {
   let engine: MatchingEngine;
   const loanToken = '0x1234567890123456789012345678901234567890';
-  const collateralToken = '0xabcdefabcdefabcdefabcdefabcdefabcdefabcd';
   const walletAddress1 = '0x1111111111111111111111111111111111111111';
   const walletAddress2 = '0x2222222222222222222222222222222222222222';
   const maturity = 1704067200;
@@ -75,8 +74,7 @@ describe('Partial Fills', () => {
       status: OrderStatus.Open,
       originalAmount: '1000000',
       remainingAmount: '1000000',
-      rate: 600,
-      collateralTokens: [collateralToken],
+      rate: 600
     };
 
     const result = engine.submitOrder(borrowOrder);
@@ -122,8 +120,7 @@ describe('Partial Fills', () => {
       status: OrderStatus.Open,
       originalAmount: '1000000',
       remainingAmount: '1000000',
-      rate: 600,
-      collateralTokens: [collateralToken],
+      rate: 600
     };
 
     const result = engine.submitOrder(borrowOrder);
@@ -169,8 +166,7 @@ describe('Partial Fills', () => {
       status: OrderStatus.Open,
       originalAmount: '300000',
       remainingAmount: '300000',
-      rate: 600,
-      collateralTokens: [collateralToken],
+      rate: 600
     };
 
     const result1 = engine.submitOrder(borrowOrder1);
@@ -189,8 +185,7 @@ describe('Partial Fills', () => {
       status: OrderStatus.Open,
       originalAmount: '400000',
       remainingAmount: '400000',
-      rate: 600,
-      collateralTokens: [collateralToken],
+      rate: 600
     };
 
     const result2 = engine.submitOrder(borrowOrder2);
@@ -209,8 +204,7 @@ describe('Partial Fills', () => {
       status: OrderStatus.Open,
       originalAmount: '300000',
       remainingAmount: '300000',
-      rate: 600,
-      collateralTokens: [collateralToken],
+      rate: 600
     };
 
     const result3 = engine.submitOrder(borrowOrder3);
@@ -260,8 +254,7 @@ describe('Partial Fills', () => {
       status: OrderStatus.Open,
       originalAmount: amount,
       remainingAmount: amount,
-      rate: 600,
-      collateralTokens: [collateralToken],
+      rate: 600
     };
 
     engine.submitOrder(lendOrder);
@@ -305,8 +298,7 @@ describe('Partial Fills', () => {
       status: OrderStatus.Open,
       originalAmount: '1000',
       remainingAmount: '1000',
-      rate: 600,
-      collateralTokens: [collateralToken],
+      rate: 600
     };
 
     engine.submitOrder(lendOrder);

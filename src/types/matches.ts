@@ -15,7 +15,6 @@ export const matchSchema = z.object({
     .min(0, 'Rate must be non-negative')
     .max(100000, 'Rate must not exceed 100000 basis points (1000%)'),
   loanToken: ethereumAddressSchema,
-  collateralTokens: z.array(ethereumAddressSchema),
   maturity: z.number().int().positive('Maturity must be a positive integer'),
   timestamp: z.number().int().positive('Timestamp must be a positive integer'),
 });
@@ -54,7 +53,6 @@ export interface OrderBookSnapshot {
     rate?: number;
     amount: string;
     timestamp: number;
-    collateralTokens: string[];
   }>;
 }
 

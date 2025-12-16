@@ -31,7 +31,6 @@ export class ExecutionEngine {
     matchedAmount: string;
     rate: number;
     loanToken: string;
-    collateralTokens: string[];
     maturity: number;
   }): Match {
     const match: Match = {
@@ -41,7 +40,6 @@ export class ExecutionEngine {
       matchedAmount: params.matchedAmount,
       rate: params.rate,
       loanToken: params.loanToken,
-      collateralTokens: params.collateralTokens,
       maturity: params.maturity,
       timestamp: Date.now(),
     };

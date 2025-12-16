@@ -6,7 +6,6 @@ import { generateOrderId } from '../utils/helpers';
 describe('Price-Time Priority', () => {
   let engine: MatchingEngine;
   const loanToken = '0x1234567890123456789012345678901234567890';
-  const collateralToken = '0xabcdefabcdefabcdefabcdefabcdefabcdefabcd';
   const walletAddress1 = '0x1111111111111111111111111111111111111111';
   const walletAddress2 = '0x2222222222222222222222222222222222222222';
   const maturity = 1704067200;
@@ -78,8 +77,7 @@ describe('Price-Time Priority', () => {
         status: OrderStatus.Open,
         originalAmount: '250000',
         remainingAmount: '250000',
-        rate: 700,
-        collateralTokens: [collateralToken],
+        rate: 700
       };
 
       const result = engine.submitOrder(borrowOrder);
@@ -109,8 +107,7 @@ describe('Price-Time Priority', () => {
         status: OrderStatus.Open,
         originalAmount: '100000',
         remainingAmount: '100000',
-        rate: 500, // Lower rate
-        collateralTokens: [collateralToken],
+        rate: 500 // Lower rate
       };
 
       const borrowOrder2: BorrowLimitOrder = {
@@ -124,8 +121,7 @@ describe('Price-Time Priority', () => {
         status: OrderStatus.Open,
         originalAmount: '100000',
         remainingAmount: '100000',
-        rate: 800, // Higher rate - should match first
-        collateralTokens: [collateralToken],
+        rate: 800 // Higher rate - should match first
       };
 
       const borrowOrder3: BorrowLimitOrder = {
@@ -139,8 +135,7 @@ describe('Price-Time Priority', () => {
         status: OrderStatus.Open,
         originalAmount: '100000',
         remainingAmount: '100000',
-        rate: 600, // Middle rate
-        collateralTokens: [collateralToken],
+        rate: 600 // Middle rate
       };
 
       engine.submitOrder(borrowOrder1);
@@ -239,8 +234,7 @@ describe('Price-Time Priority', () => {
         status: OrderStatus.Open,
         originalAmount: '250000',
         remainingAmount: '250000',
-        rate: 600,
-        collateralTokens: [collateralToken],
+        rate: 600
       };
 
       const result = engine.submitOrder(borrowOrder);
@@ -300,8 +294,7 @@ describe('Price-Time Priority', () => {
         status: OrderStatus.Open,
         originalAmount: '600000',
         remainingAmount: '600000',
-        rate: 600,
-        collateralTokens: [collateralToken],
+        rate: 600
       };
 
       const result1 = engine.submitOrder(borrowOrder1);
@@ -320,8 +313,7 @@ describe('Price-Time Priority', () => {
         status: OrderStatus.Open,
         originalAmount: '1000000',
         remainingAmount: '1000000',
-        rate: 600,
-        collateralTokens: [collateralToken],
+        rate: 600
       };
 
       const result2 = engine.submitOrder(borrowOrder2);
@@ -376,8 +368,7 @@ describe('Price-Time Priority', () => {
         status: OrderStatus.Open,
         originalAmount: '500000',
         remainingAmount: '500000',
-        rate: 700,
-        collateralTokens: [collateralToken],
+        rate: 700
       };
 
       const result = engine.submitOrder(borrowOrder);

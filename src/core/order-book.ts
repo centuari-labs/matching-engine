@@ -2,8 +2,6 @@ import createRBTree from 'functional-red-black-tree';
 import type {
   Order,
   OrderMetadata,
-  BorrowMarketOrder,
-  BorrowLimitOrder,
 } from '../types/orders';
 import { OrderStatus, OrderSide } from '../types/orders';
 import { createOrderComparator, isZero } from '../utils/helpers';
@@ -225,7 +223,6 @@ export class OrderBook {
       rate?: number;
       amount: string;
       timestamp: number;
-      collateralTokens: string[];
     }>;
   } {
     const lendOrders = this.getBestOrders(OrderSide.Lend, loanToken, maturity)
@@ -240,13 +237,11 @@ export class OrderBook {
     const borrowOrders = this.getBestOrders(OrderSide.Borrow, loanToken, maturity)
       .slice(0, depth)
       .map((order) => {
-        const borrowOrder = order as BorrowMarketOrder | BorrowLimitOrder;
         return {
           orderId: order.orderId,
           rate: 'rate' in order ? order.rate : undefined,
           amount: order.remainingAmount,
-          timestamp: order.timestamp,
-          collateralTokens: borrowOrder.collateralTokens,
+          timestamp: order.timestamp
         };
       });
 

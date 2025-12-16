@@ -6,7 +6,6 @@ import { generateOrderId } from '../utils/helpers';
 describe('MatchingEngine', () => {
   let engine: MatchingEngine;
   const loanToken = '0x1234567890123456789012345678901234567890';
-  const collateralToken = '0xabcdefabcdefabcdefabcdefabcdefabcdefabcd';
   const walletAddress1 = '0x1111111111111111111111111111111111111111';
   const walletAddress2 = '0x2222222222222222222222222222222222222222';
   const maturity = 1704067200;
@@ -45,7 +44,6 @@ describe('MatchingEngine', () => {
         originalAmount: '1000000',
         remainingAmount: '1000000',
         rate: 600,
-        collateralTokens: [collateralToken],
       };
 
       // Submit lend order first (becomes maker)
@@ -90,7 +88,6 @@ describe('MatchingEngine', () => {
         originalAmount: '1000000',
         remainingAmount: '1000000',
         rate: 600,
-        collateralTokens: [collateralToken],
       };
 
       engine.submitOrder(lendOrder);
@@ -129,7 +126,6 @@ describe('MatchingEngine', () => {
         originalAmount: '1000000',
         remainingAmount: '1000000',
         rate,
-        collateralTokens: [collateralToken],
       };
 
       engine.submitOrder(lendOrder);
@@ -155,7 +151,6 @@ describe('MatchingEngine', () => {
         originalAmount: '1000000',
         remainingAmount: '1000000',
         rate: 700,
-        collateralTokens: [collateralToken],
       };
 
       // Lender wants 500 bps
@@ -199,7 +194,6 @@ describe('MatchingEngine', () => {
         originalAmount: '500000',
         remainingAmount: '500000',
         rate: 600,
-        collateralTokens: [collateralToken],
       };
 
       const borrowOrder2: BorrowLimitOrder = {
@@ -214,7 +208,6 @@ describe('MatchingEngine', () => {
         originalAmount: '500000',
         remainingAmount: '500000',
         rate: 800, // Higher rate - better for lender
-        collateralTokens: [collateralToken],
       };
 
       engine.submitOrder(borrowOrder1);
@@ -288,7 +281,6 @@ describe('MatchingEngine', () => {
         status: OrderStatus.Open,
         originalAmount: '1000000',
         remainingAmount: '1000000',
-        collateralTokens: [collateralToken],
       };
 
       const result = engine.submitOrder(borrowMarket);
@@ -379,8 +371,7 @@ describe('MatchingEngine', () => {
         status: OrderStatus.Open,
         originalAmount: '2000000',
         remainingAmount: '2000000',
-        rate: 300,
-        collateralTokens: [collateralToken],
+        rate: 300
       };
 
       engine.submitOrder(lendOrder);
@@ -430,7 +421,6 @@ describe('MatchingEngine', () => {
         status: OrderStatus.Open,
         originalAmount: '1000000',
         remainingAmount: '1000000',
-        collateralTokens: [collateralToken],
       };
 
       const result = engine.submitOrder(borrowMarket);
@@ -455,7 +445,6 @@ describe('MatchingEngine', () => {
         originalAmount: '500000',
         remainingAmount: '500000',
         rate: 600,
-        collateralTokens: [collateralToken],
       };
 
       engine.submitOrder(borrowOrder);
@@ -512,8 +501,7 @@ describe('MatchingEngine', () => {
         type: OrderType.Market,
         status: OrderStatus.Open,
         originalAmount: '1000000',
-        remainingAmount: '1000000',
-        collateralTokens: [collateralToken],
+        remainingAmount: '1000000'
       };
 
       const result = engine.submitOrder(borrowMarket);
@@ -557,7 +545,6 @@ describe('MatchingEngine', () => {
         originalAmount: '300000',
         remainingAmount: '300000',
         rate: 600,
-        collateralTokens: [collateralToken],
       };
 
       const result = engine.submitOrder(borrowOrder);
@@ -604,7 +591,6 @@ describe('MatchingEngine', () => {
         originalAmount: '300000',
         remainingAmount: '300000',
         rate: 600,
-        collateralTokens: [collateralToken],
       };
 
       const result1 = engine.submitOrder(borrowOrder1);
@@ -624,7 +610,6 @@ describe('MatchingEngine', () => {
         originalAmount: '400000',
         remainingAmount: '400000',
         rate: 600,
-        collateralTokens: [collateralToken],
       };
 
       const result2 = engine.submitOrder(borrowOrder2);
@@ -643,8 +628,7 @@ describe('MatchingEngine', () => {
         status: OrderStatus.Open,
         originalAmount: '300000',
         remainingAmount: '300000',
-        rate: 600,
-        collateralTokens: [collateralToken],
+        rate: 600
       };
 
       const result3 = engine.submitOrder(borrowOrder3);
@@ -687,7 +671,6 @@ describe('MatchingEngine', () => {
         originalAmount: '500000',
         remainingAmount: '500000',
         rate: 600,
-        collateralTokens: [collateralToken],
       };
 
       engine.submitOrder(borrowOrder1);
@@ -705,8 +688,7 @@ describe('MatchingEngine', () => {
         status: OrderStatus.Open,
         originalAmount: '500000',
         remainingAmount: '500000',
-        rate: 600,
-        collateralTokens: [collateralToken],
+        rate: 600
       };
 
       engine.submitOrder(borrowOrder2);
@@ -746,7 +728,6 @@ describe('MatchingEngine', () => {
         originalAmount: '300000',
         remainingAmount: '300000',
         rate: 600,
-        collateralTokens: [collateralToken],
       };
 
       engine.submitOrder(borrowOrder);
@@ -788,7 +769,6 @@ describe('MatchingEngine', () => {
         originalAmount: '1000000',
         remainingAmount: '1000000',
         rate: 600,
-        collateralTokens: [collateralToken],
       };
 
       engine.submitOrder(borrowOrder);
@@ -867,7 +847,6 @@ describe('MatchingEngine', () => {
         originalAmount: '300000',
         remainingAmount: '300000',
         rate: 600,
-        collateralTokens: [collateralToken],
       };
 
       engine.submitOrder(borrowOrder);
@@ -907,7 +886,6 @@ describe('MatchingEngine', () => {
         originalAmount: '1000000',
         remainingAmount: '1000000',
         rate: 600,
-        collateralTokens: [collateralToken],
       };
 
       engine.submitOrder(borrowOrder);
@@ -1008,8 +986,7 @@ describe('MatchingEngine', () => {
         status: OrderStatus.Open,
         originalAmount: amount,
         remainingAmount: amount,
-        rate: 600,
-        collateralTokens: [collateralToken],
+        rate: 600
       };
 
       engine.submitOrder(lendOrder);
@@ -1052,7 +1029,6 @@ describe('MatchingEngine', () => {
         originalAmount: '1000',
         remainingAmount: '1000',
         rate: 600,
-        collateralTokens: [collateralToken],
       };
 
       engine.submitOrder(lendOrder);
@@ -1097,7 +1073,6 @@ describe('MatchingEngine', () => {
         originalAmount: '200000',
         remainingAmount: '200000',
         rate: 600,
-        collateralTokens: [collateralToken],
       };
 
       const borrowOrder2: BorrowLimitOrder = {
@@ -1112,7 +1087,6 @@ describe('MatchingEngine', () => {
         originalAmount: '300000',
         remainingAmount: '300000',
         rate: 600,
-        collateralTokens: [collateralToken],
       };
 
       const borrowOrder3: BorrowLimitOrder = {
@@ -1127,7 +1101,6 @@ describe('MatchingEngine', () => {
         originalAmount: '500000',
         remainingAmount: '500000',
         rate: 600,
-        collateralTokens: [collateralToken],
       };
 
       engine.submitOrder(borrowOrder1);
@@ -1191,7 +1164,6 @@ describe('MatchingEngine', () => {
         originalAmount: '1000000',
         remainingAmount: '1000000',
         rate: 600,
-        collateralTokens: [collateralToken],
       };
 
       const result = engine.submitOrder(borrowOrder);
@@ -1240,8 +1212,7 @@ describe('MatchingEngine', () => {
         status: OrderStatus.Open,
         originalAmount: '1000000',
         remainingAmount: '1000000',
-        rate: 600, // Higher than lend rate - would normally match
-        collateralTokens: [collateralToken],
+        rate: 600 // Higher than lend rate - would normally match
       };
 
       // Submit lend order first
@@ -1274,7 +1245,6 @@ describe('MatchingEngine', () => {
         originalAmount: '1000000',
         remainingAmount: '1000000',
         rate: 600,
-        collateralTokens: [collateralToken],
       };
 
       // Create lend order from the same wallet
@@ -1322,7 +1292,6 @@ describe('MatchingEngine', () => {
         originalAmount: '1000000',
         remainingAmount: '1000000',
         rate: 600,
-        collateralTokens: [collateralToken],
       };
 
       engine.submitOrder(borrowOrder);
@@ -1384,8 +1353,7 @@ describe('MatchingEngine', () => {
         type: OrderType.Market,
         status: OrderStatus.Open,
         originalAmount: '1000000',
-        remainingAmount: '1000000',
-        collateralTokens: [collateralToken],
+        remainingAmount: '1000000'
       };
 
       const result = engine.submitOrder(borrowMarket);
@@ -1434,7 +1402,6 @@ describe('MatchingEngine', () => {
         originalAmount: '500000',
         remainingAmount: '500000',
         rate: 600,
-        collateralTokens: [collateralToken],
       };
 
       const result1 = engine.submitOrder(borrowOrderSameWallet);
@@ -1452,8 +1419,7 @@ describe('MatchingEngine', () => {
         status: OrderStatus.Open,
         originalAmount: '500000',
         remainingAmount: '500000',
-        rate: 600,
-        collateralTokens: [collateralToken],
+        rate: 600
       };
 
       const result2 = engine.submitOrder(borrowOrderDiffWallet);
@@ -1502,8 +1468,7 @@ describe('MatchingEngine', () => {
         status: OrderStatus.Open,
         originalAmount: '1000000',
         remainingAmount: '1000000',
-        rate: 600,
-        collateralTokens: [collateralToken],
+        rate: 600
       };
 
       const result = engine.submitOrder(borrowOrder);

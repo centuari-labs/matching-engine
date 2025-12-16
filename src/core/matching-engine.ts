@@ -113,7 +113,6 @@ export class MatchingEngine {
           matchedAmount: matchAmount,
           rate: borrowLimitOrder.rate,
           loanToken: order.loanToken,
-          collateralTokens: borrowLimitOrder.collateralTokens,
           maturity,
         });
 
@@ -184,8 +183,6 @@ export class MatchingEngine {
           executionRate = order.rate;
         }
 
-        const borrowMarketOrLimit = borrowOrder as BorrowMarketOrder | BorrowLimitOrder;
-
         // Calculate match amount
         const matchAmount = minBigNumber(remainingAmount, borrowOrder.remainingAmount);
 
@@ -195,7 +192,6 @@ export class MatchingEngine {
           matchedAmount: matchAmount,
           rate: executionRate,
           loanToken: order.loanToken,
-          collateralTokens: borrowMarketOrLimit.collateralTokens,
           maturity,
         });
 
@@ -274,7 +270,6 @@ export class MatchingEngine {
           matchedAmount: matchAmount,
           rate: lendLimitOrder.rate,
           loanToken: order.loanToken,
-          collateralTokens: order.collateralTokens,
           maturity,
         });
 
@@ -351,7 +346,6 @@ export class MatchingEngine {
           matchedAmount: matchAmount,
           rate: executionRate,
           loanToken: order.loanToken,
-          collateralTokens: order.collateralTokens,
           maturity,
         });
 

@@ -83,10 +83,7 @@ export const lendLimitOrderSchema = baseOrderSchema.extend({
 export const borrowMarketOrderSchema = baseOrderSchema.extend({
   side: z.literal(OrderSide.Borrow),
   type: z.literal(OrderType.Market),
-  rate: z.undefined().optional(),
-  collateralTokens: z
-    .array(ethereumAddressSchema)
-    .min(1, 'At least one collateral token is required'),
+  rate: z.undefined().optional()
 });
 
 /**
@@ -100,10 +97,7 @@ export const borrowLimitOrderSchema = baseOrderSchema.extend({
     .number()
     .int('Rate must be an integer')
     .min(0, 'Rate must be non-negative')
-    .max(100000, 'Rate must not exceed 100000 basis points (1000%)'),
-  collateralTokens: z
-    .array(ethereumAddressSchema)
-    .min(1, 'At least one collateral token is required'),
+    .max(100000, 'Rate must not exceed 100000 basis points (1000%)')
 });
 
 /**
