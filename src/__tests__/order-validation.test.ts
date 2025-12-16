@@ -13,8 +13,6 @@ describe('Order Validation', () => {
   const validCollateralToken = '0xabcdefabcdefabcdefabcdefabcdefabcdefabcd';
   const validWalletAddress = '0x1111111111111111111111111111111111111111';
 
-  //@todo : validate loan token and collateral token from DB
-
   describe('Lend Market Order', () => {
     it('should validate a valid lend market order', () => {
       const order = {

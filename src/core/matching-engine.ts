@@ -37,8 +37,6 @@ export class MatchingEngine {
   submitOrder(order: Order): MatchResult {
     const matches: Match[] = [];
 
-    //@todo : validate loan token and collateral token from DB
-
     if (order.side === OrderSide.Lend) {
       // Match lend order against borrow orders
       if (order.type === OrderType.Market) {
