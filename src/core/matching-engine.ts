@@ -114,6 +114,7 @@ export class MatchingEngine {
           rate: borrowLimitOrder.rate,
           loanToken: order.loanToken,
           maturity,
+          borrowerIsTaker: false,
         });
 
         matches.push(match);
@@ -193,6 +194,7 @@ export class MatchingEngine {
           rate: executionRate,
           loanToken: order.loanToken,
           maturity,
+          borrowerIsTaker: false,
         });
 
         matches.push(match);
@@ -271,6 +273,7 @@ export class MatchingEngine {
           rate: lendLimitOrder.rate,
           loanToken: order.loanToken,
           maturity,
+          borrowerIsTaker: true,
         });
 
         matches.push(match);
@@ -347,6 +350,7 @@ export class MatchingEngine {
           rate: executionRate,
           loanToken: order.loanToken,
           maturity,
+          borrowerIsTaker: true,
         });
 
         matches.push(match);

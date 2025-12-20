@@ -17,6 +17,7 @@ export const matchSchema = z.object({
   loanToken: ethereumAddressSchema,
   maturity: z.number().int().positive('Maturity must be a positive integer'),
   timestamp: z.number().int().positive('Timestamp must be a positive integer'),
+  borrowerIsTaker: z.boolean(),
 });
 
 /**

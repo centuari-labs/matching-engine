@@ -32,6 +32,7 @@ export class ExecutionEngine {
     rate: number;
     loanToken: string;
     maturity: number;
+    borrowerIsTaker: boolean;
   }): Match {
     const match: Match = {
       matchId: generateMatchId(),
@@ -42,6 +43,7 @@ export class ExecutionEngine {
       loanToken: params.loanToken,
       maturity: params.maturity,
       timestamp: Date.now(),
+      borrowerIsTaker: params.borrowerIsTaker,
     };
 
     // Validate match against schema
