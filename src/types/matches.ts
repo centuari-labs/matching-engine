@@ -26,15 +26,33 @@ export const matchSchema = z.object({
 export type Match = z.infer<typeof matchSchema>;
 
 /**
+ * Represents an order affected by a match
+ *
+ * Contains the order's updated status and remaining amount after the match.
+ */
+export interface AffectedOrder {
+  /** The order ID */
+  orderId: string;
+  /** The order's status after the match */
+  status: string;
+  /** The order's remaining amount after the match */
+  remainingAmount: string;
+}
+
+/**
  * Match result returned after order submission
  */
 export interface MatchResult {
+  /** Array of matches created from this order */
   matches: Match[];
+  /** Remaining order info if partially filled, null if fully filled or no matches */
   remainingOrder: {
     orderId: string;
     remainingAmount: string;
     status: string;
   } | null;
+  /** Array of maker orders affected by the matching */
+  affectedMakerOrders: AffectedOrder[];
 }
 
 /**

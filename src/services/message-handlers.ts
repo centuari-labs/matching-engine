@@ -17,10 +17,13 @@ import {
   cancelOrderMessageSchema,
   createMatchCreatedMessage,
   createErrorMessage,
+  createOrderStatusMessageFromAffected,
   ERROR_CODES,
   type ErrorMessage,
   type MatchCreatedMessage,
 } from '../types/messages';
+import type { MatchResult } from '../types/matches';
+import { OrderStatus } from '../types/orders';
 import { NATS_TOPICS } from '../config/nats-config';
 
 /**
@@ -98,6 +101,58 @@ function publishMatchResult(ctx: HandlerContext, message: MatchCreatedMessage): 
 }
 
 /**
+ * Publish order status updates for taker and affected maker orders
+ *
+ * @param ctx - Handler context
+ * @param orderId - The taker order ID
+ * @param result - Match result containing affected orders
+ */
+function publishOrderStatusUpdates(
+  ctx: HandlerContext,
+  orderId: string,
+  result: MatchResult
+): void {
+  try {
+    // Publish taker order status
+    if (result.remainingOrder) {
+      // Order is partially filled or still open
+      const takerStatusMessage = {
+        orderId: result.remainingOrder.orderId,
+        status: result.remainingOrder.status,
+        remainingAmount: result.remainingOrder.remainingAmount,
+        timestamp: Date.now(),
+      };
+      ctx.nc.publish(NATS_TOPICS.ORDERS_STATUS, JSON.stringify(takerStatusMessage));
+    } else if (result.matches.length > 0) {
+      // Order was fully filled (no remaining order means it was completely matched)
+      const takerStatusMessage = {
+        orderId,
+        status: OrderStatus.Filled,
+        remainingAmount: '0',
+        timestamp: Date.now(),
+      };
+      ctx.nc.publish(NATS_TOPICS.ORDERS_STATUS, JSON.stringify(takerStatusMessage));
+    }
+
+    // Publish status updates for all affected maker orders
+    for (const affectedOrder of result.affectedMakerOrders) {
+      const statusMessage = createOrderStatusMessageFromAffected(affectedOrder);
+      ctx.nc.publish(NATS_TOPICS.ORDERS_STATUS, JSON.stringify(statusMessage));
+    }
+  } catch (err) {
+    console.error('Failed to publish order status updates:', err);
+    publishError(
+      ctx,
+      createErrorMessage(
+        ERROR_CODES.INTERNAL_ERROR,
+        'Failed to publish order status updates',
+        orderId
+      )
+    );
+  }
+}
+
+/**
  * Handle lend market order messages
  *
  * @param ctx - Handler context
@@ -113,9 +168,12 @@ export function handleLendMarketOrder(ctx: HandlerContext, data: Uint8Array): vo
     // Submit to matching engine
     const result = ctx.engine.submitOrder(order);
 
-    // Publish result
+    // Publish match result
     const message = createMatchCreatedMessage(order.orderId, result);
     publishMatchResult(ctx, message);
+
+    // Publish order status updates for taker and affected maker orders
+    publishOrderStatusUpdates(ctx, order.orderId, result);
 
     console.log(
       `Lend market order ${order.orderId} processed: ${result.matches.length} matches`
@@ -147,9 +205,12 @@ export function handleLendLimitOrder(ctx: HandlerContext, data: Uint8Array): voi
     // Submit to matching engine
     const result = ctx.engine.submitOrder(order);
 
-    // Publish result
+    // Publish match result
     const message = createMatchCreatedMessage(order.orderId, result);
     publishMatchResult(ctx, message);
+
+    // Publish order status updates for taker and affected maker orders
+    publishOrderStatusUpdates(ctx, order.orderId, result);
 
     console.log(
       `Lend limit order ${order.orderId} processed: ${result.matches.length} matches`
@@ -181,9 +242,12 @@ export function handleBorrowMarketOrder(ctx: HandlerContext, data: Uint8Array): 
     // Submit to matching engine
     const result = ctx.engine.submitOrder(order);
 
-    // Publish result
+    // Publish match result
     const message = createMatchCreatedMessage(order.orderId, result);
     publishMatchResult(ctx, message);
+
+    // Publish order status updates for taker and affected maker orders
+    publishOrderStatusUpdates(ctx, order.orderId, result);
 
     console.log(
       `Borrow market order ${order.orderId} processed: ${result.matches.length} matches`
@@ -215,9 +279,12 @@ export function handleBorrowLimitOrder(ctx: HandlerContext, data: Uint8Array): v
     // Submit to matching engine
     const result = ctx.engine.submitOrder(order);
 
-    // Publish result
+    // Publish match result
     const message = createMatchCreatedMessage(order.orderId, result);
     publishMatchResult(ctx, message);
+
+    // Publish order status updates for taker and affected maker orders
+    publishOrderStatusUpdates(ctx, order.orderId, result);
 
     console.log(
       `Borrow limit order ${order.orderId} processed: ${result.matches.length} matches`

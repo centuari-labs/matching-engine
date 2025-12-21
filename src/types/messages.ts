@@ -6,7 +6,7 @@
  */
 
 import { z } from 'zod';
-import type { MatchResult } from './matches';
+import type { MatchResult, AffectedOrder } from './matches';
 import type { Order } from './orders';
 import { ethereumAddressSchema } from './orders';
 
@@ -245,6 +245,23 @@ export function createOrderStatusMessage(order: Order): OrderStatusMessage {
     orderId: order.orderId,
     status: order.status,
     remainingAmount: order.remainingAmount.toString(),
+    timestamp: Date.now(),
+  };
+}
+
+/**
+ * Create an order status message from an affected order
+ *
+ * @param affected - Affected order containing orderId, status, and remainingAmount
+ * @returns Formatted order status message
+ */
+export function createOrderStatusMessageFromAffected(
+  affected: AffectedOrder
+): OrderStatusMessage {
+  return {
+    orderId: affected.orderId,
+    status: affected.status as OrderStatusMessage['status'],
+    remainingAmount: affected.remainingAmount,
     timestamp: Date.now(),
   };
 }

@@ -8,7 +8,7 @@ import type {
   BorrowLimitOrder,
 } from '../types/orders';
 import { OrderSide, OrderStatus, OrderType, isLimitOrder } from '../types/orders';
-import type { Match, MatchResult, OrderBookSnapshot } from '../types/matches';
+import type { Match, MatchResult, OrderBookSnapshot, AffectedOrder } from '../types/matches';
 import {
   minBigNumber,
   subtractBigNumbers,
@@ -32,24 +32,25 @@ export class MatchingEngine {
    * The order will be matched against existing orders and added to the order book if not fully filled
    *
    * @param order - The order to submit
-   * @returns Match result containing matches and remaining order info
+   * @returns Match result containing matches, remaining order info, and affected maker orders
    */
   submitOrder(order: Order): MatchResult {
     const matches: Match[] = [];
+    const affectedMakerOrders: AffectedOrder[] = [];
 
     if (order.side === OrderSide.Lend) {
       // Match lend order against borrow orders
       if (order.type === OrderType.Market) {
-        this.matchLendMarketOrder(order as LendMarketOrder, matches);
+        this.matchLendMarketOrder(order as LendMarketOrder, matches, affectedMakerOrders);
       } else {
-        this.matchLendLimitOrder(order as LendLimitOrder, matches);
+        this.matchLendLimitOrder(order as LendLimitOrder, matches, affectedMakerOrders);
       }
     } else {
       // Match borrow order against lend orders
       if (order.type === OrderType.Market) {
-        this.matchBorrowMarketOrder(order as BorrowMarketOrder, matches);
+        this.matchBorrowMarketOrder(order as BorrowMarketOrder, matches, affectedMakerOrders);
       } else {
-        this.matchBorrowLimitOrder(order as BorrowLimitOrder, matches);
+        this.matchBorrowLimitOrder(order as BorrowLimitOrder, matches, affectedMakerOrders);
       }
     }
 
@@ -69,6 +70,7 @@ export class MatchingEngine {
     return {
       matches,
       remainingOrder,
+      affectedMakerOrders,
     };
   }
 
@@ -76,7 +78,11 @@ export class MatchingEngine {
    * Match a lend market order against borrow limit orders
    * Market orders match at the best available rate (highest borrow rate)
    */
-  private matchLendMarketOrder(order: LendMarketOrder, matches: Match[]): void {
+  private matchLendMarketOrder(
+    order: LendMarketOrder,
+    matches: Match[],
+    affectedMakerOrders: AffectedOrder[]
+  ): void {
     let remainingAmount = order.remainingAmount;
 
     // Try to match with each maturity
@@ -126,11 +132,21 @@ export class MatchingEngine {
           matchAmount
         );
 
-        // Update borrow order in order book
+        // Update borrow order in order book and track affected order
         if (isZero(borrowRemainingAmount)) {
           this.orderBook.removeOrder(borrowOrder.orderId);
+          affectedMakerOrders.push({
+            orderId: borrowOrder.orderId,
+            status: OrderStatus.Filled,
+            remainingAmount: borrowRemainingAmount,
+          });
         } else {
           this.orderBook.updateOrderAmount(borrowOrder.orderId, borrowRemainingAmount);
+          affectedMakerOrders.push({
+            orderId: borrowOrder.orderId,
+            status: OrderStatus.PartiallyFilled,
+            remainingAmount: borrowRemainingAmount,
+          });
         }
       }
     }
@@ -146,7 +162,11 @@ export class MatchingEngine {
    * Match a lend limit order against borrow orders
    * Matches with borrow orders that have rate >= lend rate
    */
-  private matchLendLimitOrder(order: LendLimitOrder, matches: Match[]): void {
+  private matchLendLimitOrder(
+    order: LendLimitOrder,
+    matches: Match[],
+    affectedMakerOrders: AffectedOrder[]
+  ): void {
     let remainingAmount = order.remainingAmount;
 
     // Try to match with each maturity
@@ -206,11 +226,21 @@ export class MatchingEngine {
           matchAmount
         );
 
-        // Update borrow order in order book
+        // Update borrow order in order book and track affected order
         if (isZero(borrowRemainingAmount)) {
           this.orderBook.removeOrder(borrowOrder.orderId);
+          affectedMakerOrders.push({
+            orderId: borrowOrder.orderId,
+            status: OrderStatus.Filled,
+            remainingAmount: borrowRemainingAmount,
+          });
         } else {
           this.orderBook.updateOrderAmount(borrowOrder.orderId, borrowRemainingAmount);
+          affectedMakerOrders.push({
+            orderId: borrowOrder.orderId,
+            status: OrderStatus.PartiallyFilled,
+            remainingAmount: borrowRemainingAmount,
+          });
         }
       }
     }
@@ -235,7 +265,11 @@ export class MatchingEngine {
    * Match a borrow market order against lend limit orders
    * Market orders match at the best available rate (lowest lend rate)
    */
-  private matchBorrowMarketOrder(order: BorrowMarketOrder, matches: Match[]): void {
+  private matchBorrowMarketOrder(
+    order: BorrowMarketOrder,
+    matches: Match[],
+    affectedMakerOrders: AffectedOrder[]
+  ): void {
     let remainingAmount = order.remainingAmount;
 
     // Try to match with each maturity
@@ -282,11 +316,21 @@ export class MatchingEngine {
         remainingAmount = subtractBigNumbers(remainingAmount, matchAmount);
         const lendRemainingAmount = subtractBigNumbers(lendOrder.remainingAmount, matchAmount);
 
-        // Update lend order in order book
+        // Update lend order in order book and track affected order
         if (isZero(lendRemainingAmount)) {
           this.orderBook.removeOrder(lendOrder.orderId);
+          affectedMakerOrders.push({
+            orderId: lendOrder.orderId,
+            status: OrderStatus.Filled,
+            remainingAmount: lendRemainingAmount,
+          });
         } else {
           this.orderBook.updateOrderAmount(lendOrder.orderId, lendRemainingAmount);
+          affectedMakerOrders.push({
+            orderId: lendOrder.orderId,
+            status: OrderStatus.PartiallyFilled,
+            remainingAmount: lendRemainingAmount,
+          });
         }
       }
     }
@@ -302,7 +346,11 @@ export class MatchingEngine {
    * Match a borrow limit order against lend orders
    * Matches with lend orders that have rate <= borrow rate
    */
-  private matchBorrowLimitOrder(order: BorrowLimitOrder, matches: Match[]): void {
+  private matchBorrowLimitOrder(
+    order: BorrowLimitOrder,
+    matches: Match[],
+    affectedMakerOrders: AffectedOrder[]
+  ): void {
     let remainingAmount = order.remainingAmount;
 
     // Try to match with each maturity
@@ -359,11 +407,21 @@ export class MatchingEngine {
         remainingAmount = subtractBigNumbers(remainingAmount, matchAmount);
         const lendRemainingAmount = subtractBigNumbers(lendOrder.remainingAmount, matchAmount);
 
-        // Update lend order in order book
+        // Update lend order in order book and track affected order
         if (isZero(lendRemainingAmount)) {
           this.orderBook.removeOrder(lendOrder.orderId);
+          affectedMakerOrders.push({
+            orderId: lendOrder.orderId,
+            status: OrderStatus.Filled,
+            remainingAmount: lendRemainingAmount,
+          });
         } else {
           this.orderBook.updateOrderAmount(lendOrder.orderId, lendRemainingAmount);
+          affectedMakerOrders.push({
+            orderId: lendOrder.orderId,
+            status: OrderStatus.PartiallyFilled,
+            remainingAmount: lendRemainingAmount,
+          });
         }
       }
     }
