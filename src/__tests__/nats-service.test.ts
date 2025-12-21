@@ -296,139 +296,25 @@ describe('NatsService', () => {
   });
 });
 
-/**
- * Check if NATS server is available
- *
- * @returns Promise that resolves to true if NATS is available, false otherwise
- */
-async function isNatsAvailable(): Promise<boolean> {
-  const testService = new NatsService(new MatchingEngine(), {
-    ...mockConfig,
-    timeout: 5000, // Increased timeout to 5 seconds
-    maxReconnectAttempts: 0, // Don't retry, fail fast if not available
-  });
-
-  // Suppress console.error during availability check to avoid noise
-  const originalError = console.error;
-  console.error = jest.fn();
-
-  try {
-    // Try to connect with a reasonable timeout
-    await Promise.race([
-      testService.connect(),
-      new Promise<never>((_, reject) => 
-        setTimeout(() => reject(new Error('Connection timeout')), 6000)
-      )
-    ]);
-    
-    // Give it a moment to fully establish connection
-    await new Promise((resolve) => setTimeout(resolve, 100));
-    
-    const available = testService.isServiceConnected();
-    
-    // Clean up if connected
-    if (available) {
-      try {
-        await testService.disconnect();
-        // Wait a bit for disconnect to complete
-        await new Promise((resolve) => setTimeout(resolve, 100));
-      } catch {
-        // Ignore disconnect errors
-      }
-    }
-    
-    // Restore console.error
-    console.error = originalError;
-    return available;
-  } catch (error) {
-    // Connection failed, NATS is not available
-    // Restore console.error before returning
-    console.error = originalError;
-    return false;
-  }
-}
-
-/**
- * Integration tests that require a running NATS server
- * 
- * These tests will automatically skip if NATS server is not available.
- * To run these tests:
- * 1. Start a local NATS server: docker run -p 4222:4222 nats
- * 2. Run: npm test -- nats-service.test.ts
- * 
- * Note: Tests are defined with it.skip() when NATS is not available.
- * Since beforeAll is async, we check availability and define tests accordingly.
- */
 describe('NatsService Integration (requires NATS server)', () => {
   let engine: MatchingEngine;
   let natsService: NatsService;
-  let natsAvailable = false;
+  engine = new MatchingEngine();
+  natsService = new NatsService(engine, mockConfig);
 
-  // Check NATS availability before tests run
-  beforeAll(async () => {
-    natsAvailable = await isNatsAvailable();
-    if (!natsAvailable) {
-      console.log('⚠️  NATS server not available - integration tests will be skipped');
-      console.log('   Make sure NATS is running: docker run -p 4222:4222 nats');
-    } else {
-      console.log('✓ NATS server is available - integration tests will run');
-    }
-  });
-
-  beforeEach(() => {
-    engine = new MatchingEngine();
-    natsService = new NatsService(engine, mockConfig);
-  });
-
-  afterEach(async () => {
-    if (natsService.isServiceConnected()) {
-      await natsService.disconnect();
-    }
-  });
-
-  // Helper to conditionally run tests based on NATS availability
-  // Note: Since beforeAll is async and runs before tests execute, we check natsAvailable
-  // at test execution time. However, Jest doesn't support runtime skipping, so we use
-  // it.skip() conditionally at definition time. Since natsAvailable is false initially,
-  // all tests will be defined as skipped. When beforeAll runs, if NATS is available,
-  // natsAvailable becomes true, but tests are already defined as skipped.
-  // 
-  // This means: if NATS is down, tests are skipped (correct). If NATS is available,
-  // tests might still be skipped (not ideal, but acceptable for optional integration tests).
-  // 
-  // To fix this properly, we'd need to check availability synchronously before defining tests,
-  // which isn't possible for a network service. The current approach ensures tests are skipped
-  // when NATS is down, which is the primary use case.
-  const testIfNatsAvailable = (name: string, fn: () => Promise<void>) => {
-    // Define test with it.skip() when NATS is not available (initial state)
-    // This ensures tests show as "skipped" in Jest output when NATS is down.
-    // Note: Since natsAvailable is false when tests are defined, all tests will
-    // be marked as skipped. When beforeAll runs and NATS is available, natsAvailable
-    // becomes true, but tests are already defined as skipped.
-    // 
-    // This is acceptable: tests will be skipped when NATS is down (desired behavior).
-    // If NATS is available, tests would ideally run, but due to Jest's execution model,
-    // they'll still be skipped. For optional integration tests, this is acceptable.
-    if (!natsAvailable) {
-      it.skip(name, fn);
-    } else {
-      it(name, fn);
-    }
-  };
-
-  testIfNatsAvailable('should connect to NATS server', async () => {
+  it('should connect to NATS server', async () => {
     await natsService.connect();
     expect(natsService.isServiceConnected()).toBe(true);
   });
 
-  testIfNatsAvailable('should subscribe to all order topics', async () => {
+  it('should subscribe to all order topics', async () => {
     await natsService.connect();
     
     const stats = natsService.getStats();
     expect(stats.subscriptions).toBe(5); // Updated: 4 order types + cancel (removed orderbook.query)
   });
 
-  testIfNatsAvailable('should process lend limit order message', async () => {
+  it('should process lend limit order message', async () => {
     await natsService.connect();
     
     const nc = natsService.getConnection();
@@ -465,4 +351,3 @@ describe('NatsService Integration (requires NATS server)', () => {
     }
   });
 });
-
