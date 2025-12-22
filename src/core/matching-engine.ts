@@ -9,6 +9,7 @@ import type {
 } from '../types/orders';
 import { OrderSide, OrderStatus, OrderType, isLimitOrder } from '../types/orders';
 import type { Match, MatchResult, OrderBookSnapshot, AffectedOrder } from '../types/matches';
+import type { SettlementPublisher } from '../types/settlement';
 import {
   minBigNumber,
   subtractBigNumbers,
@@ -22,9 +23,14 @@ export class MatchingEngine {
   private orderBook: OrderBook;
   private executionEngine: ExecutionEngine;
 
-  constructor() {
+  /**
+   * Create a new MatchingEngine instance
+   *
+   * @param settlementPublisher - Optional publisher for settlement matches (e.g., Redis)
+   */
+  constructor(settlementPublisher?: SettlementPublisher) {
     this.orderBook = new OrderBook();
-    this.executionEngine = new ExecutionEngine();
+    this.executionEngine = new ExecutionEngine(settlementPublisher);
   }
 
   /**
@@ -116,6 +122,8 @@ export class MatchingEngine {
         const match = this.executionEngine.recordMatch({
           lendOrderId: order.orderId,
           borrowOrderId: borrowOrder.orderId,
+          lenderWallet: order.walletAddress,
+          borrowerWallet: borrowOrder.walletAddress,
           matchedAmount: matchAmount,
           rate: borrowLimitOrder.rate,
           loanToken: order.loanToken,
@@ -210,6 +218,8 @@ export class MatchingEngine {
         const match = this.executionEngine.recordMatch({
           lendOrderId: order.orderId,
           borrowOrderId: borrowOrder.orderId,
+          lenderWallet: order.walletAddress,
+          borrowerWallet: borrowOrder.walletAddress,
           matchedAmount: matchAmount,
           rate: executionRate,
           loanToken: order.loanToken,
@@ -303,6 +313,8 @@ export class MatchingEngine {
         const match = this.executionEngine.recordMatch({
           lendOrderId: lendOrder.orderId,
           borrowOrderId: order.orderId,
+          lenderWallet: lendOrder.walletAddress,
+          borrowerWallet: order.walletAddress,
           matchedAmount: matchAmount,
           rate: lendLimitOrder.rate,
           loanToken: order.loanToken,
@@ -394,6 +406,8 @@ export class MatchingEngine {
         const match = this.executionEngine.recordMatch({
           lendOrderId: lendOrder.orderId,
           borrowOrderId: order.orderId,
+          lenderWallet: lendOrder.walletAddress,
+          borrowerWallet: order.walletAddress,
           matchedAmount: matchAmount,
           rate: executionRate,
           loanToken: order.loanToken,

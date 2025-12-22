@@ -7,6 +7,7 @@
 
 import { MatchingEngine } from '../core/matching-engine';
 import { NatsService } from './nats-service';
+import { RedisService } from './redis-service';
 import * as dotenv from 'dotenv';
 
 // Load environment variables from .env file
@@ -16,6 +17,7 @@ dotenv.config();
  * Service instance references for cleanup
  */
 let natsService: NatsService | null = null;
+let redisService: RedisService | null = null;
 let isShuttingDown = false;
 
 /**
@@ -36,6 +38,11 @@ async function handleShutdown(signal: string): Promise<void> {
     // Disconnect from NATS
     if (natsService) {
       await natsService.disconnect();
+    }
+
+    // Disconnect from Redis
+    if (redisService) {
+      await redisService.disconnect();
     }
 
     console.log('✓ Service shutdown complete');
@@ -72,11 +79,26 @@ async function main(): Promise<void> {
     // Display configuration
     console.log('Configuration:');
     console.log(`  NATS URL: ${process.env.NATS_URL || 'nats://localhost:4222'}`);
+    console.log(`  Redis URL: ${process.env.REDIS_URL || 'redis://localhost:6379'}`);
     console.log(`  Node Environment: ${process.env.NODE_ENV || 'development'}\n`);
 
-    // Initialize matching engine
+    // Initialize Redis service first (optional - continues without it if connection fails)
+    // Redis is used as the settlement publisher for the matching engine
+    console.log('Initializing Redis service...');
+    try {
+      redisService = new RedisService();
+      await redisService.connect();
+      console.log();
+    } catch (redisError) {
+      console.warn('⚠ Redis connection failed, settlement publishing disabled');
+      console.warn(`  Error: ${redisError instanceof Error ? redisError.message : 'Unknown error'}`);
+      console.log();
+      redisService = null;
+    }
+
+    // Initialize matching engine with optional settlement publisher (Redis)
     console.log('Initializing matching engine...');
-    const matchingEngine = new MatchingEngine();
+    const matchingEngine = new MatchingEngine(redisService ?? undefined);
     console.log('✓ Matching engine initialized\n');
 
     // Initialize NATS service
@@ -86,13 +108,31 @@ async function main(): Promise<void> {
     console.log();
 
     // Display service statistics
-    const stats = natsService.getStats();
+    const natsStats = natsService.getStats();
     console.log('Service Status:');
-    console.log(`  Connected: ${stats.connected}`);
-    console.log(`  Active Subscriptions: ${stats.subscriptions}`);
-    console.log(`  NATS Server: ${stats.config.url}`);
-    console.log(`  Authentication: ${stats.config.hasAuth ? 'Enabled' : 'Disabled'}\n`);
+    console.log(`  NATS Connected: ${natsStats.connected}`);
+    console.log(`  Active Subscriptions: ${natsStats.subscriptions}`);
+    console.log(`  NATS Server: ${natsStats.config.url}`);
+    console.log(`  NATS Authentication: ${natsStats.config.hasAuth ? 'Enabled' : 'Disabled'}`);
 
+    // Display Redis status
+    if (redisService) {
+      const redisStats = redisService.getStats();
+      console.log(`  Redis Connected: ${redisStats.connected}`);
+      console.log(`  Redis Server: ${redisStats.config.url}`);
+      console.log(`  Redis Database: ${redisStats.config.db}`);
+
+      // Get stream info
+      const streamInfo = await redisService.getStreamInfo();
+      if (streamInfo) {
+        console.log(`  Settlement Stream Length: ${streamInfo.length}`);
+        console.log(`  Consumer Groups: ${streamInfo.groups}`);
+      }
+    } else {
+      console.log('  Redis: Disabled (settlement publishing disabled)');
+    }
+
+    console.log();
     console.log('=================================');
     console.log('Service is ready to process orders');
     console.log('Press Ctrl+C to stop');

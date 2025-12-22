@@ -8,6 +8,8 @@ export const matchSchema = z.object({
   matchId: z.string().uuid('Match ID must be a valid UUID'),
   lendOrderId: z.string().uuid('Lend order ID must be a valid UUID'),
   borrowOrderId: z.string().uuid('Borrow order ID must be a valid UUID'),
+  lenderWallet: ethereumAddressSchema,
+  borrowerWallet: ethereumAddressSchema,
   matchedAmount: z.string().regex(/^\d+$/, 'Matched amount must be a positive integer string'),
   rate: z
     .number()

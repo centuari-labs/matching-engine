@@ -103,6 +103,8 @@ describe('Message Helpers', () => {
         matchId: '223e4567-e89b-12d3-a456-426614174001',
         lendOrderId: orderId,
         borrowOrderId: '323e4567-e89b-12d3-a456-426614174002',
+        lenderWallet: '0x1111111111111111111111111111111111111111',
+        borrowerWallet: '0x2222222222222222222222222222222222222222',
         matchedAmount: '1000000',
         rate: 500,
         loanToken: '0x1234567890123456789012345678901234567890',

@@ -1,26 +1,44 @@
 import type { Match } from '../types/matches';
 import { matchSchema } from '../types/matches';
+import type { SettlementPublisher } from '../types/settlement';
 import { generateMatchId } from '../utils/helpers';
 
 /**
  * ExecutionEngine handles recording and managing match results
+ *
+ * Matches are temporarily stored in memory, then published to a settlement publisher.
+ * On successful publish, matches are removed from memory to optimize memory usage.
+ * Failed publishes keep the match in memory as a fallback buffer.
  */
 export class ExecutionEngine {
-  // Store all matches by matchId
+  /** Store all matches by matchId (temporary buffer until published) */
   private matches: Map<string, Match>;
 
-  // Index matches by order ID for quick lookups
+  /** Index matches by order ID for quick lookups */
   private matchesByLendOrder: Map<string, string[]>;
   private matchesByBorrowOrder: Map<string, string[]>;
 
-  constructor() {
+  /** Optional publisher for settlement matches */
+  private settlementPublisher?: SettlementPublisher;
+
+  /**
+   * Create a new ExecutionEngine instance
+   *
+   * @param settlementPublisher - Optional publisher for settlement matches
+   */
+  constructor(settlementPublisher?: SettlementPublisher) {
     this.matches = new Map();
     this.matchesByLendOrder = new Map();
     this.matchesByBorrowOrder = new Map();
+    this.settlementPublisher = settlementPublisher;
   }
 
   /**
    * Record a new match
+   *
+   * Stores the match in memory temporarily, then publishes to settlement publisher.
+   * On successful publish, match is removed from memory to optimize memory usage.
+   * On failed publish, match remains in memory as a fallback buffer.
    *
    * @param params - Match parameters
    * @returns The created match
@@ -28,6 +46,8 @@ export class ExecutionEngine {
   recordMatch(params: {
     lendOrderId: string;
     borrowOrderId: string;
+    lenderWallet: string;
+    borrowerWallet: string;
     matchedAmount: string;
     rate: number;
     loanToken: string;
@@ -38,6 +58,8 @@ export class ExecutionEngine {
       matchId: generateMatchId(),
       lendOrderId: params.lendOrderId,
       borrowOrderId: params.borrowOrderId,
+      lenderWallet: params.lenderWallet,
+      borrowerWallet: params.borrowerWallet,
       matchedAmount: params.matchedAmount,
       rate: params.rate,
       loanToken: params.loanToken,
@@ -49,7 +71,7 @@ export class ExecutionEngine {
     // Validate match against schema
     matchSchema.parse(match);
 
-    // Store match
+    // Store match in memory (temporary buffer)
     this.matches.set(match.matchId, match);
 
     // Index by lend order
@@ -64,7 +86,84 @@ export class ExecutionEngine {
     }
     this.matchesByBorrowOrder.get(params.borrowOrderId)!.push(match.matchId);
 
+    // Publish to settlement publisher (async, non-blocking)
+    if (this.settlementPublisher) {
+      this.publishAndCleanup(match);
+    }
+
     return match;
+  }
+
+  /**
+   * Publish match to settlement publisher and remove from memory on success
+   *
+   * This is fire-and-forget (non-blocking). On success, the match is removed
+   * from memory since Redis becomes the source of truth. On failure, the match
+   * remains in memory as a fallback buffer.
+   *
+   * @param match - Match to publish
+   */
+  private publishAndCleanup(match: Match): void {
+    this.settlementPublisher!.publishSettlementMatch(match)
+      .then((messageId) => {
+        if (messageId) {
+          // Success: remove from memory (Redis is source of truth)
+          this.removeMatch(match.matchId);
+        } else {
+          // Failed: keep in memory as fallback
+          console.warn(
+            `Settlement publish returned null for match ${match.matchId}, keeping in memory`
+          );
+        }
+      })
+      .catch((error) => {
+        // Error: keep in memory as fallback
+        console.error(
+          `Failed to publish settlement match ${match.matchId}, keeping in memory:`,
+          error
+        );
+      });
+  }
+
+  /**
+   * Remove a match from memory storage
+   *
+   * @param matchId - ID of the match to remove
+   */
+  private removeMatch(matchId: string): void {
+    const match = this.matches.get(matchId);
+    if (!match) {
+      return;
+    }
+
+    // Remove from main storage
+    this.matches.delete(matchId);
+
+    // Remove from lend order index
+    const lendMatchIds = this.matchesByLendOrder.get(match.lendOrderId);
+    if (lendMatchIds) {
+      const index = lendMatchIds.indexOf(matchId);
+      if (index > -1) {
+        lendMatchIds.splice(index, 1);
+      }
+      // Clean up empty arrays
+      if (lendMatchIds.length === 0) {
+        this.matchesByLendOrder.delete(match.lendOrderId);
+      }
+    }
+
+    // Remove from borrow order index
+    const borrowMatchIds = this.matchesByBorrowOrder.get(match.borrowOrderId);
+    if (borrowMatchIds) {
+      const index = borrowMatchIds.indexOf(matchId);
+      if (index > -1) {
+        borrowMatchIds.splice(index, 1);
+      }
+      // Clean up empty arrays
+      if (borrowMatchIds.length === 0) {
+        this.matchesByBorrowOrder.delete(match.borrowOrderId);
+      }
+    }
   }
 
   /**
