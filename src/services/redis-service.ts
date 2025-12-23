@@ -5,7 +5,7 @@
  * Uses ioredis for full Redis Streams support.
  */
 
-import Redis from 'ioredis';
+import Redis, { type RedisOptions } from 'ioredis';
 import {
   loadRedisConfig,
   REDIS_STREAMS,
@@ -48,7 +48,7 @@ export class RedisService implements SettlementPublisher {
       console.log(`Connecting to Redis at ${this.config.url}...`);
 
       // Parse URL and build options
-      const options: Redis.RedisOptions = {
+      const options: RedisOptions = {
         maxRetriesPerRequest: this.config.maxReconnectAttempts,
         retryStrategy: (times: number) => {
           if (times > this.config.maxReconnectAttempts) {
