@@ -16,6 +16,8 @@ import {
   isZero
 } from '../utils/helpers';
 
+//@todo : need to add snapshot for order book, so if the matching-engine is down we can restore the order book from the snapshot.
+
 /**
  * MatchingEngine is the core component that matches lend and borrow orders
  */
