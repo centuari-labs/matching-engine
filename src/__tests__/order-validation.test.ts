@@ -25,6 +25,7 @@ describe('Order Validation', () => {
         status: OrderStatus.Open,
         originalAmount: '1000000',
         remainingAmount: '1000000',
+        settlementFeeAmount: '10000',
       };
 
       expect(() => lendMarketOrderSchema.parse(order)).not.toThrow();
@@ -42,6 +43,7 @@ describe('Order Validation', () => {
         status: OrderStatus.Open,
         originalAmount: '1000000',
         remainingAmount: '1000000',
+        settlementFeeAmount: '10000',
         rate: 500,
       };
 
@@ -60,6 +62,7 @@ describe('Order Validation', () => {
         status: OrderStatus.Open,
         originalAmount: '1000000',
         remainingAmount: '1000000',
+        settlementFeeAmount: '10000',
       };
 
       expect(() => lendMarketOrderSchema.parse(order)).toThrow();
@@ -77,6 +80,7 @@ describe('Order Validation', () => {
         status: OrderStatus.Open,
         originalAmount: '1000000',
         remainingAmount: '1000000',
+        settlementFeeAmount: '10000',
       };
 
       expect(() => lendMarketOrderSchema.parse(order)).toThrow();
@@ -96,6 +100,7 @@ describe('Order Validation', () => {
         status: OrderStatus.Open,
         originalAmount: '1000000',
         remainingAmount: '1000000',
+        settlementFeeAmount: '10000',
         rate: 500,
       };
 
@@ -114,6 +119,7 @@ describe('Order Validation', () => {
         status: OrderStatus.Open,
         originalAmount: '1000000',
         remainingAmount: '1000000',
+        settlementFeeAmount: '10000',
       };
 
       expect(() => lendLimitOrderSchema.parse(order)).toThrow();
@@ -131,6 +137,7 @@ describe('Order Validation', () => {
         status: OrderStatus.Open,
         originalAmount: '1000000',
         remainingAmount: '1000000',
+        settlementFeeAmount: '10000',
         rate: -100,
       };
 
@@ -149,6 +156,7 @@ describe('Order Validation', () => {
         status: OrderStatus.Open,
         originalAmount: '1000000',
         remainingAmount: '1000000',
+        settlementFeeAmount: '10000',
         rate: 100001,
       };
 
@@ -169,6 +177,7 @@ describe('Order Validation', () => {
         status: OrderStatus.Open,
         originalAmount: '1000000',
         remainingAmount: '1000000',
+        settlementFeeAmount: '10000',
       };
 
       expect(() => borrowMarketOrderSchema.parse(order)).not.toThrow();
@@ -188,6 +197,7 @@ describe('Order Validation', () => {
         status: OrderStatus.Open,
         originalAmount: '1000000',
         remainingAmount: '1000000',
+        settlementFeeAmount: '10000',
         rate: 750,
       };
 
@@ -206,6 +216,7 @@ describe('Order Validation', () => {
         status: OrderStatus.Open,
         originalAmount: '1000000',
         remainingAmount: '1000000',
+        settlementFeeAmount: '10000',
       };
 
       expect(() => borrowLimitOrderSchema.parse(order)).toThrow();

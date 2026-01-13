@@ -52,6 +52,7 @@ const baseOrderSchema = z.object({
   status: z.nativeEnum(OrderStatus).default(OrderStatus.Open),
   originalAmount: z.string().regex(/^\d+$/, 'Amount must be a positive integer string'),
   remainingAmount: z.string().regex(/^\d+$/, 'Amount must be a positive integer string'),
+  settlementFeeAmount: z.string().regex(/^\d+$/, 'Fee amount must be a positive integer string'),
 });
 
 /**

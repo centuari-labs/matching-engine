@@ -29,8 +29,9 @@ describe('Price-Time Priority', () => {
         type: OrderType.Limit,
         status: OrderStatus.Open,
         originalAmount: '100000',
-        remainingAmount: '100000',
-        rate: 600, // Higher rate
+      remainingAmount: '100000',
+      settlementFeeAmount: '10000',
+      rate: 600, // Higher rate
       };
 
       const lendOrder2: LendLimitOrder = {
@@ -43,8 +44,9 @@ describe('Price-Time Priority', () => {
         type: OrderType.Limit,
         status: OrderStatus.Open,
         originalAmount: '100000',
-        remainingAmount: '100000',
-        rate: 400, // Lower rate - should match first
+      remainingAmount: '100000',
+      settlementFeeAmount: '10000',
+      rate: 400, // Lower rate - should match first
       };
 
       const lendOrder3: LendLimitOrder = {
@@ -57,8 +59,9 @@ describe('Price-Time Priority', () => {
         type: OrderType.Limit,
         status: OrderStatus.Open,
         originalAmount: '100000',
-        remainingAmount: '100000',
-        rate: 500, // Middle rate
+      remainingAmount: '100000',
+      settlementFeeAmount: '10000',
+      rate: 500, // Middle rate
       };
 
       engine.submitOrder(lendOrder1);
@@ -76,8 +79,9 @@ describe('Price-Time Priority', () => {
         type: OrderType.Limit,
         status: OrderStatus.Open,
         originalAmount: '250000',
-        remainingAmount: '250000',
-        rate: 700
+      remainingAmount: '250000',
+      settlementFeeAmount: '10000',
+      rate: 700
       };
 
       const result = engine.submitOrder(borrowOrder);
@@ -106,8 +110,9 @@ describe('Price-Time Priority', () => {
         type: OrderType.Limit,
         status: OrderStatus.Open,
         originalAmount: '100000',
-        remainingAmount: '100000',
-        rate: 500 // Lower rate
+      remainingAmount: '100000',
+      settlementFeeAmount: '10000',
+      rate: 500 // Lower rate
       };
 
       const borrowOrder2: BorrowLimitOrder = {
@@ -120,8 +125,9 @@ describe('Price-Time Priority', () => {
         type: OrderType.Limit,
         status: OrderStatus.Open,
         originalAmount: '100000',
-        remainingAmount: '100000',
-        rate: 800 // Higher rate - should match first
+      remainingAmount: '100000',
+      settlementFeeAmount: '10000',
+      rate: 800 // Higher rate - should match first
       };
 
       const borrowOrder3: BorrowLimitOrder = {
@@ -134,8 +140,9 @@ describe('Price-Time Priority', () => {
         type: OrderType.Limit,
         status: OrderStatus.Open,
         originalAmount: '100000',
-        remainingAmount: '100000',
-        rate: 600 // Middle rate
+      remainingAmount: '100000',
+      settlementFeeAmount: '10000',
+      rate: 600 // Middle rate
       };
 
       engine.submitOrder(borrowOrder1);
@@ -153,8 +160,9 @@ describe('Price-Time Priority', () => {
         type: OrderType.Limit,
         status: OrderStatus.Open,
         originalAmount: '250000',
-        remainingAmount: '250000',
-        rate: 400,
+      remainingAmount: '250000',
+      settlementFeeAmount: '10000',
+      rate: 400,
       };
 
       const result = engine.submitOrder(lendOrder);
@@ -188,6 +196,7 @@ describe('Price-Time Priority', () => {
         originalAmount: '100000',
         remainingAmount: '100000',
         rate,
+        settlementFeeAmount: '10000',
       };
 
       const lendOrder2: LendLimitOrder = {
@@ -202,6 +211,7 @@ describe('Price-Time Priority', () => {
         originalAmount: '100000',
         remainingAmount: '100000',
         rate,
+        settlementFeeAmount: '10000',
       };
 
       const lendOrder3: LendLimitOrder = {
@@ -216,6 +226,7 @@ describe('Price-Time Priority', () => {
         originalAmount: '100000',
         remainingAmount: '100000',
         rate,
+        settlementFeeAmount: '10000',
       };
 
       engine.submitOrder(lendOrder1);
@@ -233,8 +244,9 @@ describe('Price-Time Priority', () => {
         type: OrderType.Limit,
         status: OrderStatus.Open,
         originalAmount: '250000',
-        remainingAmount: '250000',
-        rate: 600
+      remainingAmount: '250000',
+      settlementFeeAmount: '10000',
+      rate: 600
       };
 
       const result = engine.submitOrder(borrowOrder);
@@ -263,6 +275,7 @@ describe('Price-Time Priority', () => {
         originalAmount: '1000000',
         remainingAmount: '1000000',
         rate,
+        settlementFeeAmount: '10000',
       };
 
       const lendOrder2: LendLimitOrder = {
@@ -277,6 +290,7 @@ describe('Price-Time Priority', () => {
         originalAmount: '1000000',
         remainingAmount: '1000000',
         rate,
+        settlementFeeAmount: '10000',
       };
 
       engine.submitOrder(lendOrder1);
@@ -294,7 +308,8 @@ describe('Price-Time Priority', () => {
         status: OrderStatus.Open,
         originalAmount: '600000',
         remainingAmount: '600000',
-        rate: 600
+        rate: 600,
+        settlementFeeAmount: '10000',
       };
 
       const result1 = engine.submitOrder(borrowOrder1);
@@ -312,8 +327,9 @@ describe('Price-Time Priority', () => {
         type: OrderType.Limit,
         status: OrderStatus.Open,
         originalAmount: '1000000',
-        remainingAmount: '1000000',
-        rate: 600
+      remainingAmount: '1000000',
+      settlementFeeAmount: '10000',
+      rate: 600
       };
 
       const result2 = engine.submitOrder(borrowOrder2);
@@ -351,6 +367,7 @@ describe('Price-Time Priority', () => {
           originalAmount: amount,
           remainingAmount: amount,
           rate,
+          settlementFeeAmount: '10000',
         };
         orderIds.push(order.orderId);
         engine.submitOrder(order);
@@ -367,8 +384,9 @@ describe('Price-Time Priority', () => {
         type: OrderType.Limit,
         status: OrderStatus.Open,
         originalAmount: '500000',
-        remainingAmount: '500000',
-        rate: 700
+      remainingAmount: '500000',
+      settlementFeeAmount: '10000',
+      rate: 700
       };
 
       const result = engine.submitOrder(borrowOrder);

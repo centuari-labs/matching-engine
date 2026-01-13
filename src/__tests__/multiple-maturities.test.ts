@@ -29,6 +29,7 @@ describe('Multiple Maturities Matching', () => {
       status: OrderStatus.Open,
       originalAmount: '1000000',
       remainingAmount: '1000000',
+      settlementFeeAmount: '10000',
       rate: 500,
     };
 
@@ -46,6 +47,7 @@ describe('Multiple Maturities Matching', () => {
       status: OrderStatus.Open,
       originalAmount: '500000',
       remainingAmount: '500000',
+      settlementFeeAmount: '10000',
       rate: 600
     };
 
@@ -71,6 +73,7 @@ describe('Multiple Maturities Matching', () => {
       status: OrderStatus.Open,
       originalAmount: '300000',
       remainingAmount: '300000',
+      settlementFeeAmount: '10000',
       rate: 500,
     };
 
@@ -85,6 +88,7 @@ describe('Multiple Maturities Matching', () => {
       status: OrderStatus.Open,
       originalAmount: '400000',
       remainingAmount: '400000',
+      settlementFeeAmount: '10000',
       rate: 500,
     };
 
@@ -99,6 +103,7 @@ describe('Multiple Maturities Matching', () => {
       status: OrderStatus.Open,
       originalAmount: '500000',
       remainingAmount: '500000',
+      settlementFeeAmount: '10000',
       rate: 500,
     };
 
@@ -118,6 +123,7 @@ describe('Multiple Maturities Matching', () => {
       status: OrderStatus.Open,
       originalAmount: '1000000',
       remainingAmount: '1000000',
+      settlementFeeAmount: '10000',
       rate: 600
     };
 
@@ -152,6 +158,7 @@ describe('Multiple Maturities Matching', () => {
       status: OrderStatus.Open,
       originalAmount: '1000000',
       remainingAmount: '1000000',
+      settlementFeeAmount: '10000',
       rate: 500,
     };
 
@@ -169,6 +176,7 @@ describe('Multiple Maturities Matching', () => {
       status: OrderStatus.Open,
       originalAmount: '500000',
       remainingAmount: '500000',
+      settlementFeeAmount: '10000',
       rate: 600
     };
 
@@ -192,6 +200,7 @@ describe('Multiple Maturities Matching', () => {
       status: OrderStatus.Open,
       originalAmount: '1000000',
       remainingAmount: '1000000',
+      settlementFeeAmount: '10000',
       rate: 500,
     };
 
@@ -209,6 +218,7 @@ describe('Multiple Maturities Matching', () => {
       status: OrderStatus.Open,
       originalAmount: '500000',
       remainingAmount: '500000',
+      settlementFeeAmount: '10000',
       rate: 600
     };
 
@@ -233,6 +243,7 @@ describe('Multiple Maturities Matching', () => {
       status: OrderStatus.Open,
       originalAmount: '300000',
       remainingAmount: '300000',
+      settlementFeeAmount: '10000',
       rate: 500,
     };
 
@@ -247,6 +258,7 @@ describe('Multiple Maturities Matching', () => {
       status: OrderStatus.Open,
       originalAmount: '400000',
       remainingAmount: '400000',
+      settlementFeeAmount: '10000',
       rate: 500,
     };
 
@@ -265,6 +277,7 @@ describe('Multiple Maturities Matching', () => {
       status: OrderStatus.Open,
       originalAmount: '1000000',
       remainingAmount: '1000000',
+      settlementFeeAmount: '10000',
       rate: 600
     };
 
@@ -288,6 +301,7 @@ describe('Multiple Maturities Matching', () => {
       status: OrderStatus.Open,
       originalAmount: '1000000',
       remainingAmount: '1000000',
+      settlementFeeAmount: '10000',
       rate: 500,
     };
 

@@ -32,8 +32,9 @@ describe('Affected Maker Orders', () => {
         type: OrderType.Limit,
         status: OrderStatus.Open,
         originalAmount: '1000000',
-        remainingAmount: '1000000',
-        rate: 600,
+      remainingAmount: '1000000',
+      settlementFeeAmount: '10000',
+      rate: 600,
       };
 
       engine.submitOrder(borrowOrder);
@@ -49,8 +50,9 @@ describe('Affected Maker Orders', () => {
         type: OrderType.Limit,
         status: OrderStatus.Open,
         originalAmount: '1000000',
-        remainingAmount: '1000000',
-        rate: 500,
+      remainingAmount: '1000000',
+      settlementFeeAmount: '10000',
+      rate: 500,
       };
 
       const result = engine.submitOrder(lendOrder);
@@ -74,8 +76,9 @@ describe('Affected Maker Orders', () => {
         type: OrderType.Limit,
         status: OrderStatus.Open,
         originalAmount: '1000000',
-        remainingAmount: '1000000',
-        rate: 600,
+      remainingAmount: '1000000',
+      settlementFeeAmount: '10000',
+      rate: 600,
       };
 
       engine.submitOrder(borrowOrder);
@@ -91,8 +94,9 @@ describe('Affected Maker Orders', () => {
         type: OrderType.Limit,
         status: OrderStatus.Open,
         originalAmount: '300000',
-        remainingAmount: '300000',
-        rate: 500,
+      remainingAmount: '300000',
+      settlementFeeAmount: '10000',
+      rate: 500,
       };
 
       const result = engine.submitOrder(lendOrder);
@@ -116,8 +120,9 @@ describe('Affected Maker Orders', () => {
         type: OrderType.Limit,
         status: OrderStatus.Open,
         originalAmount: '300000',
-        remainingAmount: '300000',
-        rate: 700,
+      remainingAmount: '300000',
+      settlementFeeAmount: '10000',
+      rate: 700,
       };
 
       const borrowOrder2: BorrowLimitOrder = {
@@ -130,8 +135,9 @@ describe('Affected Maker Orders', () => {
         type: OrderType.Limit,
         status: OrderStatus.Open,
         originalAmount: '400000',
-        remainingAmount: '400000',
-        rate: 600,
+      remainingAmount: '400000',
+      settlementFeeAmount: '10000',
+      rate: 600,
       };
 
       engine.submitOrder(borrowOrder1);
@@ -150,6 +156,7 @@ describe('Affected Maker Orders', () => {
         originalAmount: '700000',
         remainingAmount: '700000',
         rate: 500,
+        settlementFeeAmount: '10000',
       };
 
       const result = engine.submitOrder(lendOrder);
@@ -181,8 +188,9 @@ describe('Affected Maker Orders', () => {
         type: OrderType.Limit,
         status: OrderStatus.Open,
         originalAmount: '1000000',
-        remainingAmount: '1000000',
-        rate: 500,
+      remainingAmount: '1000000',
+      settlementFeeAmount: '10000',
+      rate: 500,
       };
 
       engine.submitOrder(lendOrder);
@@ -198,8 +206,9 @@ describe('Affected Maker Orders', () => {
         type: OrderType.Limit,
         status: OrderStatus.Open,
         originalAmount: '1000000',
-        remainingAmount: '1000000',
-        rate: 600,
+      remainingAmount: '1000000',
+      settlementFeeAmount: '10000',
+      rate: 600,
       };
 
       const result = engine.submitOrder(borrowOrder);
@@ -223,8 +232,9 @@ describe('Affected Maker Orders', () => {
         type: OrderType.Limit,
         status: OrderStatus.Open,
         originalAmount: '1000000',
-        remainingAmount: '1000000',
-        rate: 500,
+      remainingAmount: '1000000',
+      settlementFeeAmount: '10000',
+      rate: 500,
       };
 
       engine.submitOrder(lendOrder);
@@ -240,8 +250,9 @@ describe('Affected Maker Orders', () => {
         type: OrderType.Limit,
         status: OrderStatus.Open,
         originalAmount: '400000',
-        remainingAmount: '400000',
-        rate: 600,
+      remainingAmount: '400000',
+      settlementFeeAmount: '10000',
+      rate: 600,
       };
 
       const result = engine.submitOrder(borrowOrder);
@@ -267,6 +278,7 @@ describe('Affected Maker Orders', () => {
         originalAmount: '200000',
         remainingAmount: '200000',
         rate: 400,
+        settlementFeeAmount: '10000',
       };
 
       const lendOrder2: LendLimitOrder = {
@@ -279,8 +291,9 @@ describe('Affected Maker Orders', () => {
         type: OrderType.Limit,
         status: OrderStatus.Open,
         originalAmount: '300000',
-        remainingAmount: '300000',
-        rate: 500,
+      remainingAmount: '300000',
+      settlementFeeAmount: '10000',
+      rate: 500,
       };
 
       engine.submitOrder(lendOrder1);
@@ -297,8 +310,9 @@ describe('Affected Maker Orders', () => {
         type: OrderType.Limit,
         status: OrderStatus.Open,
         originalAmount: '500000',
-        remainingAmount: '500000',
-        rate: 600,
+      remainingAmount: '500000',
+      settlementFeeAmount: '10000',
+      rate: 600,
       };
 
       const result = engine.submitOrder(borrowOrder);
@@ -330,8 +344,9 @@ describe('Affected Maker Orders', () => {
         type: OrderType.Limit,
         status: OrderStatus.Open,
         originalAmount: '500000',
-        remainingAmount: '500000',
-        rate: 800,
+      remainingAmount: '500000',
+      settlementFeeAmount: '10000',
+      rate: 800,
       };
 
       const borrowOrder2: BorrowLimitOrder = {
@@ -344,8 +359,9 @@ describe('Affected Maker Orders', () => {
         type: OrderType.Limit,
         status: OrderStatus.Open,
         originalAmount: '500000',
-        remainingAmount: '500000',
-        rate: 600,
+      remainingAmount: '500000',
+      settlementFeeAmount: '10000',
+      rate: 600,
       };
 
       engine.submitOrder(borrowOrder1);
@@ -363,6 +379,7 @@ describe('Affected Maker Orders', () => {
         status: OrderStatus.Open,
         originalAmount: '1000000',
         remainingAmount: '1000000',
+      settlementFeeAmount: '10000',
       };
 
       const result = engine.submitOrder(lendMarket);
@@ -387,8 +404,9 @@ describe('Affected Maker Orders', () => {
         type: OrderType.Limit,
         status: OrderStatus.Open,
         originalAmount: '400000',
-        remainingAmount: '400000',
-        rate: 400,
+      remainingAmount: '400000',
+      settlementFeeAmount: '10000',
+      rate: 400,
       };
 
       const lendOrder2: LendLimitOrder = {
@@ -403,6 +421,7 @@ describe('Affected Maker Orders', () => {
         originalAmount: '600000',
         remainingAmount: '600000',
         rate: 500,
+        settlementFeeAmount: '10000',
       };
 
       engine.submitOrder(lendOrder1);
@@ -420,6 +439,7 @@ describe('Affected Maker Orders', () => {
         status: OrderStatus.Open,
         originalAmount: '1000000',
         remainingAmount: '1000000',
+      settlementFeeAmount: '10000',
       };
 
       const result = engine.submitOrder(borrowMarket);
@@ -446,8 +466,9 @@ describe('Affected Maker Orders', () => {
         type: OrderType.Limit,
         status: OrderStatus.Open,
         originalAmount: '1000000',
-        remainingAmount: '1000000',
-        rate: 800, // High rate
+      remainingAmount: '1000000',
+      settlementFeeAmount: '10000',
+      rate: 800, // High rate
       };
 
       // Create borrow order with rate too low to match
@@ -461,8 +482,9 @@ describe('Affected Maker Orders', () => {
         type: OrderType.Limit,
         status: OrderStatus.Open,
         originalAmount: '1000000',
-        remainingAmount: '1000000',
-        rate: 500, // Too low to match
+      remainingAmount: '1000000',
+      settlementFeeAmount: '10000',
+      rate: 500, // Too low to match
       };
 
       engine.submitOrder(lendOrder);
@@ -483,8 +505,9 @@ describe('Affected Maker Orders', () => {
         type: OrderType.Limit,
         status: OrderStatus.Open,
         originalAmount: '1000000',
-        remainingAmount: '1000000',
-        rate: 500,
+      remainingAmount: '1000000',
+      settlementFeeAmount: '10000',
+      rate: 500,
       };
 
       const result = engine.submitOrder(lendOrder);
@@ -505,6 +528,7 @@ describe('Affected Maker Orders', () => {
         status: OrderStatus.Open,
         originalAmount: '1000000',
         remainingAmount: '1000000',
+      settlementFeeAmount: '10000',
       };
 
       const result = engine.submitOrder(lendMarket);
@@ -527,8 +551,9 @@ describe('Affected Maker Orders', () => {
         type: OrderType.Limit,
         status: OrderStatus.Open,
         originalAmount: '300000',
-        remainingAmount: '300000',
-        rate: 400,
+      remainingAmount: '300000',
+      settlementFeeAmount: '10000',
+      rate: 400,
       };
 
       const lendOrder2: LendLimitOrder = {
@@ -541,8 +566,9 @@ describe('Affected Maker Orders', () => {
         type: OrderType.Limit,
         status: OrderStatus.Open,
         originalAmount: '500000',
-        remainingAmount: '500000',
-        rate: 500,
+      remainingAmount: '500000',
+      settlementFeeAmount: '10000',
+      rate: 500,
       };
 
       engine.submitOrder(lendOrder1);
@@ -559,8 +585,9 @@ describe('Affected Maker Orders', () => {
         type: OrderType.Limit,
         status: OrderStatus.Open,
         originalAmount: '500000',
-        remainingAmount: '500000',
-        rate: 600,
+      remainingAmount: '500000',
+      settlementFeeAmount: '10000',
+      rate: 600,
       };
 
       const result = engine.submitOrder(borrowOrder);

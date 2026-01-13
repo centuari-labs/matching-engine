@@ -53,6 +53,8 @@ export class ExecutionEngine {
     loanToken: string;
     maturity: number;
     borrowerIsTaker: boolean;
+    // settlementFeeAmount: string;
+    // makerTakerFeeAmount: string;
   }): Match {
     const match: Match = {
       matchId: generateMatchId(),

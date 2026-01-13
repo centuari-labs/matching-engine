@@ -67,6 +67,7 @@ describe('Order Status Publishing', () => {
         status: OrderStatus.Open,
         originalAmount: '1000000',
         remainingAmount: '1000000',
+        settlementFeeAmount: '10000',
         rate: 600,
       };
       engine.submitOrder(borrowOrder);
@@ -83,6 +84,7 @@ describe('Order Status Publishing', () => {
         status: OrderStatus.Open,
         originalAmount: '1000000',
         remainingAmount: '1000000',
+        settlementFeeAmount: '10000',
         rate: 500,
       };
 
@@ -117,6 +119,7 @@ describe('Order Status Publishing', () => {
         status: OrderStatus.Open,
         originalAmount: '300000',
         remainingAmount: '300000',
+        settlementFeeAmount: '10000',
         rate: 600,
       };
       engine.submitOrder(borrowOrder);
@@ -133,6 +136,7 @@ describe('Order Status Publishing', () => {
         status: OrderStatus.Open,
         originalAmount: '1000000',
         remainingAmount: '1000000',
+        settlementFeeAmount: '10000',
         rate: 500,
       };
 
@@ -166,6 +170,7 @@ describe('Order Status Publishing', () => {
         status: OrderStatus.Open,
         originalAmount: '1000000',
         remainingAmount: '1000000',
+        settlementFeeAmount: '10000',
         rate: 500,
       };
 
@@ -196,6 +201,7 @@ describe('Order Status Publishing', () => {
         status: OrderStatus.Open,
         originalAmount: '1000000',
         remainingAmount: '1000000',
+        settlementFeeAmount: '10000',
         rate: 500,
       };
       engine.submitOrder(lendOrder);
@@ -212,6 +218,7 @@ describe('Order Status Publishing', () => {
         status: OrderStatus.Open,
         originalAmount: '1000000',
         remainingAmount: '1000000',
+        settlementFeeAmount: '10000',
         rate: 600,
       };
 
@@ -245,6 +252,7 @@ describe('Order Status Publishing', () => {
         status: OrderStatus.Open,
         originalAmount: '1000000',
         remainingAmount: '1000000',
+        settlementFeeAmount: '10000',
         rate: 500,
       };
       engine.submitOrder(lendOrder);
@@ -261,6 +269,7 @@ describe('Order Status Publishing', () => {
         status: OrderStatus.Open,
         originalAmount: '400000',
         remainingAmount: '400000',
+        settlementFeeAmount: '10000',
         rate: 600,
       };
 
@@ -294,6 +303,7 @@ describe('Order Status Publishing', () => {
         status: OrderStatus.Open,
         originalAmount: '300000',
         remainingAmount: '300000',
+        settlementFeeAmount: '10000',
         rate: 400,
       };
 
@@ -308,6 +318,7 @@ describe('Order Status Publishing', () => {
         status: OrderStatus.Open,
         originalAmount: '400000',
         remainingAmount: '400000',
+        settlementFeeAmount: '10000',
         rate: 500,
       };
 
@@ -326,6 +337,7 @@ describe('Order Status Publishing', () => {
         status: OrderStatus.Open,
         originalAmount: '700000',
         remainingAmount: '700000',
+        settlementFeeAmount: '10000',
         rate: 600,
       };
 
@@ -370,6 +382,7 @@ describe('Order Status Publishing', () => {
         status: OrderStatus.Open,
         originalAmount: '1000000',
         remainingAmount: '1000000',
+        settlementFeeAmount: '10000',
         rate: 600,
       };
       engine.submitOrder(borrowOrder);
@@ -386,6 +399,7 @@ describe('Order Status Publishing', () => {
         status: OrderStatus.Open,
         originalAmount: '1000000',
         remainingAmount: '1000000',
+        settlementFeeAmount: '10000',
       };
 
       handleLendMarketOrder(ctx, createOrderBytes(lendMarketOrder));
@@ -416,6 +430,7 @@ describe('Order Status Publishing', () => {
         status: OrderStatus.Open,
         originalAmount: '500000',
         remainingAmount: '500000',
+        settlementFeeAmount: '10000',
         rate: 500,
       };
       engine.submitOrder(lendOrder);
@@ -432,6 +447,7 @@ describe('Order Status Publishing', () => {
         status: OrderStatus.Open,
         originalAmount: '500000',
         remainingAmount: '500000',
+        settlementFeeAmount: '10000',
       };
 
       handleBorrowMarketOrder(ctx, createOrderBytes(borrowMarketOrder));
@@ -464,6 +480,7 @@ describe('Order Status Publishing', () => {
         status: OrderStatus.Open,
         originalAmount: '1000000',
         remainingAmount: '1000000',
+        settlementFeeAmount: '10000',
         rate: 500,
       };
       engine.submitOrder(lendOrder);
@@ -480,6 +497,7 @@ describe('Order Status Publishing', () => {
         status: OrderStatus.Open,
         originalAmount: '1000000',
         remainingAmount: '1000000',
+        settlementFeeAmount: '10000',
         rate: 600,
       };
 

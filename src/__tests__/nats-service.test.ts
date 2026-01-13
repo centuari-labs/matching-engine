@@ -332,6 +332,7 @@ describe('NatsService Integration (requires NATS server)', () => {
         type: OrderType.Limit,
         originalAmount: '1000000',
         remainingAmount: '1000000',
+        settlementFeeAmount: '10000',
         status: OrderStatus.Open,
         rate: 500,
       };

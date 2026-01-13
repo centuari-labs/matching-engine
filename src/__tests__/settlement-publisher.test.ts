@@ -330,6 +330,7 @@ describe('SettlementPublisher Integration', () => {
         originalAmount: '1000000',
         remainingAmount: '1000000',
         rate: 500,
+        settlementFeeAmount: '10000',
       };
 
       // Create borrow limit order that will match
@@ -345,6 +346,7 @@ describe('SettlementPublisher Integration', () => {
         originalAmount: '1000000',
         remainingAmount: '1000000',
         rate: 600,
+        settlementFeeAmount: '10000',
       };
 
       // Submit lend order first (becomes maker)
@@ -380,6 +382,7 @@ describe('SettlementPublisher Integration', () => {
         originalAmount: '2000000',
         remainingAmount: '2000000',
         rate: 500,
+        settlementFeeAmount: '10000',
       };
 
       // Create borrow order for 1000000 (partial match)
@@ -395,6 +398,7 @@ describe('SettlementPublisher Integration', () => {
         originalAmount: '1000000',
         remainingAmount: '1000000',
         rate: 600,
+        settlementFeeAmount: '10000',
       };
 
       matchingEngine.submitOrder(lendOrder);
@@ -428,6 +432,7 @@ describe('SettlementPublisher Integration', () => {
         originalAmount: '1000000',
         remainingAmount: '1000000',
         rate: 500,
+        settlementFeeAmount: '10000',
       };
 
       const borrowOrder: BorrowLimitOrder = {
@@ -442,6 +447,7 @@ describe('SettlementPublisher Integration', () => {
         originalAmount: '1000000',
         remainingAmount: '1000000',
         rate: 600,
+        settlementFeeAmount: '10000',
       };
 
       matchingEngine.submitOrder(lendOrder);

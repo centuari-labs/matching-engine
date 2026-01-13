@@ -42,8 +42,9 @@ describe('BorrowerIsTaker Field', () => {
         type: OrderType.Limit,
         status: OrderStatus.Open,
         originalAmount: '1000000',
-        remainingAmount: '1000000',
-        rate: 600,
+      remainingAmount: '1000000',
+      settlementFeeAmount: '10000',
+      rate: 600,
       };
 
       engine.submitOrder(borrowOrder);
@@ -60,6 +61,7 @@ describe('BorrowerIsTaker Field', () => {
         status: OrderStatus.Open,
         originalAmount: '1000000',
         remainingAmount: '1000000',
+      settlementFeeAmount: '10000',
       };
 
       const result = engine.submitOrder(lendMarket);
@@ -82,8 +84,9 @@ describe('BorrowerIsTaker Field', () => {
         type: OrderType.Limit,
         status: OrderStatus.Open,
         originalAmount: '500000',
-        remainingAmount: '500000',
-        rate: 800,
+      remainingAmount: '500000',
+      settlementFeeAmount: '10000',
+      rate: 800,
       };
 
       const borrowOrder2: BorrowLimitOrder = {
@@ -96,8 +99,9 @@ describe('BorrowerIsTaker Field', () => {
         type: OrderType.Limit,
         status: OrderStatus.Open,
         originalAmount: '500000',
-        remainingAmount: '500000',
-        rate: 600,
+      remainingAmount: '500000',
+      settlementFeeAmount: '10000',
+      rate: 600,
       };
 
       engine.submitOrder(borrowOrder1);
@@ -115,6 +119,7 @@ describe('BorrowerIsTaker Field', () => {
         status: OrderStatus.Open,
         originalAmount: '1000000',
         remainingAmount: '1000000',
+      settlementFeeAmount: '10000',
       };
 
       const result = engine.submitOrder(lendMarket);
@@ -138,8 +143,9 @@ describe('BorrowerIsTaker Field', () => {
         type: OrderType.Limit,
         status: OrderStatus.Open,
         originalAmount: '1000000',
-        remainingAmount: '1000000',
-        rate: 600,
+      remainingAmount: '1000000',
+      settlementFeeAmount: '10000',
+      rate: 600,
       };
 
       engine.submitOrder(borrowOrder);
@@ -155,8 +161,9 @@ describe('BorrowerIsTaker Field', () => {
         type: OrderType.Limit,
         status: OrderStatus.Open,
         originalAmount: '1000000',
-        remainingAmount: '1000000',
-        rate: 500, // Lender wants 500 bps, borrower willing to pay 600 bps - matches
+      remainingAmount: '1000000',
+      settlementFeeAmount: '10000',
+      rate: 500, // Lender wants 500 bps, borrower willing to pay 600 bps - matches
       };
 
       const result = engine.submitOrder(lendOrder);
@@ -179,8 +186,9 @@ describe('BorrowerIsTaker Field', () => {
         type: OrderType.Limit,
         status: OrderStatus.Open,
         originalAmount: '500000',
-        remainingAmount: '500000',
-        rate: 700,
+      remainingAmount: '500000',
+      settlementFeeAmount: '10000',
+      rate: 700,
       };
 
       const borrowOrder2: BorrowLimitOrder = {
@@ -193,8 +201,9 @@ describe('BorrowerIsTaker Field', () => {
         type: OrderType.Limit,
         status: OrderStatus.Open,
         originalAmount: '500000',
-        remainingAmount: '500000',
-        rate: 600,
+      remainingAmount: '500000',
+      settlementFeeAmount: '10000',
+      rate: 600,
       };
 
       engine.submitOrder(borrowOrder1);
@@ -211,8 +220,9 @@ describe('BorrowerIsTaker Field', () => {
         type: OrderType.Limit,
         status: OrderStatus.Open,
         originalAmount: '1000000',
-        remainingAmount: '1000000',
-        rate: 500,
+      remainingAmount: '1000000',
+      settlementFeeAmount: '10000',
+      rate: 500,
       };
 
       const result = engine.submitOrder(lendOrder);
@@ -236,8 +246,9 @@ describe('BorrowerIsTaker Field', () => {
         type: OrderType.Limit,
         status: OrderStatus.Open,
         originalAmount: '1000000',
-        remainingAmount: '1000000',
-        rate: 500,
+      remainingAmount: '1000000',
+      settlementFeeAmount: '10000',
+      rate: 500,
       };
 
       engine.submitOrder(lendOrder);
@@ -254,6 +265,7 @@ describe('BorrowerIsTaker Field', () => {
         status: OrderStatus.Open,
         originalAmount: '1000000',
         remainingAmount: '1000000',
+      settlementFeeAmount: '10000',
       };
 
       const result = engine.submitOrder(borrowMarket);
@@ -276,8 +288,9 @@ describe('BorrowerIsTaker Field', () => {
         type: OrderType.Limit,
         status: OrderStatus.Open,
         originalAmount: '500000',
-        remainingAmount: '500000',
-        rate: 400,
+      remainingAmount: '500000',
+      settlementFeeAmount: '10000',
+      rate: 400,
       };
 
       const lendOrder2: LendLimitOrder = {
@@ -290,8 +303,9 @@ describe('BorrowerIsTaker Field', () => {
         type: OrderType.Limit,
         status: OrderStatus.Open,
         originalAmount: '500000',
-        remainingAmount: '500000',
-        rate: 600,
+      remainingAmount: '500000',
+      settlementFeeAmount: '10000',
+      rate: 600,
       };
 
       engine.submitOrder(lendOrder1);
@@ -309,6 +323,7 @@ describe('BorrowerIsTaker Field', () => {
         status: OrderStatus.Open,
         originalAmount: '1000000',
         remainingAmount: '1000000',
+      settlementFeeAmount: '10000',
       };
 
       const result = engine.submitOrder(borrowMarket);
@@ -332,8 +347,9 @@ describe('BorrowerIsTaker Field', () => {
         type: OrderType.Limit,
         status: OrderStatus.Open,
         originalAmount: '1000000',
-        remainingAmount: '1000000',
-        rate: 500,
+      remainingAmount: '1000000',
+      settlementFeeAmount: '10000',
+      rate: 500,
       };
 
       engine.submitOrder(lendOrder);
@@ -349,8 +365,9 @@ describe('BorrowerIsTaker Field', () => {
         type: OrderType.Limit,
         status: OrderStatus.Open,
         originalAmount: '1000000',
-        remainingAmount: '1000000',
-        rate: 600, // Borrower willing to pay 600 bps, lender wants 500 bps - matches
+      remainingAmount: '1000000',
+      settlementFeeAmount: '10000',
+      rate: 600, // Borrower willing to pay 600 bps, lender wants 500 bps - matches
       };
 
       const result = engine.submitOrder(borrowOrder);
@@ -373,8 +390,9 @@ describe('BorrowerIsTaker Field', () => {
         type: OrderType.Limit,
         status: OrderStatus.Open,
         originalAmount: '500000',
-        remainingAmount: '500000',
-        rate: 400,
+      remainingAmount: '500000',
+      settlementFeeAmount: '10000',
+      rate: 400,
       };
 
       const lendOrder2: LendLimitOrder = {
@@ -387,8 +405,9 @@ describe('BorrowerIsTaker Field', () => {
         type: OrderType.Limit,
         status: OrderStatus.Open,
         originalAmount: '500000',
-        remainingAmount: '500000',
-        rate: 500,
+      remainingAmount: '500000',
+      settlementFeeAmount: '10000',
+      rate: 500,
       };
 
       engine.submitOrder(lendOrder1);
@@ -405,8 +424,9 @@ describe('BorrowerIsTaker Field', () => {
         type: OrderType.Limit,
         status: OrderStatus.Open,
         originalAmount: '1000000',
-        remainingAmount: '1000000',
-        rate: 600,
+      remainingAmount: '1000000',
+      settlementFeeAmount: '10000',
+      rate: 600,
       };
 
       const result = engine.submitOrder(borrowOrder);
@@ -430,8 +450,9 @@ describe('BorrowerIsTaker Field', () => {
         type: OrderType.Limit,
         status: OrderStatus.Open,
         originalAmount: '1000000',
-        remainingAmount: '1000000',
-        rate: 500,
+      remainingAmount: '1000000',
+      settlementFeeAmount: '10000',
+      rate: 500,
       };
 
       engine.submitOrder(lendOrder);
@@ -447,8 +468,9 @@ describe('BorrowerIsTaker Field', () => {
         type: OrderType.Limit,
         status: OrderStatus.Open,
         originalAmount: '1000000',
-        remainingAmount: '1000000',
-        rate: 500, // Exactly at lend rate - matches instantly
+      remainingAmount: '1000000',
+      settlementFeeAmount: '10000',
+      rate: 500, // Exactly at lend rate - matches instantly
       };
 
       const result = engine.submitOrder(borrowOrder);
@@ -470,8 +492,9 @@ describe('BorrowerIsTaker Field', () => {
         type: OrderType.Limit,
         status: OrderStatus.Open,
         originalAmount: '1000000',
-        remainingAmount: '1000000',
-        rate: 500,
+      remainingAmount: '1000000',
+      settlementFeeAmount: '10000',
+      rate: 500,
       };
 
       engine.submitOrder(lendOrder);
@@ -489,6 +512,7 @@ describe('BorrowerIsTaker Field', () => {
         originalAmount: '400000',
         remainingAmount: '400000',
         rate: 600,
+        settlementFeeAmount: '10000',
       };
 
       const result1 = engine.submitOrder(borrowOrder1);
@@ -508,6 +532,7 @@ describe('BorrowerIsTaker Field', () => {
         originalAmount: '600000',
         remainingAmount: '600000',
         rate: 600,
+        settlementFeeAmount: '10000',
       };
 
       const result2 = engine.submitOrder(borrowOrder2);
@@ -530,8 +555,9 @@ describe('BorrowerIsTaker Field', () => {
         type: OrderType.Limit,
         status: OrderStatus.Open,
         originalAmount: '500000',
-        remainingAmount: '500000',
-        rate: 500,
+      remainingAmount: '500000',
+      settlementFeeAmount: '10000',
+      rate: 500,
       };
 
       const lendOrder2: LendLimitOrder = {
@@ -544,8 +570,9 @@ describe('BorrowerIsTaker Field', () => {
         type: OrderType.Limit,
         status: OrderStatus.Open,
         originalAmount: '500000',
-        remainingAmount: '500000',
-        rate: 600,
+      remainingAmount: '500000',
+      settlementFeeAmount: '10000',
+      rate: 600,
       };
 
       engine.submitOrder(lendOrder1);
@@ -563,6 +590,7 @@ describe('BorrowerIsTaker Field', () => {
         status: OrderStatus.Open,
         originalAmount: '1000000',
         remainingAmount: '1000000',
+      settlementFeeAmount: '10000',
       };
 
       const result = engine.submitOrder(borrowMarket);

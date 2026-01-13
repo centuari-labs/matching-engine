@@ -27,6 +27,7 @@ describe('Partial Fills', () => {
       status: OrderStatus.Open,
       originalAmount: '300000',
       remainingAmount: '300000',
+      settlementFeeAmount: '10000',
       rate: 500,
     };
 
@@ -41,6 +42,7 @@ describe('Partial Fills', () => {
       status: OrderStatus.Open,
       originalAmount: '200000',
       remainingAmount: '200000',
+      settlementFeeAmount: '10000',
       rate: 500,
     };
 
@@ -55,6 +57,7 @@ describe('Partial Fills', () => {
       status: OrderStatus.Open,
       originalAmount: '400000',
       remainingAmount: '400000',
+      settlementFeeAmount: '10000',
       rate: 500,
     };
 
@@ -74,6 +77,7 @@ describe('Partial Fills', () => {
       status: OrderStatus.Open,
       originalAmount: '1000000',
       remainingAmount: '1000000',
+      settlementFeeAmount: '10000',
       rate: 600
     };
 
@@ -103,6 +107,7 @@ describe('Partial Fills', () => {
       status: OrderStatus.Open,
       originalAmount: '5000000',
       remainingAmount: '5000000',
+      settlementFeeAmount: '10000',
       rate: 500,
     };
 
@@ -120,6 +125,7 @@ describe('Partial Fills', () => {
       status: OrderStatus.Open,
       originalAmount: '1000000',
       remainingAmount: '1000000',
+      settlementFeeAmount: '10000',
       rate: 600
     };
 
@@ -150,6 +156,7 @@ describe('Partial Fills', () => {
       originalAmount: '1000000',
       remainingAmount: '1000000',
       rate: 500,
+      settlementFeeAmount: '10000',
     };
 
     engine.submitOrder(lendOrder);
@@ -166,6 +173,7 @@ describe('Partial Fills', () => {
       status: OrderStatus.Open,
       originalAmount: '300000',
       remainingAmount: '300000',
+      settlementFeeAmount: '10000',
       rate: 600
     };
 
@@ -185,6 +193,7 @@ describe('Partial Fills', () => {
       status: OrderStatus.Open,
       originalAmount: '400000',
       remainingAmount: '400000',
+      settlementFeeAmount: '10000',
       rate: 600
     };
 
@@ -204,6 +213,7 @@ describe('Partial Fills', () => {
       status: OrderStatus.Open,
       originalAmount: '300000',
       remainingAmount: '300000',
+      settlementFeeAmount: '10000',
       rate: 600
     };
 
@@ -240,6 +250,7 @@ describe('Partial Fills', () => {
       status: OrderStatus.Open,
       originalAmount: amount,
       remainingAmount: amount,
+      settlementFeeAmount: '10000',
       rate: 500,
     };
 
@@ -254,6 +265,7 @@ describe('Partial Fills', () => {
       status: OrderStatus.Open,
       originalAmount: amount,
       remainingAmount: amount,
+      settlementFeeAmount: '10000',
       rate: 600
     };
 
@@ -284,6 +296,7 @@ describe('Partial Fills', () => {
       status: OrderStatus.Open,
       originalAmount: largeAmount,
       remainingAmount: largeAmount,
+      settlementFeeAmount: '10000',
       rate: 500,
     };
 
@@ -298,6 +311,7 @@ describe('Partial Fills', () => {
       status: OrderStatus.Open,
       originalAmount: '1000',
       remainingAmount: '1000',
+      settlementFeeAmount: '10000',
       rate: 600
     };
 

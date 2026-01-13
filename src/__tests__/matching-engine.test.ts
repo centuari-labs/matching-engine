@@ -28,6 +28,7 @@ describe('MatchingEngine', () => {
         status: OrderStatus.Open,
         originalAmount: '1000000',
         remainingAmount: '1000000',
+        settlementFeeAmount: '10000',
         rate: 500,
       };
 
@@ -43,6 +44,7 @@ describe('MatchingEngine', () => {
         status: OrderStatus.Open,
         originalAmount: '1000000',
         remainingAmount: '1000000',
+        settlementFeeAmount: '10000',
         rate: 600,
       };
 
@@ -72,6 +74,7 @@ describe('MatchingEngine', () => {
         status: OrderStatus.Open,
         originalAmount: '1000000',
         remainingAmount: '1000000',
+        settlementFeeAmount: '10000',
         rate: 800,
       };
 
@@ -87,6 +90,7 @@ describe('MatchingEngine', () => {
         status: OrderStatus.Open,
         originalAmount: '1000000',
         remainingAmount: '1000000',
+        settlementFeeAmount: '10000',
         rate: 600,
       };
 
@@ -111,6 +115,7 @@ describe('MatchingEngine', () => {
         status: OrderStatus.Open,
         originalAmount: '1000000',
         remainingAmount: '1000000',
+        settlementFeeAmount: '10000',
         rate,
       };
 
@@ -125,6 +130,7 @@ describe('MatchingEngine', () => {
         status: OrderStatus.Open,
         originalAmount: '1000000',
         remainingAmount: '1000000',
+        settlementFeeAmount: '10000',
         rate,
       };
 
@@ -150,6 +156,7 @@ describe('MatchingEngine', () => {
         status: OrderStatus.Open,
         originalAmount: '1000000',
         remainingAmount: '1000000',
+        settlementFeeAmount: '10000',
         rate: 700,
       };
 
@@ -165,6 +172,7 @@ describe('MatchingEngine', () => {
         status: OrderStatus.Open,
         originalAmount: '1000000',
         remainingAmount: '1000000',
+        settlementFeeAmount: '10000',
         rate: 500,
       };
 
@@ -193,6 +201,7 @@ describe('MatchingEngine', () => {
         status: OrderStatus.Open,
         originalAmount: '500000',
         remainingAmount: '500000',
+        settlementFeeAmount: '10000',
         rate: 600,
       };
 
@@ -207,6 +216,7 @@ describe('MatchingEngine', () => {
         status: OrderStatus.Open,
         originalAmount: '500000',
         remainingAmount: '500000',
+        settlementFeeAmount: '10000',
         rate: 800, // Higher rate - better for lender
       };
 
@@ -225,6 +235,7 @@ describe('MatchingEngine', () => {
         status: OrderStatus.Open,
         originalAmount: '1000000',
         remainingAmount: '1000000',
+        settlementFeeAmount: '10000',
       };
 
       const result = engine.submitOrder(lendMarket);
@@ -249,6 +260,7 @@ describe('MatchingEngine', () => {
         status: OrderStatus.Open,
         originalAmount: '500000',
         remainingAmount: '500000',
+        settlementFeeAmount: '10000',
         rate: 400, // Lower rate - better for borrower
       };
 
@@ -263,6 +275,7 @@ describe('MatchingEngine', () => {
         status: OrderStatus.Open,
         originalAmount: '500000',
         remainingAmount: '500000',
+        settlementFeeAmount: '10000',
         rate: 600,
       };
 
@@ -281,6 +294,7 @@ describe('MatchingEngine', () => {
         status: OrderStatus.Open,
         originalAmount: '1000000',
         remainingAmount: '1000000',
+        settlementFeeAmount: '10000',
       };
 
       const result = engine.submitOrder(borrowMarket);
@@ -305,6 +319,7 @@ describe('MatchingEngine', () => {
         status: OrderStatus.Open,
         originalAmount: '1000000',
         remainingAmount: '1000000',
+        settlementFeeAmount: '10000',
         rate: 500,
       };
 
@@ -332,6 +347,7 @@ describe('MatchingEngine', () => {
         status: OrderStatus.Open,
         originalAmount: '1000000',
         remainingAmount: '1000000',
+        settlementFeeAmount: '10000',
         rate: 500,
       };
 
@@ -357,6 +373,7 @@ describe('MatchingEngine', () => {
         status: OrderStatus.Open,
         originalAmount: '1000000',
         remainingAmount: '1000000',
+        settlementFeeAmount: '10000',
         rate: 500,
       };
 
@@ -371,6 +388,7 @@ describe('MatchingEngine', () => {
         status: OrderStatus.Open,
         originalAmount: '2000000',
         remainingAmount: '2000000',
+        settlementFeeAmount: '10000',
         rate: 300
       };
 
@@ -399,6 +417,7 @@ describe('MatchingEngine', () => {
         status: OrderStatus.Open,
         originalAmount: '1000000',
         remainingAmount: '1000000',
+        settlementFeeAmount: '10000',
       };
 
       const result = engine.submitOrder(lendMarket);
@@ -421,6 +440,7 @@ describe('MatchingEngine', () => {
         status: OrderStatus.Open,
         originalAmount: '1000000',
         remainingAmount: '1000000',
+        settlementFeeAmount: '10000',
       };
 
       const result = engine.submitOrder(borrowMarket);
@@ -444,6 +464,7 @@ describe('MatchingEngine', () => {
         status: OrderStatus.Open,
         originalAmount: '500000',
         remainingAmount: '500000',
+        settlementFeeAmount: '10000',
         rate: 600,
       };
 
@@ -461,6 +482,7 @@ describe('MatchingEngine', () => {
         status: OrderStatus.Open,
         originalAmount: '1000000',
         remainingAmount: '1000000',
+        settlementFeeAmount: '10000',
       };
 
       const result = engine.submitOrder(lendMarket);
@@ -485,6 +507,7 @@ describe('MatchingEngine', () => {
         status: OrderStatus.Open,
         originalAmount: '500000',
         remainingAmount: '500000',
+        settlementFeeAmount: '10000',
         rate: 400,
       };
 
@@ -501,7 +524,8 @@ describe('MatchingEngine', () => {
         type: OrderType.Market,
         status: OrderStatus.Open,
         originalAmount: '1000000',
-        remainingAmount: '1000000'
+        remainingAmount: '1000000',
+        settlementFeeAmount: '10000',
       };
 
       const result = engine.submitOrder(borrowMarket);
@@ -527,6 +551,7 @@ describe('MatchingEngine', () => {
         status: OrderStatus.Open,
         originalAmount: '1000000',
         remainingAmount: '1000000',
+        settlementFeeAmount: '10000',
         rate: 500,
       };
 
@@ -544,6 +569,7 @@ describe('MatchingEngine', () => {
         status: OrderStatus.Open,
         originalAmount: '300000',
         remainingAmount: '300000',
+        settlementFeeAmount: '10000',
         rate: 600,
       };
 
@@ -573,6 +599,7 @@ describe('MatchingEngine', () => {
         status: OrderStatus.Open,
         originalAmount: '1000000',
         remainingAmount: '1000000',
+        settlementFeeAmount: '10000',
         rate: 500,
       };
 
@@ -590,6 +617,7 @@ describe('MatchingEngine', () => {
         status: OrderStatus.Open,
         originalAmount: '300000',
         remainingAmount: '300000',
+        settlementFeeAmount: '10000',
         rate: 600,
       };
 
@@ -609,6 +637,7 @@ describe('MatchingEngine', () => {
         status: OrderStatus.Open,
         originalAmount: '400000',
         remainingAmount: '400000',
+        settlementFeeAmount: '10000',
         rate: 600,
       };
 
@@ -628,6 +657,7 @@ describe('MatchingEngine', () => {
         status: OrderStatus.Open,
         originalAmount: '300000',
         remainingAmount: '300000',
+        settlementFeeAmount: '10000',
         rate: 600
       };
 
@@ -652,6 +682,7 @@ describe('MatchingEngine', () => {
         status: OrderStatus.Open,
         originalAmount: '1000000',
         remainingAmount: '1000000',
+        settlementFeeAmount: '10000',
         rate: 500,
       };
 
@@ -670,6 +701,7 @@ describe('MatchingEngine', () => {
         status: OrderStatus.Open,
         originalAmount: '500000',
         remainingAmount: '500000',
+        settlementFeeAmount: '10000',
         rate: 600,
       };
 
@@ -688,6 +720,7 @@ describe('MatchingEngine', () => {
         status: OrderStatus.Open,
         originalAmount: '500000',
         remainingAmount: '500000',
+        settlementFeeAmount: '10000',
         rate: 600
       };
 
@@ -710,6 +743,7 @@ describe('MatchingEngine', () => {
         status: OrderStatus.Open,
         originalAmount: '1000000',
         remainingAmount: '1000000',
+        settlementFeeAmount: '10000',
         rate: 500,
       };
 
@@ -727,6 +761,7 @@ describe('MatchingEngine', () => {
         status: OrderStatus.Open,
         originalAmount: '300000',
         remainingAmount: '300000',
+        settlementFeeAmount: '10000',
         rate: 600,
       };
 
@@ -751,6 +786,7 @@ describe('MatchingEngine', () => {
         status: OrderStatus.Open,
         originalAmount: '1000000',
         remainingAmount: '1000000',
+        settlementFeeAmount: '10000',
         rate: 500,
       };
 
@@ -768,6 +804,7 @@ describe('MatchingEngine', () => {
         status: OrderStatus.Open,
         originalAmount: '1000000',
         remainingAmount: '1000000',
+        settlementFeeAmount: '10000',
         rate: 600,
       };
 
@@ -792,6 +829,7 @@ describe('MatchingEngine', () => {
         status: OrderStatus.Open,
         originalAmount: '1000000',
         remainingAmount: '1000000',
+        settlementFeeAmount: '10000',
         rate: 500,
       };
 
@@ -829,6 +867,7 @@ describe('MatchingEngine', () => {
         status: OrderStatus.Open,
         originalAmount: '1000000',
         remainingAmount: '1000000',
+        settlementFeeAmount: '10000',
         rate: 500,
       };
 
@@ -846,6 +885,7 @@ describe('MatchingEngine', () => {
         status: OrderStatus.Open,
         originalAmount: '300000',
         remainingAmount: '300000',
+        settlementFeeAmount: '10000',
         rate: 600,
       };
 
@@ -868,6 +908,7 @@ describe('MatchingEngine', () => {
         status: OrderStatus.Open,
         originalAmount: '1000000',
         remainingAmount: '1000000',
+        settlementFeeAmount: '10000',
         rate: 500,
       };
 
@@ -885,6 +926,7 @@ describe('MatchingEngine', () => {
         status: OrderStatus.Open,
         originalAmount: '1000000',
         remainingAmount: '1000000',
+        settlementFeeAmount: '10000',
         rate: 600,
       };
 
@@ -908,6 +950,7 @@ describe('MatchingEngine', () => {
           status: OrderStatus.Open,
           originalAmount: '1000000',
           remainingAmount: '1000000',
+          settlementFeeAmount: '10000',
           rate: 500 + i * 10,
         };
         engine.submitOrder(lendOrder);
@@ -933,6 +976,7 @@ describe('MatchingEngine', () => {
         status: OrderStatus.Open,
         originalAmount: '1000000',
         remainingAmount: '1000000',
+        settlementFeeAmount: '10000',
         rate: 500,
       };
 
@@ -947,6 +991,7 @@ describe('MatchingEngine', () => {
         status: OrderStatus.Open,
         originalAmount: '1000000',
         remainingAmount: '1000000',
+        settlementFeeAmount: '10000',
         rate: 500, // Same rate
       };
 
@@ -972,6 +1017,7 @@ describe('MatchingEngine', () => {
         status: OrderStatus.Open,
         originalAmount: amount,
         remainingAmount: amount,
+        settlementFeeAmount: '10000',
         rate: 500,
       };
 
@@ -986,7 +1032,8 @@ describe('MatchingEngine', () => {
         status: OrderStatus.Open,
         originalAmount: amount,
         remainingAmount: amount,
-        rate: 600
+        settlementFeeAmount: '10000',
+        rate: 600,
       };
 
       engine.submitOrder(lendOrder);
@@ -1014,6 +1061,7 @@ describe('MatchingEngine', () => {
         status: OrderStatus.Open,
         originalAmount: largeAmount,
         remainingAmount: largeAmount,
+        settlementFeeAmount: '10000',
         rate: 500,
       };
 
@@ -1028,6 +1076,7 @@ describe('MatchingEngine', () => {
         status: OrderStatus.Open,
         originalAmount: '1000',
         remainingAmount: '1000',
+        settlementFeeAmount: '10000',
         rate: 600,
       };
 
@@ -1055,6 +1104,7 @@ describe('MatchingEngine', () => {
         status: OrderStatus.Open,
         originalAmount: '1000000',
         remainingAmount: '1000000',
+        settlementFeeAmount: '10000',
         rate: 500,
       };
 
@@ -1072,6 +1122,7 @@ describe('MatchingEngine', () => {
         status: OrderStatus.Open,
         originalAmount: '200000',
         remainingAmount: '200000',
+        settlementFeeAmount: '10000',
         rate: 600,
       };
 
@@ -1086,6 +1137,7 @@ describe('MatchingEngine', () => {
         status: OrderStatus.Open,
         originalAmount: '300000',
         remainingAmount: '300000',
+        settlementFeeAmount: '10000',
         rate: 600,
       };
 
@@ -1100,6 +1152,7 @@ describe('MatchingEngine', () => {
         status: OrderStatus.Open,
         originalAmount: '500000',
         remainingAmount: '500000',
+        settlementFeeAmount: '10000',
         rate: 600,
       };
 
@@ -1131,6 +1184,7 @@ describe('MatchingEngine', () => {
         status: OrderStatus.Open,
         originalAmount: '200000',
         remainingAmount: '200000',
+        settlementFeeAmount: '10000',
         rate: 400,
       };
 
@@ -1145,6 +1199,7 @@ describe('MatchingEngine', () => {
         status: OrderStatus.Open,
         originalAmount: '300000',
         remainingAmount: '300000',
+        settlementFeeAmount: '10000',
         rate: 500,
       };
 
@@ -1163,6 +1218,7 @@ describe('MatchingEngine', () => {
         status: OrderStatus.Open,
         originalAmount: '1000000',
         remainingAmount: '1000000',
+        settlementFeeAmount: '10000',
         rate: 600,
       };
 
@@ -1197,6 +1253,7 @@ describe('MatchingEngine', () => {
         status: OrderStatus.Open,
         originalAmount: '1000000',
         remainingAmount: '1000000',
+        settlementFeeAmount: '10000',
         rate: 500,
       };
 
@@ -1212,6 +1269,7 @@ describe('MatchingEngine', () => {
         status: OrderStatus.Open,
         originalAmount: '1000000',
         remainingAmount: '1000000',
+        settlementFeeAmount: '10000',
         rate: 600 // Higher than lend rate - would normally match
       };
 
@@ -1244,6 +1302,7 @@ describe('MatchingEngine', () => {
         status: OrderStatus.Open,
         originalAmount: '1000000',
         remainingAmount: '1000000',
+        settlementFeeAmount: '10000',
         rate: 600,
       };
 
@@ -1259,6 +1318,7 @@ describe('MatchingEngine', () => {
         status: OrderStatus.Open,
         originalAmount: '1000000',
         remainingAmount: '1000000',
+        settlementFeeAmount: '10000',
         rate: 500, // Lower than borrow rate - would normally match
       };
 
@@ -1291,6 +1351,7 @@ describe('MatchingEngine', () => {
         status: OrderStatus.Open,
         originalAmount: '1000000',
         remainingAmount: '1000000',
+        settlementFeeAmount: '10000',
         rate: 600,
       };
 
@@ -1308,6 +1369,7 @@ describe('MatchingEngine', () => {
         status: OrderStatus.Open,
         originalAmount: '1000000',
         remainingAmount: '1000000',
+        settlementFeeAmount: '10000',
       };
 
       const result = engine.submitOrder(lendMarket);
@@ -1337,6 +1399,7 @@ describe('MatchingEngine', () => {
         status: OrderStatus.Open,
         originalAmount: '1000000',
         remainingAmount: '1000000',
+        settlementFeeAmount: '10000',
         rate: 500,
       };
 
@@ -1353,7 +1416,8 @@ describe('MatchingEngine', () => {
         type: OrderType.Market,
         status: OrderStatus.Open,
         originalAmount: '1000000',
-        remainingAmount: '1000000'
+        remainingAmount: '1000000',
+        settlementFeeAmount: '10000',
       };
 
       const result = engine.submitOrder(borrowMarket);
@@ -1384,6 +1448,7 @@ describe('MatchingEngine', () => {
         status: OrderStatus.Open,
         originalAmount: '1000000',
         remainingAmount: '1000000',
+        settlementFeeAmount: '10000',
         rate: 500,
       };
 
@@ -1401,6 +1466,7 @@ describe('MatchingEngine', () => {
         status: OrderStatus.Open,
         originalAmount: '500000',
         remainingAmount: '500000',
+        settlementFeeAmount: '10000',
         rate: 600,
       };
 
@@ -1419,6 +1485,7 @@ describe('MatchingEngine', () => {
         status: OrderStatus.Open,
         originalAmount: '500000',
         remainingAmount: '500000',
+        settlementFeeAmount: '10000',
         rate: 600
       };
 
@@ -1451,6 +1518,7 @@ describe('MatchingEngine', () => {
         status: OrderStatus.Open,
         originalAmount: '1000000',
         remainingAmount: '1000000',
+        settlementFeeAmount: '10000',
         rate: 500,
       };
 
@@ -1468,6 +1536,7 @@ describe('MatchingEngine', () => {
         status: OrderStatus.Open,
         originalAmount: '1000000',
         remainingAmount: '1000000',
+        settlementFeeAmount: '10000',
         rate: 600
       };
 
