@@ -48,6 +48,9 @@ describe('RedisService', () => {
       maturity,
       timestamp: Date.now(),
       borrowerIsTaker: true,
+      makerFeeAmount: '1000',
+      takerFeeAmount: '2000',
+      settlementFeeAmount: '10000',
     };
   }
 

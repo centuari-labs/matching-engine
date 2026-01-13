@@ -111,6 +111,9 @@ describe('Message Helpers', () => {
         maturity: 1704067200,
         timestamp: Date.now(),
         borrowerIsTaker: true,
+        makerFeeAmount: '1000',
+        takerFeeAmount: '2000',
+        settlementFeeAmount: '10000',
       };
       const result: MatchResult = {
         matches: [mockMatch],

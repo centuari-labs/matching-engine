@@ -12,7 +12,7 @@ import { ExecutionEngine } from '../core/execution-engine';
 import { MatchingEngine } from '../core/matching-engine';
 import type { SettlementPublisher } from '../types/settlement';
 import type { Match } from '../types/matches';
-import { generateOrderId } from '../utils/helpers';
+import { generateOrderId, calculateMakerFee, calculateTakerFee } from '../utils/helpers';
 import { OrderSide, OrderType, OrderStatus } from '../types/orders';
 import type { LendLimitOrder, BorrowLimitOrder } from '../types/orders';
 
@@ -70,16 +70,20 @@ describe('SettlementPublisher Integration', () => {
     });
 
     it('should publish match to settlement publisher when recording', async () => {
+      const matchedAmount = '1000000';
       const match = executionEngine.recordMatch({
         lendOrderId: generateOrderId(),
         borrowOrderId: generateOrderId(),
         lenderWallet: walletAddress1,
         borrowerWallet: walletAddress2,
-        matchedAmount: '1000000',
+        matchedAmount,
         rate: 500,
         loanToken,
         maturity,
         borrowerIsTaker: true,
+        makerFeeAmount: calculateMakerFee(matchedAmount),
+        takerFeeAmount: calculateTakerFee(matchedAmount),
+        settlementFeeAmount: '10000',
       });
 
       // Wait for async publish to complete
@@ -92,17 +96,21 @@ describe('SettlementPublisher Integration', () => {
     it('should include all match fields in published message', async () => {
       const lendOrderId = generateOrderId();
       const borrowOrderId = generateOrderId();
+      const matchedAmount = '5000000';
 
       executionEngine.recordMatch({
         lendOrderId,
         borrowOrderId,
         lenderWallet: walletAddress1,
         borrowerWallet: walletAddress2,
-        matchedAmount: '5000000',
+        matchedAmount,
         rate: 750,
         loanToken,
         maturity,
         borrowerIsTaker: false,
+        makerFeeAmount: calculateMakerFee(matchedAmount),
+        takerFeeAmount: calculateTakerFee(matchedAmount),
+        settlementFeeAmount: '10000',
       });
 
       await new Promise((resolve) => setTimeout(resolve, 10));
@@ -122,16 +130,20 @@ describe('SettlementPublisher Integration', () => {
     });
 
     it('should remove match from memory after successful publish', async () => {
+      const matchedAmount = '1000000';
       const match = executionEngine.recordMatch({
         lendOrderId: generateOrderId(),
         borrowOrderId: generateOrderId(),
         lenderWallet: walletAddress1,
         borrowerWallet: walletAddress2,
-        matchedAmount: '1000000',
+        matchedAmount,
         rate: 500,
         loanToken,
         maturity,
         borrowerIsTaker: true,
+        makerFeeAmount: calculateMakerFee(matchedAmount),
+        takerFeeAmount: calculateTakerFee(matchedAmount),
+        settlementFeeAmount: '10000',
       });
 
       // Match should be in memory immediately
@@ -149,16 +161,20 @@ describe('SettlementPublisher Integration', () => {
     it('should keep match in memory when publish returns null', async () => {
       mockPublisher.shouldReturnNull = true;
 
+      const matchedAmount = '1000000';
       const match = executionEngine.recordMatch({
         lendOrderId: generateOrderId(),
         borrowOrderId: generateOrderId(),
         lenderWallet: walletAddress1,
         borrowerWallet: walletAddress2,
-        matchedAmount: '1000000',
+        matchedAmount,
         rate: 500,
         loanToken,
         maturity,
         borrowerIsTaker: true,
+        makerFeeAmount: calculateMakerFee(matchedAmount),
+        takerFeeAmount: calculateTakerFee(matchedAmount),
+        settlementFeeAmount: '10000',
       });
 
       // Wait for async publish attempt
@@ -176,16 +192,20 @@ describe('SettlementPublisher Integration', () => {
       const originalError = console.error;
       console.error = jest.fn();
 
+      const matchedAmount = '1000000';
       const match = executionEngine.recordMatch({
         lendOrderId: generateOrderId(),
         borrowOrderId: generateOrderId(),
         lenderWallet: walletAddress1,
         borrowerWallet: walletAddress2,
-        matchedAmount: '1000000',
+        matchedAmount,
         rate: 500,
         loanToken,
         maturity,
         borrowerIsTaker: true,
+        makerFeeAmount: calculateMakerFee(matchedAmount),
+        takerFeeAmount: calculateTakerFee(matchedAmount),
+        settlementFeeAmount: '10000',
       });
 
       // Wait for async publish attempt
@@ -199,28 +219,36 @@ describe('SettlementPublisher Integration', () => {
     });
 
     it('should publish multiple matches independently', async () => {
+      const matchedAmount1 = '1000000';
       executionEngine.recordMatch({
         lendOrderId: generateOrderId(),
         borrowOrderId: generateOrderId(),
         lenderWallet: walletAddress1,
         borrowerWallet: walletAddress2,
-        matchedAmount: '1000000',
+        matchedAmount: matchedAmount1,
         rate: 500,
         loanToken,
         maturity,
         borrowerIsTaker: true,
+        makerFeeAmount: calculateMakerFee(matchedAmount1),
+        takerFeeAmount: calculateTakerFee(matchedAmount1),
+        settlementFeeAmount: '10000',
       });
 
+      const matchedAmount2 = '2000000';
       executionEngine.recordMatch({
         lendOrderId: generateOrderId(),
         borrowOrderId: generateOrderId(),
         lenderWallet: walletAddress1,
         borrowerWallet: walletAddress2,
-        matchedAmount: '2000000',
+        matchedAmount: matchedAmount2,
         rate: 600,
         loanToken,
         maturity,
         borrowerIsTaker: false,
+        makerFeeAmount: calculateMakerFee(matchedAmount2),
+        takerFeeAmount: calculateTakerFee(matchedAmount2),
+        settlementFeeAmount: '10000',
       });
 
       await new Promise((resolve) => setTimeout(resolve, 50));
@@ -232,17 +260,21 @@ describe('SettlementPublisher Integration', () => {
     it('should clean up order indexes when match is removed', async () => {
       const lendOrderId = generateOrderId();
       const borrowOrderId = generateOrderId();
+      const matchedAmount = '1000000';
 
       executionEngine.recordMatch({
         lendOrderId,
         borrowOrderId,
         lenderWallet: walletAddress1,
         borrowerWallet: walletAddress2,
-        matchedAmount: '1000000',
+        matchedAmount,
         rate: 500,
         loanToken,
         maturity,
         borrowerIsTaker: true,
+        makerFeeAmount: calculateMakerFee(matchedAmount),
+        takerFeeAmount: calculateTakerFee(matchedAmount),
+        settlementFeeAmount: '10000',
       });
 
       // Matches should be indexed
@@ -266,16 +298,20 @@ describe('SettlementPublisher Integration', () => {
     });
 
     it('should work without settlement publisher', () => {
+      const matchedAmount = '1000000';
       const match = executionEngine.recordMatch({
         lendOrderId: generateOrderId(),
         borrowOrderId: generateOrderId(),
         lenderWallet: walletAddress1,
         borrowerWallet: walletAddress2,
-        matchedAmount: '1000000',
+        matchedAmount,
         rate: 500,
         loanToken,
         maturity,
         borrowerIsTaker: true,
+        makerFeeAmount: calculateMakerFee(matchedAmount),
+        takerFeeAmount: calculateTakerFee(matchedAmount),
+        settlementFeeAmount: '10000',
       });
 
       expect(match).toBeDefined();
@@ -283,16 +319,20 @@ describe('SettlementPublisher Integration', () => {
     });
 
     it('should keep matches in memory when no publisher', async () => {
+      const matchedAmount = '1000000';
       const match = executionEngine.recordMatch({
         lendOrderId: generateOrderId(),
         borrowOrderId: generateOrderId(),
         lenderWallet: walletAddress1,
         borrowerWallet: walletAddress2,
-        matchedAmount: '1000000',
+        matchedAmount,
         rate: 500,
         loanToken,
         maturity,
         borrowerIsTaker: true,
+        makerFeeAmount: calculateMakerFee(matchedAmount),
+        takerFeeAmount: calculateTakerFee(matchedAmount),
+        settlementFeeAmount: '10000',
       });
 
       await new Promise((resolve) => setTimeout(resolve, 50));
@@ -477,17 +517,21 @@ describe('SettlementPublisher Integration', () => {
 
     it('should remove multiple matches from memory after successful publishes', async () => {
       // Create multiple matches
+      const matchedAmount = '1000000';
       for (let i = 0; i < 10; i++) {
         executionEngine.recordMatch({
           lendOrderId: generateOrderId(),
           borrowOrderId: generateOrderId(),
           lenderWallet: walletAddress1,
           borrowerWallet: walletAddress2,
-          matchedAmount: '1000000',
+          matchedAmount,
           rate: 500 + i,
           loanToken,
           maturity,
           borrowerIsTaker: true,
+          makerFeeAmount: calculateMakerFee(matchedAmount),
+          takerFeeAmount: calculateTakerFee(matchedAmount),
+          settlementFeeAmount: '10000',
         });
       }
 
@@ -519,17 +563,21 @@ describe('SettlementPublisher Integration', () => {
       console.warn = jest.fn();
 
       // Create 10 matches
+      const matchedAmount = '1000000';
       for (let i = 0; i < 10; i++) {
         executionEngine.recordMatch({
           lendOrderId: generateOrderId(),
           borrowOrderId: generateOrderId(),
           lenderWallet: walletAddress1,
           borrowerWallet: walletAddress2,
-          matchedAmount: '1000000',
+          matchedAmount,
           rate: 500 + i,
           loanToken,
           maturity,
           borrowerIsTaker: true,
+          makerFeeAmount: calculateMakerFee(matchedAmount),
+          takerFeeAmount: calculateTakerFee(matchedAmount),
+          settlementFeeAmount: '10000',
         });
       }
 

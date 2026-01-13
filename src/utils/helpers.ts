@@ -170,3 +170,25 @@ export function isZero(a: string): boolean {
   return BigInt(a) === 0n;
 }
 
+/**
+ * Calculate maker fee (0.1% of matched amount)
+ *
+ * @param matchedAmount - The matched amount as a string
+ * @returns Maker fee amount as a string (floor division)
+ */
+export function calculateMakerFee(matchedAmount: string): string {
+  // 0.1% = 1/1000
+  return ((BigInt(matchedAmount) * 1n) / 1000n).toString();
+}
+
+/**
+ * Calculate taker fee (0.2% of matched amount)
+ *
+ * @param matchedAmount - The matched amount as a string
+ * @returns Taker fee amount as a string (floor division)
+ */
+export function calculateTakerFee(matchedAmount: string): string {
+  // 0.2% = 2/1000
+  return ((BigInt(matchedAmount) * 2n) / 1000n).toString();
+}
+

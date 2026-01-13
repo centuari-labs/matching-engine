@@ -20,8 +20,9 @@ export const matchSchema = z.object({
   maturity: z.number().int().positive('Maturity must be a positive integer'),
   timestamp: z.number().int().positive('Timestamp must be a positive integer'),
   borrowerIsTaker: z.boolean(),
-  // makerTakerFeeAmount: z.string().regex(/^\d+$/, 'Fee amount must be a positive integer string'),
-  // settlementFeeAmount: z.string().regex(/^\d+$/, 'Fee amount must be a positive integer string'),
+  makerFeeAmount: z.string().regex(/^\d+$/, 'Maker fee amount must be a positive integer string'),
+  takerFeeAmount: z.string().regex(/^\d+$/, 'Taker fee amount must be a positive integer string'),
+  settlementFeeAmount: z.string().regex(/^\d+$/, 'Settlement fee amount must be a positive integer string'),
 });
 
 /**

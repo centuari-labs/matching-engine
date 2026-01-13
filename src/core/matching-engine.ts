@@ -13,7 +13,9 @@ import type { SettlementPublisher } from '../types/settlement';
 import {
   minBigNumber,
   subtractBigNumbers,
-  isZero
+  isZero,
+  calculateMakerFee,
+  calculateTakerFee
 } from '../utils/helpers';
 
 //@todo : need to add snapshot for order book, so if the matching-engine is down we can restore the order book from the snapshot.
@@ -120,6 +122,11 @@ export class MatchingEngine {
         // Calculate match amount
         const matchAmount = minBigNumber(remainingAmount, borrowOrder.remainingAmount);
 
+        // Calculate fees
+        const makerFeeAmount = calculateMakerFee(matchAmount);
+        const takerFeeAmount = calculateTakerFee(matchAmount);
+        // borrowerIsTaker is false, so borrower is maker, lender (order) is taker
+
         // Create match at borrow order's rate
         const match = this.executionEngine.recordMatch({
           lendOrderId: order.orderId,
@@ -131,6 +138,9 @@ export class MatchingEngine {
           loanToken: order.loanToken,
           maturity,
           borrowerIsTaker: false,
+          makerFeeAmount,
+          takerFeeAmount,
+          settlementFeeAmount: order.settlementFeeAmount,
         });
 
         matches.push(match);
@@ -217,6 +227,11 @@ export class MatchingEngine {
         // Calculate match amount
         const matchAmount = minBigNumber(remainingAmount, borrowOrder.remainingAmount);
 
+        // Calculate fees
+        const makerFeeAmount = calculateMakerFee(matchAmount);
+        const takerFeeAmount = calculateTakerFee(matchAmount);
+        // borrowerIsTaker is false, so borrower is maker, lender (order) is taker
+
         const match = this.executionEngine.recordMatch({
           lendOrderId: order.orderId,
           borrowOrderId: borrowOrder.orderId,
@@ -227,6 +242,9 @@ export class MatchingEngine {
           loanToken: order.loanToken,
           maturity,
           borrowerIsTaker: false,
+          makerFeeAmount,
+          takerFeeAmount,
+          settlementFeeAmount: order.settlementFeeAmount,
         });
 
         matches.push(match);
@@ -311,6 +329,11 @@ export class MatchingEngine {
         // Calculate match amount
         const matchAmount = minBigNumber(remainingAmount, lendOrder.remainingAmount);
 
+        // Calculate fees
+        const makerFeeAmount = calculateMakerFee(matchAmount);
+        const takerFeeAmount = calculateTakerFee(matchAmount);
+        // borrowerIsTaker is true, so borrower (order) is taker, lender is maker
+
         // Create match at lend order's rate
         const match = this.executionEngine.recordMatch({
           lendOrderId: lendOrder.orderId,
@@ -322,6 +345,9 @@ export class MatchingEngine {
           loanToken: order.loanToken,
           maturity,
           borrowerIsTaker: true,
+          makerFeeAmount,
+          takerFeeAmount,
+          settlementFeeAmount: order.settlementFeeAmount,
         });
 
         matches.push(match);
@@ -405,6 +431,11 @@ export class MatchingEngine {
         // Calculate match amount
         const matchAmount = minBigNumber(remainingAmount, lendOrder.remainingAmount);
 
+        // Calculate fees
+        const makerFeeAmount = calculateMakerFee(matchAmount);
+        const takerFeeAmount = calculateTakerFee(matchAmount);
+        // borrowerIsTaker is true, so borrower (order) is taker, lender is maker
+
         const match = this.executionEngine.recordMatch({
           lendOrderId: lendOrder.orderId,
           borrowOrderId: order.orderId,
@@ -415,6 +446,9 @@ export class MatchingEngine {
           loanToken: order.loanToken,
           maturity,
           borrowerIsTaker: true,
+          makerFeeAmount,
+          takerFeeAmount,
+          settlementFeeAmount: order.settlementFeeAmount,
         });
 
         matches.push(match);

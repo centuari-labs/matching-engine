@@ -53,8 +53,9 @@ export class ExecutionEngine {
     loanToken: string;
     maturity: number;
     borrowerIsTaker: boolean;
-    // settlementFeeAmount: string;
-    // makerTakerFeeAmount: string;
+    makerFeeAmount: string;
+    takerFeeAmount: string;
+    settlementFeeAmount: string;
   }): Match {
     const match: Match = {
       matchId: generateMatchId(),
@@ -68,6 +69,9 @@ export class ExecutionEngine {
       maturity: params.maturity,
       timestamp: Date.now(),
       borrowerIsTaker: params.borrowerIsTaker,
+      makerFeeAmount: params.makerFeeAmount,
+      takerFeeAmount: params.takerFeeAmount,
+      settlementFeeAmount: params.settlementFeeAmount,
     };
 
     // Validate match against schema
