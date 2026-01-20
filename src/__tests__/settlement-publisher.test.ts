@@ -13,8 +13,13 @@ import { MatchingEngine } from '../core/matching-engine';
 import type { SettlementPublisher } from '../types/settlement';
 import type { Match } from '../types/matches';
 import { generateOrderId, calculateMakerFee, calculateTakerFee } from '../utils/helpers';
-import { OrderSide, OrderType, OrderStatus } from '../types/orders';
 import type { LendLimitOrder, BorrowLimitOrder } from '../types/orders';
+import {
+  createLendLimitOrder,
+  createBorrowLimitOrder,
+  DEFAULT_LOAN_TOKEN,
+  DEFAULT_MATURITY,
+} from './factories/order-factory';
 
 /**
  * Mock implementation of SettlementPublisher for testing
@@ -51,10 +56,10 @@ class MockSettlementPublisher implements SettlementPublisher {
 }
 
 describe('SettlementPublisher Integration', () => {
-  const loanToken = '0x1234567890123456789012345678901234567890';
+  const loanToken = DEFAULT_LOAN_TOKEN;
   const walletAddress1 = '0x1111111111111111111111111111111111111111';
   const walletAddress2 = '0x2222222222222222222222222222222222222222';
-  const maturity = 1704067200;
+  const maturity = DEFAULT_MATURITY;
 
   describe('ExecutionEngine with SettlementPublisher', () => {
     let mockPublisher: MockSettlementPublisher;
@@ -209,7 +214,8 @@ describe('SettlementPublisher Integration', () => {
         borrowerIsTaker: true,
         makerFeeAmount: calculateMakerFee(matchedAmount),
         takerFeeAmount: calculateTakerFee(matchedAmount),
-        settlementFeeAmount: '10000',
+        lenderSettlementFeeAmount: '5000',
+        borrowerSettlementFeeAmount: '5000',
       });
 
       // Wait for async publish attempt
@@ -367,36 +373,28 @@ describe('SettlementPublisher Integration', () => {
 
     it('should publish matches created through order matching', async () => {
       // Create lend limit order
-      const lendOrder: LendLimitOrder = {
-        orderId: generateOrderId(),
+      const lendOrder: LendLimitOrder = createLendLimitOrder({
         walletAddress: walletAddress1,
         loanToken,
         maturities: [maturity],
         timestamp: Date.now(),
-        side: OrderSide.Lend,
-        type: OrderType.Limit,
-        status: OrderStatus.Open,
         originalAmount: '1000000',
         remainingAmount: '1000000',
         rate: 500,
         settlementFeeAmount: '10000',
-      };
+      });
 
       // Create borrow limit order that will match
-      const borrowOrder: BorrowLimitOrder = {
-        orderId: generateOrderId(),
+      const borrowOrder: BorrowLimitOrder = createBorrowLimitOrder({
         walletAddress: walletAddress2,
         loanToken,
         maturities: [maturity],
         timestamp: Date.now() + 1,
-        side: OrderSide.Borrow,
-        type: OrderType.Limit,
-        status: OrderStatus.Open,
         originalAmount: '1000000',
         remainingAmount: '1000000',
         rate: 600,
         settlementFeeAmount: '10000',
-      };
+      });
 
       // Submit lend order first (becomes maker)
       matchingEngine.submitOrder(lendOrder);
@@ -419,36 +417,28 @@ describe('SettlementPublisher Integration', () => {
 
     it('should publish partial fill matches', async () => {
       // Create lend order for 2000000
-      const lendOrder: LendLimitOrder = {
-        orderId: generateOrderId(),
+      const lendOrder: LendLimitOrder = createLendLimitOrder({
         walletAddress: walletAddress1,
         loanToken,
         maturities: [maturity],
         timestamp: Date.now(),
-        side: OrderSide.Lend,
-        type: OrderType.Limit,
-        status: OrderStatus.Open,
         originalAmount: '2000000',
         remainingAmount: '2000000',
         rate: 500,
         settlementFeeAmount: '10000',
-      };
+      });
 
       // Create borrow order for 1000000 (partial match)
-      const borrowOrder: BorrowLimitOrder = {
-        orderId: generateOrderId(),
+      const borrowOrder: BorrowLimitOrder = createBorrowLimitOrder({
         walletAddress: walletAddress2,
         loanToken,
         maturities: [maturity],
         timestamp: Date.now() + 1,
-        side: OrderSide.Borrow,
-        type: OrderType.Limit,
-        status: OrderStatus.Open,
         originalAmount: '1000000',
         remainingAmount: '1000000',
         rate: 600,
         settlementFeeAmount: '10000',
-      };
+      });
 
       matchingEngine.submitOrder(lendOrder);
       const result = matchingEngine.submitOrder(borrowOrder);
@@ -469,35 +459,27 @@ describe('SettlementPublisher Integration', () => {
       const originalError = console.error;
       console.error = jest.fn();
 
-      const lendOrder: LendLimitOrder = {
-        orderId: generateOrderId(),
+      const lendOrder: LendLimitOrder = createLendLimitOrder({
         walletAddress: walletAddress1,
         loanToken,
         maturities: [maturity],
         timestamp: Date.now(),
-        side: OrderSide.Lend,
-        type: OrderType.Limit,
-        status: OrderStatus.Open,
         originalAmount: '1000000',
         remainingAmount: '1000000',
         rate: 500,
         settlementFeeAmount: '10000',
-      };
+      });
 
-      const borrowOrder: BorrowLimitOrder = {
-        orderId: generateOrderId(),
+      const borrowOrder: BorrowLimitOrder = createBorrowLimitOrder({
         walletAddress: walletAddress2,
         loanToken,
         maturities: [maturity],
         timestamp: Date.now() + 1,
-        side: OrderSide.Borrow,
-        type: OrderType.Limit,
-        status: OrderStatus.Open,
         originalAmount: '1000000',
         remainingAmount: '1000000',
         rate: 600,
         settlementFeeAmount: '10000',
-      };
+      });
 
       matchingEngine.submitOrder(lendOrder);
       const result = matchingEngine.submitOrder(borrowOrder);

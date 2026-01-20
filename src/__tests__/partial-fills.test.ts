@@ -1,7 +1,9 @@
 import { MatchingEngine } from '../core/matching-engine';
 import type { LendLimitOrder, BorrowLimitOrder } from '../types/orders';
-import { OrderSide, OrderType, OrderStatus } from '../types/orders';
-import { generateOrderId } from '../utils/helpers';
+import {
+  createLendLimitOrder,
+  createBorrowLimitOrder,
+} from './factories/order-factory';
 
 describe('Partial Fills', () => {
   let engine: MatchingEngine;
@@ -16,70 +18,54 @@ describe('Partial Fills', () => {
 
   it('should partially fill a large order with smaller orders', () => {
     // Add three small lend orders
-    const lendOrder1: LendLimitOrder = {
-      orderId: generateOrderId(),
+    const lendOrder1: LendLimitOrder = createLendLimitOrder({
       walletAddress: walletAddress1,
       loanToken,
       maturities: [maturity],
       timestamp: Date.now(),
-      side: OrderSide.Lend,
-      type: OrderType.Limit,
-      status: OrderStatus.Open,
       originalAmount: '300000',
       remainingAmount: '300000',
       settlementFeeAmount: '10000',
       rate: 500,
-    };
+    });
 
-    const lendOrder2: LendLimitOrder = {
-      orderId: generateOrderId(),
+    const lendOrder2: LendLimitOrder = createLendLimitOrder({
       walletAddress: walletAddress1,
       loanToken,
       maturities: [maturity],
       timestamp: Date.now() + 1,
-      side: OrderSide.Lend,
-      type: OrderType.Limit,
-      status: OrderStatus.Open,
       originalAmount: '200000',
       remainingAmount: '200000',
       settlementFeeAmount: '10000',
       rate: 500,
-    };
+    });
 
-    const lendOrder3: LendLimitOrder = {
-      orderId: generateOrderId(),
+    const lendOrder3: LendLimitOrder = createLendLimitOrder({
       walletAddress: walletAddress1,
       loanToken,
       maturities: [maturity],
       timestamp: Date.now() + 2,
-      side: OrderSide.Lend,
-      type: OrderType.Limit,
-      status: OrderStatus.Open,
       originalAmount: '400000',
       remainingAmount: '400000',
       settlementFeeAmount: '10000',
       rate: 500,
-    };
+    });
 
     engine.submitOrder(lendOrder1);
     engine.submitOrder(lendOrder2);
     engine.submitOrder(lendOrder3);
 
     // Submit large borrow order
-    const borrowOrder: BorrowLimitOrder = {
-      orderId: generateOrderId(),
+    const borrowOrder: BorrowLimitOrder = createBorrowLimitOrder({
       walletAddress: walletAddress2,
       loanToken,
       maturities: [maturity],
       timestamp: Date.now() + 3,
-      side: OrderSide.Borrow,
-      type: OrderType.Limit,
-      status: OrderStatus.Open,
       originalAmount: '1000000',
       remainingAmount: '1000000',
       settlementFeeAmount: '10000',
-      rate: 600
-    };
+      rate: 600,
+    });
 
     const result = engine.submitOrder(borrowOrder);
 
@@ -96,38 +82,30 @@ describe('Partial Fills', () => {
 
   it('should handle partial fill when maker order is larger', () => {
     // Large lend order
-    const lendOrder: LendLimitOrder = {
-      orderId: generateOrderId(),
+    const lendOrder: LendLimitOrder = createLendLimitOrder({
       walletAddress: walletAddress1,
       loanToken,
       maturities: [maturity],
       timestamp: Date.now(),
-      side: OrderSide.Lend,
-      type: OrderType.Limit,
-      status: OrderStatus.Open,
       originalAmount: '5000000',
       remainingAmount: '5000000',
       settlementFeeAmount: '10000',
       rate: 500,
-    };
+    });
 
     engine.submitOrder(lendOrder);
 
     // Small borrow order
-    const borrowOrder: BorrowLimitOrder = {
-      orderId: generateOrderId(),
+    const borrowOrder: BorrowLimitOrder = createBorrowLimitOrder({
       walletAddress: walletAddress2,
       loanToken,
       maturities: [maturity],
       timestamp: Date.now() + 1,
-      side: OrderSide.Borrow,
-      type: OrderType.Limit,
-      status: OrderStatus.Open,
       originalAmount: '1000000',
       remainingAmount: '1000000',
       settlementFeeAmount: '10000',
-      rate: 600
-    };
+      rate: 600,
+    });
 
     const result = engine.submitOrder(borrowOrder);
 
@@ -144,78 +122,62 @@ describe('Partial Fills', () => {
 
   it('should handle multiple partial fills on the same order', () => {
     // Submit a large lend order
-    const lendOrder: LendLimitOrder = {
-      orderId: generateOrderId(),
+    const lendOrder: LendLimitOrder = createLendLimitOrder({
       walletAddress: walletAddress1,
       loanToken,
       maturities: [maturity],
       timestamp: Date.now(),
-      side: OrderSide.Lend,
-      type: OrderType.Limit,
-      status: OrderStatus.Open,
       originalAmount: '1000000',
       remainingAmount: '1000000',
       rate: 500,
       settlementFeeAmount: '10000',
-    };
+    });
 
     engine.submitOrder(lendOrder);
 
     // First partial fill
-    const borrowOrder1: BorrowLimitOrder = {
-      orderId: generateOrderId(),
+    const borrowOrder1: BorrowLimitOrder = createBorrowLimitOrder({
       walletAddress: walletAddress2,
       loanToken,
       maturities: [maturity],
       timestamp: Date.now() + 1,
-      side: OrderSide.Borrow,
-      type: OrderType.Limit,
-      status: OrderStatus.Open,
       originalAmount: '300000',
       remainingAmount: '300000',
       settlementFeeAmount: '10000',
-      rate: 600
-    };
+      rate: 600,
+    });
 
     const result1 = engine.submitOrder(borrowOrder1);
     expect(result1.matches).toHaveLength(1);
     expect(result1.matches[0].lendOrderId).toBe(lendOrder.orderId);
 
     // Second partial fill
-    const borrowOrder2: BorrowLimitOrder = {
-      orderId: generateOrderId(),
+    const borrowOrder2: BorrowLimitOrder = createBorrowLimitOrder({
       walletAddress: walletAddress2,
       loanToken,
       maturities: [maturity],
       timestamp: Date.now() + 2,
-      side: OrderSide.Borrow,
-      type: OrderType.Limit,
-      status: OrderStatus.Open,
       originalAmount: '400000',
       remainingAmount: '400000',
       settlementFeeAmount: '10000',
-      rate: 600
-    };
+      rate: 600,
+    });
 
     const result2 = engine.submitOrder(borrowOrder2);
     expect(result2.matches).toHaveLength(1);
     expect(result2.matches[0].lendOrderId).toBe(lendOrder.orderId);
 
     // Third partial fill - complete the order
-    const borrowOrder3: BorrowLimitOrder = {
-      orderId: generateOrderId(),
+    const borrowOrder3: BorrowLimitOrder = createBorrowLimitOrder({
       walletAddress: walletAddress2,
       loanToken,
       maturities: [maturity],
       timestamp: Date.now() + 3,
-      side: OrderSide.Borrow,
-      type: OrderType.Limit,
-      status: OrderStatus.Open,
       originalAmount: '300000',
       remainingAmount: '300000',
       settlementFeeAmount: '10000',
-      rate: 600
-    };
+      rate: 600,
+    });
 
     const result3 = engine.submitOrder(borrowOrder3);
     expect(result3.matches).toHaveLength(1);
@@ -239,35 +201,27 @@ describe('Partial Fills', () => {
   it('should handle exact amount matching', () => {
     const amount = '1234567890';
 
-    const lendOrder: LendLimitOrder = {
-      orderId: generateOrderId(),
+    const lendOrder: LendLimitOrder = createLendLimitOrder({
       walletAddress: walletAddress1,
       loanToken,
       maturities: [maturity],
       timestamp: Date.now(),
-      side: OrderSide.Lend,
-      type: OrderType.Limit,
-      status: OrderStatus.Open,
       originalAmount: amount,
       remainingAmount: amount,
       settlementFeeAmount: '10000',
       rate: 500,
-    };
+    });
 
-    const borrowOrder: BorrowLimitOrder = {
-      orderId: generateOrderId(),
+    const borrowOrder: BorrowLimitOrder = createBorrowLimitOrder({
       walletAddress: walletAddress2,
       loanToken,
       maturities: [maturity],
       timestamp: Date.now() + 1,
-      side: OrderSide.Borrow,
-      type: OrderType.Limit,
-      status: OrderStatus.Open,
       originalAmount: amount,
       remainingAmount: amount,
       settlementFeeAmount: '10000',
-      rate: 600
-    };
+      rate: 600,
+    });
 
     engine.submitOrder(lendOrder);
     const result = engine.submitOrder(borrowOrder);
@@ -285,35 +239,27 @@ describe('Partial Fills', () => {
   it('should handle very large numbers', () => {
     const largeAmount = '999999999999999999999999';
 
-    const lendOrder: LendLimitOrder = {
-      orderId: generateOrderId(),
+    const lendOrder: LendLimitOrder = createLendLimitOrder({
       walletAddress: walletAddress1,
       loanToken,
       maturities: [maturity],
       timestamp: Date.now(),
-      side: OrderSide.Lend,
-      type: OrderType.Limit,
-      status: OrderStatus.Open,
       originalAmount: largeAmount,
       remainingAmount: largeAmount,
       settlementFeeAmount: '10000',
       rate: 500,
-    };
+    });
 
-    const borrowOrder: BorrowLimitOrder = {
-      orderId: generateOrderId(),
+    const borrowOrder: BorrowLimitOrder = createBorrowLimitOrder({
       walletAddress: walletAddress2,
       loanToken,
       maturities: [maturity],
       timestamp: Date.now() + 1,
-      side: OrderSide.Borrow,
-      type: OrderType.Limit,
-      status: OrderStatus.Open,
       originalAmount: '1000',
       remainingAmount: '1000',
       settlementFeeAmount: '10000',
-      rate: 600
-    };
+      rate: 600,
+    });
 
     engine.submitOrder(lendOrder);
     const result = engine.submitOrder(borrowOrder);

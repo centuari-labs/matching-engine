@@ -50,7 +50,8 @@ describe('RedisService', () => {
       borrowerIsTaker: true,
       makerFeeAmount: '1000',
       takerFeeAmount: '2000',
-      settlementFeeAmount: '10000',
+      lenderSettlementFeeAmount: '5000',
+      borrowerSettlementFeeAmount: '5000',
     };
   }
 

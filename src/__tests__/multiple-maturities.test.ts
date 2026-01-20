@@ -1,7 +1,10 @@
 import { MatchingEngine } from '../core/matching-engine';
 import type { LendLimitOrder, BorrowLimitOrder } from '../types/orders';
-import { OrderSide, OrderType, OrderStatus } from '../types/orders';
-import { generateOrderId } from '../utils/helpers';
+import { OrderSide } from '../types/orders';
+import {
+  createLendLimitOrder,
+  createBorrowLimitOrder,
+} from './factories/order-factory';
 
 describe('Multiple Maturities Matching', () => {
   let engine: MatchingEngine;
@@ -18,38 +21,31 @@ describe('Multiple Maturities Matching', () => {
 
   it('should match orders with single maturity across multiple order maturities', () => {
     // Lend order with single maturity
-    const lendOrder: LendLimitOrder = {
-      orderId: generateOrderId(),
+    const lendOrder: LendLimitOrder = createLendLimitOrder({
       walletAddress: walletAddress1,
       loanToken,
       maturities: [maturity1],
       timestamp: Date.now(),
-      side: OrderSide.Lend,
-      type: OrderType.Limit,
-      status: OrderStatus.Open,
       originalAmount: '1000000',
       remainingAmount: '1000000',
       settlementFeeAmount: '10000',
       rate: 500,
-    };
+    });
 
     engine.submitOrder(lendOrder);
 
     // Borrow order with multiple maturities including maturity1
-    const borrowOrder: BorrowLimitOrder = {
-      orderId: generateOrderId(),
+    const borrowOrder: BorrowLimitOrder = createBorrowLimitOrder({
       walletAddress: walletAddress2,
       loanToken,
       maturities: [maturity1, maturity2, maturity3],
       timestamp: Date.now() + 1,
       side: OrderSide.Borrow,
-      type: OrderType.Limit,
-      status: OrderStatus.Open,
       originalAmount: '500000',
       remainingAmount: '500000',
       settlementFeeAmount: '10000',
-      rate: 600
-    };
+      rate: 600,
+    });
 
     const result = engine.submitOrder(borrowOrder);
 
@@ -62,70 +58,54 @@ describe('Multiple Maturities Matching', () => {
 
   it('should match across multiple maturities when sufficient liquidity exists', () => {
     // Add lend orders at different maturities
-    const lendOrder1: LendLimitOrder = {
-      orderId: generateOrderId(),
+    const lendOrder1: LendLimitOrder = createLendLimitOrder({
       walletAddress: walletAddress1,
       loanToken,
       maturities: [maturity1],
       timestamp: Date.now(),
-      side: OrderSide.Lend,
-      type: OrderType.Limit,
-      status: OrderStatus.Open,
       originalAmount: '300000',
       remainingAmount: '300000',
       settlementFeeAmount: '10000',
       rate: 500,
-    };
+    });
 
-    const lendOrder2: LendLimitOrder = {
-      orderId: generateOrderId(),
+    const lendOrder2: LendLimitOrder = createLendLimitOrder({
       walletAddress: walletAddress1,
       loanToken,
       maturities: [maturity2],
       timestamp: Date.now() + 1,
-      side: OrderSide.Lend,
-      type: OrderType.Limit,
-      status: OrderStatus.Open,
       originalAmount: '400000',
       remainingAmount: '400000',
       settlementFeeAmount: '10000',
       rate: 500,
-    };
+    });
 
-    const lendOrder3: LendLimitOrder = {
-      orderId: generateOrderId(),
+    const lendOrder3: LendLimitOrder = createLendLimitOrder({
       walletAddress: walletAddress1,
       loanToken,
       maturities: [maturity3],
       timestamp: Date.now() + 2,
-      side: OrderSide.Lend,
-      type: OrderType.Limit,
-      status: OrderStatus.Open,
       originalAmount: '500000',
       remainingAmount: '500000',
       settlementFeeAmount: '10000',
       rate: 500,
-    };
+    });
 
     engine.submitOrder(lendOrder1);
     engine.submitOrder(lendOrder2);
     engine.submitOrder(lendOrder3);
 
     // Borrow order matching all three maturities
-    const borrowOrder: BorrowLimitOrder = {
-      orderId: generateOrderId(),
+    const borrowOrder: BorrowLimitOrder = createBorrowLimitOrder({
       walletAddress: walletAddress2,
       loanToken,
       maturities: [maturity1, maturity2, maturity3],
       timestamp: Date.now() + 3,
-      side: OrderSide.Borrow,
-      type: OrderType.Limit,
-      status: OrderStatus.Open,
       originalAmount: '1000000',
       remainingAmount: '1000000',
       settlementFeeAmount: '10000',
-      rate: 600
-    };
+      rate: 600,
+    });
 
     const result = engine.submitOrder(borrowOrder);
 
@@ -147,38 +127,30 @@ describe('Multiple Maturities Matching', () => {
 
   it('should only match on overlapping maturities', () => {
     // Lend order for maturity1 and maturity2
-    const lendOrder: LendLimitOrder = {
-      orderId: generateOrderId(),
+    const lendOrder: LendLimitOrder = createLendLimitOrder({
       walletAddress: walletAddress1,
       loanToken,
       maturities: [maturity1, maturity2],
       timestamp: Date.now(),
-      side: OrderSide.Lend,
-      type: OrderType.Limit,
-      status: OrderStatus.Open,
       originalAmount: '1000000',
       remainingAmount: '1000000',
       settlementFeeAmount: '10000',
       rate: 500,
-    };
+    });
 
     engine.submitOrder(lendOrder);
 
     // Borrow order only for maturity2 and maturity3
-    const borrowOrder: BorrowLimitOrder = {
-      orderId: generateOrderId(),
+    const borrowOrder: BorrowLimitOrder = createBorrowLimitOrder({
       walletAddress: walletAddress2,
       loanToken,
       maturities: [maturity2, maturity3],
       timestamp: Date.now() + 1,
-      side: OrderSide.Borrow,
-      type: OrderType.Limit,
-      status: OrderStatus.Open,
       originalAmount: '500000',
       remainingAmount: '500000',
       settlementFeeAmount: '10000',
-      rate: 600
-    };
+      rate: 600,
+    });
 
     const result = engine.submitOrder(borrowOrder);
 
@@ -189,38 +161,30 @@ describe('Multiple Maturities Matching', () => {
 
   it('should handle no overlapping maturities', () => {
     // Lend order for maturity1
-    const lendOrder: LendLimitOrder = {
-      orderId: generateOrderId(),
+    const lendOrder: LendLimitOrder = createLendLimitOrder({
       walletAddress: walletAddress1,
       loanToken,
       maturities: [maturity1],
       timestamp: Date.now(),
-      side: OrderSide.Lend,
-      type: OrderType.Limit,
-      status: OrderStatus.Open,
       originalAmount: '1000000',
       remainingAmount: '1000000',
       settlementFeeAmount: '10000',
       rate: 500,
-    };
+    });
 
     engine.submitOrder(lendOrder);
 
     // Borrow order for maturity2 (no overlap)
-    const borrowOrder: BorrowLimitOrder = {
-      orderId: generateOrderId(),
+    const borrowOrder: BorrowLimitOrder = createBorrowLimitOrder({
       walletAddress: walletAddress2,
       loanToken,
       maturities: [maturity2],
       timestamp: Date.now() + 1,
-      side: OrderSide.Borrow,
-      type: OrderType.Limit,
-      status: OrderStatus.Open,
       originalAmount: '500000',
       remainingAmount: '500000',
       settlementFeeAmount: '10000',
-      rate: 600
-    };
+      rate: 600,
+    });
 
     const result = engine.submitOrder(borrowOrder);
 
@@ -232,54 +196,42 @@ describe('Multiple Maturities Matching', () => {
 
   it('should match with multiple orders at the same maturity', () => {
     // Add multiple lend orders at maturity1
-    const lendOrder1: LendLimitOrder = {
-      orderId: generateOrderId(),
+    const lendOrder1: LendLimitOrder = createLendLimitOrder({
       walletAddress: walletAddress1,
       loanToken,
       maturities: [maturity1],
       timestamp: Date.now(),
-      side: OrderSide.Lend,
-      type: OrderType.Limit,
-      status: OrderStatus.Open,
       originalAmount: '300000',
       remainingAmount: '300000',
       settlementFeeAmount: '10000',
       rate: 500,
-    };
+    });
 
-    const lendOrder2: LendLimitOrder = {
-      orderId: generateOrderId(),
+    const lendOrder2: LendLimitOrder = createLendLimitOrder({
       walletAddress: walletAddress1,
       loanToken,
       maturities: [maturity1],
       timestamp: Date.now() + 1,
-      side: OrderSide.Lend,
-      type: OrderType.Limit,
-      status: OrderStatus.Open,
       originalAmount: '400000',
       remainingAmount: '400000',
       settlementFeeAmount: '10000',
       rate: 500,
-    };
+    });
 
     engine.submitOrder(lendOrder1);
     engine.submitOrder(lendOrder2);
 
     // Borrow order with multiple maturities including maturity1
-    const borrowOrder: BorrowLimitOrder = {
-      orderId: generateOrderId(),
+    const borrowOrder: BorrowLimitOrder = createBorrowLimitOrder({
       walletAddress: walletAddress2,
       loanToken,
       maturities: [maturity1, maturity2],
       timestamp: Date.now() + 2,
-      side: OrderSide.Borrow,
-      type: OrderType.Limit,
-      status: OrderStatus.Open,
       originalAmount: '1000000',
       remainingAmount: '1000000',
       settlementFeeAmount: '10000',
-      rate: 600
-    };
+      rate: 600,
+    });
 
     const result = engine.submitOrder(borrowOrder);
 
@@ -290,20 +242,16 @@ describe('Multiple Maturities Matching', () => {
   });
 
   it('should create separate order book entries for each maturity', () => {
-    const order: LendLimitOrder = {
-      orderId: generateOrderId(),
+    const order: LendLimitOrder = createLendLimitOrder({
       walletAddress: walletAddress1,
       loanToken,
       maturities: [maturity1, maturity2, maturity3],
       timestamp: Date.now(),
-      side: OrderSide.Lend,
-      type: OrderType.Limit,
-      status: OrderStatus.Open,
       originalAmount: '1000000',
       remainingAmount: '1000000',
       settlementFeeAmount: '10000',
       rate: 500,
-    };
+    });
 
     engine.submitOrder(order);
 

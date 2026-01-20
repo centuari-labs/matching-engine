@@ -5,8 +5,12 @@ import type {
   LendMarketOrder,
   BorrowMarketOrder,
 } from '../types/orders';
-import { OrderSide, OrderType, OrderStatus } from '../types/orders';
-import { generateOrderId } from '../utils/helpers';
+import {
+  createLendLimitOrder,
+  createBorrowLimitOrder,
+  createLendMarketOrder,
+  createBorrowMarketOrder,
+} from './factories/order-factory';
 
 /**
  * Tests for the borrowerIsTaker field in matches
@@ -32,37 +36,29 @@ describe('BorrowerIsTaker Field', () => {
   describe('Lend Market Order (borrowerIsTaker = false)', () => {
     it('should set borrowerIsTaker to false when lend market order matches borrow limit order', () => {
       // Borrow limit order is placed first (becomes maker)
-      const borrowOrder: BorrowLimitOrder = {
-        orderId: generateOrderId(),
+      const borrowOrder: BorrowLimitOrder = createBorrowLimitOrder({
         walletAddress: walletAddress2,
         loanToken,
         maturities: [maturity],
         timestamp: Date.now(),
-        side: OrderSide.Borrow,
-        type: OrderType.Limit,
-        status: OrderStatus.Open,
         originalAmount: '1000000',
-      remainingAmount: '1000000',
-      settlementFeeAmount: '10000',
-      rate: 600,
-      };
+        remainingAmount: '1000000',
+        settlementFeeAmount: '10000',
+        rate: 600,
+      });
 
       engine.submitOrder(borrowOrder);
 
       // Lend market order comes in (becomes taker)
-      const lendMarket: LendMarketOrder = {
-        orderId: generateOrderId(),
+      const lendMarket: LendMarketOrder = createLendMarketOrder({
         walletAddress: walletAddress1,
         loanToken,
         maturities: [maturity],
         timestamp: Date.now() + 1,
-        side: OrderSide.Lend,
-        type: OrderType.Market,
-        status: OrderStatus.Open,
         originalAmount: '1000000',
         remainingAmount: '1000000',
-      settlementFeeAmount: '10000',
-      };
+        settlementFeeAmount: '10000',
+      });
 
       const result = engine.submitOrder(lendMarket);
 
@@ -74,53 +70,41 @@ describe('BorrowerIsTaker Field', () => {
 
     it('should set borrowerIsTaker to false for all matches when lend market order matches multiple borrow orders', () => {
       // Add multiple borrow orders (all become makers)
-      const borrowOrder1: BorrowLimitOrder = {
-        orderId: generateOrderId(),
+      const borrowOrder1: BorrowLimitOrder = createBorrowLimitOrder({
         walletAddress: walletAddress2,
         loanToken,
         maturities: [maturity],
         timestamp: Date.now(),
-        side: OrderSide.Borrow,
-        type: OrderType.Limit,
-        status: OrderStatus.Open,
         originalAmount: '500000',
-      remainingAmount: '500000',
-      settlementFeeAmount: '10000',
-      rate: 800,
-      };
+        remainingAmount: '500000',
+        settlementFeeAmount: '10000',
+        rate: 800,
+      });
 
-      const borrowOrder2: BorrowLimitOrder = {
-        orderId: generateOrderId(),
+      const borrowOrder2: BorrowLimitOrder = createBorrowLimitOrder({
         walletAddress: walletAddress2,
         loanToken,
         maturities: [maturity],
         timestamp: Date.now() + 1,
-        side: OrderSide.Borrow,
-        type: OrderType.Limit,
-        status: OrderStatus.Open,
         originalAmount: '500000',
-      remainingAmount: '500000',
-      settlementFeeAmount: '10000',
-      rate: 600,
-      };
+        remainingAmount: '500000',
+        settlementFeeAmount: '10000',
+        rate: 600,
+      });
 
       engine.submitOrder(borrowOrder1);
       engine.submitOrder(borrowOrder2);
 
       // Lend market order matches both (taker)
-      const lendMarket: LendMarketOrder = {
-        orderId: generateOrderId(),
+      const lendMarket: LendMarketOrder = createLendMarketOrder({
         walletAddress: walletAddress1,
         loanToken,
         maturities: [maturity],
         timestamp: Date.now() + 2,
-        side: OrderSide.Lend,
-        type: OrderType.Market,
-        status: OrderStatus.Open,
         originalAmount: '1000000',
         remainingAmount: '1000000',
-      settlementFeeAmount: '10000',
-      };
+        settlementFeeAmount: '10000',
+      });
 
       const result = engine.submitOrder(lendMarket);
 
@@ -133,38 +117,30 @@ describe('BorrowerIsTaker Field', () => {
   describe('Lend Limit Order (borrowerIsTaker = false)', () => {
     it('should set borrowerIsTaker to false when lend limit order matches borrow limit order', () => {
       // Borrow limit order is placed first (becomes maker)
-      const borrowOrder: BorrowLimitOrder = {
-        orderId: generateOrderId(),
+      const borrowOrder: BorrowLimitOrder = createBorrowLimitOrder({
         walletAddress: walletAddress2,
         loanToken,
         maturities: [maturity],
         timestamp: Date.now(),
-        side: OrderSide.Borrow,
-        type: OrderType.Limit,
-        status: OrderStatus.Open,
         originalAmount: '1000000',
-      remainingAmount: '1000000',
-      settlementFeeAmount: '10000',
-      rate: 600,
-      };
+        remainingAmount: '1000000',
+        settlementFeeAmount: '10000',
+        rate: 600,
+      });
 
       engine.submitOrder(borrowOrder);
 
       // Lend limit order comes in and matches (becomes taker)
-      const lendOrder: LendLimitOrder = {
-        orderId: generateOrderId(),
+      const lendOrder: LendLimitOrder = createLendLimitOrder({
         walletAddress: walletAddress1,
         loanToken,
         maturities: [maturity],
         timestamp: Date.now() + 1,
-        side: OrderSide.Lend,
-        type: OrderType.Limit,
-        status: OrderStatus.Open,
         originalAmount: '1000000',
-      remainingAmount: '1000000',
-      settlementFeeAmount: '10000',
-      rate: 500, // Lender wants 500 bps, borrower willing to pay 600 bps - matches
-      };
+        remainingAmount: '1000000',
+        settlementFeeAmount: '10000',
+        rate: 500, // Lender wants 500 bps, borrower willing to pay 600 bps - matches
+      });
 
       const result = engine.submitOrder(lendOrder);
 
@@ -176,54 +152,42 @@ describe('BorrowerIsTaker Field', () => {
 
     it('should set borrowerIsTaker to false for all matches when lend limit order matches multiple borrow orders', () => {
       // Add multiple borrow orders (all become makers)
-      const borrowOrder1: BorrowLimitOrder = {
-        orderId: generateOrderId(),
+      const borrowOrder1: BorrowLimitOrder = createBorrowLimitOrder({
         walletAddress: walletAddress2,
         loanToken,
         maturities: [maturity],
         timestamp: Date.now(),
-        side: OrderSide.Borrow,
-        type: OrderType.Limit,
-        status: OrderStatus.Open,
         originalAmount: '500000',
-      remainingAmount: '500000',
-      settlementFeeAmount: '10000',
-      rate: 700,
-      };
+        remainingAmount: '500000',
+        settlementFeeAmount: '10000',
+        rate: 700,
+      });
 
-      const borrowOrder2: BorrowLimitOrder = {
-        orderId: generateOrderId(),
+      const borrowOrder2: BorrowLimitOrder = createBorrowLimitOrder({
         walletAddress: walletAddress2,
         loanToken,
         maturities: [maturity],
         timestamp: Date.now() + 1,
-        side: OrderSide.Borrow,
-        type: OrderType.Limit,
-        status: OrderStatus.Open,
         originalAmount: '500000',
-      remainingAmount: '500000',
-      settlementFeeAmount: '10000',
-      rate: 600,
-      };
+        remainingAmount: '500000',
+        settlementFeeAmount: '10000',
+        rate: 600,
+      });
 
       engine.submitOrder(borrowOrder1);
       engine.submitOrder(borrowOrder2);
 
       // Lend limit order matches both (taker)
-      const lendOrder: LendLimitOrder = {
-        orderId: generateOrderId(),
+      const lendOrder: LendLimitOrder = createLendLimitOrder({
         walletAddress: walletAddress1,
         loanToken,
         maturities: [maturity],
         timestamp: Date.now() + 2,
-        side: OrderSide.Lend,
-        type: OrderType.Limit,
-        status: OrderStatus.Open,
         originalAmount: '1000000',
-      remainingAmount: '1000000',
-      settlementFeeAmount: '10000',
-      rate: 500,
-      };
+        remainingAmount: '1000000',
+        settlementFeeAmount: '10000',
+        rate: 500,
+      });
 
       const result = engine.submitOrder(lendOrder);
 
@@ -236,37 +200,29 @@ describe('BorrowerIsTaker Field', () => {
   describe('Borrow Market Order (borrowerIsTaker = true)', () => {
     it('should set borrowerIsTaker to true when borrow market order matches lend limit order', () => {
       // Lend limit order is placed first (becomes maker)
-      const lendOrder: LendLimitOrder = {
-        orderId: generateOrderId(),
+      const lendOrder: LendLimitOrder = createLendLimitOrder({
         walletAddress: walletAddress1,
         loanToken,
         maturities: [maturity],
         timestamp: Date.now(),
-        side: OrderSide.Lend,
-        type: OrderType.Limit,
-        status: OrderStatus.Open,
         originalAmount: '1000000',
-      remainingAmount: '1000000',
-      settlementFeeAmount: '10000',
-      rate: 500,
-      };
+        remainingAmount: '1000000',
+        settlementFeeAmount: '10000',
+        rate: 500,
+      });
 
       engine.submitOrder(lendOrder);
 
       // Borrow market order comes in (becomes taker)
-      const borrowMarket: BorrowMarketOrder = {
-        orderId: generateOrderId(),
+      const borrowMarket: BorrowMarketOrder = createBorrowMarketOrder({
         walletAddress: walletAddress2,
         loanToken,
         maturities: [maturity],
         timestamp: Date.now() + 1,
-        side: OrderSide.Borrow,
-        type: OrderType.Market,
-        status: OrderStatus.Open,
         originalAmount: '1000000',
         remainingAmount: '1000000',
-      settlementFeeAmount: '10000',
-      };
+        settlementFeeAmount: '10000',
+      });
 
       const result = engine.submitOrder(borrowMarket);
 
@@ -278,53 +234,41 @@ describe('BorrowerIsTaker Field', () => {
 
     it('should set borrowerIsTaker to true for all matches when borrow market order matches multiple lend orders', () => {
       // Add multiple lend orders (all become makers)
-      const lendOrder1: LendLimitOrder = {
-        orderId: generateOrderId(),
+      const lendOrder1: LendLimitOrder = createLendLimitOrder({
         walletAddress: walletAddress1,
         loanToken,
         maturities: [maturity],
         timestamp: Date.now(),
-        side: OrderSide.Lend,
-        type: OrderType.Limit,
-        status: OrderStatus.Open,
         originalAmount: '500000',
-      remainingAmount: '500000',
-      settlementFeeAmount: '10000',
-      rate: 400,
-      };
+        remainingAmount: '500000',
+        settlementFeeAmount: '10000',
+        rate: 400,
+      });
 
-      const lendOrder2: LendLimitOrder = {
-        orderId: generateOrderId(),
+      const lendOrder2: LendLimitOrder = createLendLimitOrder({
         walletAddress: walletAddress1,
         loanToken,
         maturities: [maturity],
         timestamp: Date.now() + 1,
-        side: OrderSide.Lend,
-        type: OrderType.Limit,
-        status: OrderStatus.Open,
         originalAmount: '500000',
-      remainingAmount: '500000',
-      settlementFeeAmount: '10000',
-      rate: 600,
-      };
+        remainingAmount: '500000',
+        settlementFeeAmount: '10000',
+        rate: 600,
+      });
 
       engine.submitOrder(lendOrder1);
       engine.submitOrder(lendOrder2);
 
       // Borrow market order matches both (taker)
-      const borrowMarket: BorrowMarketOrder = {
-        orderId: generateOrderId(),
+      const borrowMarket: BorrowMarketOrder = createBorrowMarketOrder({
         walletAddress: walletAddress2,
         loanToken,
         maturities: [maturity],
         timestamp: Date.now() + 2,
-        side: OrderSide.Borrow,
-        type: OrderType.Market,
-        status: OrderStatus.Open,
         originalAmount: '1000000',
         remainingAmount: '1000000',
-      settlementFeeAmount: '10000',
-      };
+        settlementFeeAmount: '10000',
+      });
 
       const result = engine.submitOrder(borrowMarket);
 
@@ -337,38 +281,30 @@ describe('BorrowerIsTaker Field', () => {
   describe('Borrow Limit Order (borrowerIsTaker = true)', () => {
     it('should set borrowerIsTaker to true when borrow limit order matches lend limit order', () => {
       // Lend limit order is placed first (becomes maker)
-      const lendOrder: LendLimitOrder = {
-        orderId: generateOrderId(),
+      const lendOrder: LendLimitOrder = createLendLimitOrder({
         walletAddress: walletAddress1,
         loanToken,
         maturities: [maturity],
         timestamp: Date.now(),
-        side: OrderSide.Lend,
-        type: OrderType.Limit,
-        status: OrderStatus.Open,
         originalAmount: '1000000',
-      remainingAmount: '1000000',
-      settlementFeeAmount: '10000',
-      rate: 500,
-      };
+        remainingAmount: '1000000',
+        settlementFeeAmount: '10000',
+        rate: 500,
+      });
 
       engine.submitOrder(lendOrder);
 
       // Borrow limit order comes in and matches (becomes taker)
-      const borrowOrder: BorrowLimitOrder = {
-        orderId: generateOrderId(),
+      const borrowOrder: BorrowLimitOrder = createBorrowLimitOrder({
         walletAddress: walletAddress2,
         loanToken,
         maturities: [maturity],
         timestamp: Date.now() + 1,
-        side: OrderSide.Borrow,
-        type: OrderType.Limit,
-        status: OrderStatus.Open,
         originalAmount: '1000000',
-      remainingAmount: '1000000',
-      settlementFeeAmount: '10000',
-      rate: 600, // Borrower willing to pay 600 bps, lender wants 500 bps - matches
-      };
+        remainingAmount: '1000000',
+        settlementFeeAmount: '10000',
+        rate: 600, // Borrower willing to pay 600 bps, lender wants 500 bps - matches
+      });
 
       const result = engine.submitOrder(borrowOrder);
 
@@ -380,54 +316,42 @@ describe('BorrowerIsTaker Field', () => {
 
     it('should set borrowerIsTaker to true for all matches when borrow limit order matches multiple lend orders', () => {
       // Add multiple lend orders (all become makers)
-      const lendOrder1: LendLimitOrder = {
-        orderId: generateOrderId(),
+      const lendOrder1: LendLimitOrder = createLendLimitOrder({
         walletAddress: walletAddress1,
         loanToken,
         maturities: [maturity],
         timestamp: Date.now(),
-        side: OrderSide.Lend,
-        type: OrderType.Limit,
-        status: OrderStatus.Open,
         originalAmount: '500000',
-      remainingAmount: '500000',
-      settlementFeeAmount: '10000',
-      rate: 400,
-      };
+        remainingAmount: '500000',
+        settlementFeeAmount: '10000',
+        rate: 400,
+      });
 
-      const lendOrder2: LendLimitOrder = {
-        orderId: generateOrderId(),
+      const lendOrder2: LendLimitOrder = createLendLimitOrder({
         walletAddress: walletAddress1,
         loanToken,
         maturities: [maturity],
         timestamp: Date.now() + 1,
-        side: OrderSide.Lend,
-        type: OrderType.Limit,
-        status: OrderStatus.Open,
         originalAmount: '500000',
-      remainingAmount: '500000',
-      settlementFeeAmount: '10000',
-      rate: 500,
-      };
+        remainingAmount: '500000',
+        settlementFeeAmount: '10000',
+        rate: 500,
+      });
 
       engine.submitOrder(lendOrder1);
       engine.submitOrder(lendOrder2);
 
       // Borrow limit order matches both (taker)
-      const borrowOrder: BorrowLimitOrder = {
-        orderId: generateOrderId(),
+      const borrowOrder: BorrowLimitOrder = createBorrowLimitOrder({
         walletAddress: walletAddress2,
         loanToken,
         maturities: [maturity],
         timestamp: Date.now() + 2,
-        side: OrderSide.Borrow,
-        type: OrderType.Limit,
-        status: OrderStatus.Open,
         originalAmount: '1000000',
-      remainingAmount: '1000000',
-      settlementFeeAmount: '10000',
-      rate: 600,
-      };
+        remainingAmount: '1000000',
+        settlementFeeAmount: '10000',
+        rate: 600,
+      });
 
       const result = engine.submitOrder(borrowOrder);
 
@@ -440,38 +364,30 @@ describe('BorrowerIsTaker Field', () => {
   describe('Edge Cases', () => {
     it('should correctly set borrowerIsTaker when limit order instantly matches (acts as taker)', () => {
       // This test verifies that a limit order can be a taker if it matches immediately
-      const lendOrder: LendLimitOrder = {
-        orderId: generateOrderId(),
+      const lendOrder: LendLimitOrder = createLendLimitOrder({
         walletAddress: walletAddress1,
         loanToken,
         maturities: [maturity],
         timestamp: Date.now(),
-        side: OrderSide.Lend,
-        type: OrderType.Limit,
-        status: OrderStatus.Open,
         originalAmount: '1000000',
-      remainingAmount: '1000000',
-      settlementFeeAmount: '10000',
-      rate: 500,
-      };
+        remainingAmount: '1000000',
+        settlementFeeAmount: '10000',
+        rate: 500,
+      });
 
       engine.submitOrder(lendOrder);
 
       // Borrow limit order with rate >= lend rate matches instantly (taker)
-      const borrowOrder: BorrowLimitOrder = {
-        orderId: generateOrderId(),
+      const borrowOrder: BorrowLimitOrder = createBorrowLimitOrder({
         walletAddress: walletAddress2,
         loanToken,
         maturities: [maturity],
         timestamp: Date.now() + 1,
-        side: OrderSide.Borrow,
-        type: OrderType.Limit,
-        status: OrderStatus.Open,
         originalAmount: '1000000',
-      remainingAmount: '1000000',
-      settlementFeeAmount: '10000',
-      rate: 500, // Exactly at lend rate - matches instantly
-      };
+        remainingAmount: '1000000',
+        settlementFeeAmount: '10000',
+        rate: 500, // Exactly at lend rate - matches instantly
+      });
 
       const result = engine.submitOrder(borrowOrder);
 
@@ -482,58 +398,46 @@ describe('BorrowerIsTaker Field', () => {
 
     it('should correctly set borrowerIsTaker in partial fill scenarios', () => {
       // Lend order in book (maker)
-      const lendOrder: LendLimitOrder = {
-        orderId: generateOrderId(),
+      const lendOrder: LendLimitOrder = createLendLimitOrder({
         walletAddress: walletAddress1,
         loanToken,
         maturities: [maturity],
         timestamp: Date.now(),
-        side: OrderSide.Lend,
-        type: OrderType.Limit,
-        status: OrderStatus.Open,
         originalAmount: '1000000',
-      remainingAmount: '1000000',
-      settlementFeeAmount: '10000',
-      rate: 500,
-      };
+        remainingAmount: '1000000',
+        settlementFeeAmount: '10000',
+        rate: 500,
+      });
 
       engine.submitOrder(lendOrder);
 
       // First borrow order partially fills (taker)
-      const borrowOrder1: BorrowLimitOrder = {
-        orderId: generateOrderId(),
+      const borrowOrder1: BorrowLimitOrder = createBorrowLimitOrder({
         walletAddress: walletAddress2,
         loanToken,
         maturities: [maturity],
         timestamp: Date.now() + 1,
-        side: OrderSide.Borrow,
-        type: OrderType.Limit,
-        status: OrderStatus.Open,
         originalAmount: '400000',
         remainingAmount: '400000',
         rate: 600,
         settlementFeeAmount: '10000',
-      };
+      });
 
       const result1 = engine.submitOrder(borrowOrder1);
       expect(result1.matches).toHaveLength(1);
       expect(result1.matches[0].borrowerIsTaker).toBe(true);
 
       // Second borrow order also matches remaining (taker)
-      const borrowOrder2: BorrowLimitOrder = {
-        orderId: generateOrderId(),
+      const borrowOrder2: BorrowLimitOrder = createBorrowLimitOrder({
         walletAddress: walletAddress2,
         loanToken,
         maturities: [maturity],
         timestamp: Date.now() + 2,
-        side: OrderSide.Borrow,
-        type: OrderType.Limit,
-        status: OrderStatus.Open,
         originalAmount: '600000',
         remainingAmount: '600000',
         rate: 600,
         settlementFeeAmount: '10000',
-      };
+      });
 
       const result2 = engine.submitOrder(borrowOrder2);
       expect(result2.matches).toHaveLength(1);
@@ -545,53 +449,41 @@ describe('BorrowerIsTaker Field', () => {
       const maturity2 = 1706745600;
 
       // Add lend orders for both maturities (makers)
-      const lendOrder1: LendLimitOrder = {
-        orderId: generateOrderId(),
+      const lendOrder1: LendLimitOrder = createLendLimitOrder({
         walletAddress: walletAddress1,
         loanToken,
         maturities: [maturity1],
         timestamp: Date.now(),
-        side: OrderSide.Lend,
-        type: OrderType.Limit,
-        status: OrderStatus.Open,
         originalAmount: '500000',
-      remainingAmount: '500000',
-      settlementFeeAmount: '10000',
-      rate: 500,
-      };
+        remainingAmount: '500000',
+        settlementFeeAmount: '10000',
+        rate: 500,
+      });
 
-      const lendOrder2: LendLimitOrder = {
-        orderId: generateOrderId(),
+      const lendOrder2: LendLimitOrder = createLendLimitOrder({
         walletAddress: walletAddress1,
         loanToken,
         maturities: [maturity2],
         timestamp: Date.now() + 1,
-        side: OrderSide.Lend,
-        type: OrderType.Limit,
-        status: OrderStatus.Open,
         originalAmount: '500000',
-      remainingAmount: '500000',
-      settlementFeeAmount: '10000',
-      rate: 600,
-      };
+        remainingAmount: '500000',
+        settlementFeeAmount: '10000',
+        rate: 600,
+      });
 
       engine.submitOrder(lendOrder1);
       engine.submitOrder(lendOrder2);
 
       // Borrow market order for both maturities (taker)
-      const borrowMarket: BorrowMarketOrder = {
-        orderId: generateOrderId(),
+      const borrowMarket: BorrowMarketOrder = createBorrowMarketOrder({
         walletAddress: walletAddress2,
         loanToken,
         maturities: [maturity1, maturity2],
         timestamp: Date.now() + 2,
-        side: OrderSide.Borrow,
-        type: OrderType.Market,
-        status: OrderStatus.Open,
         originalAmount: '1000000',
         remainingAmount: '1000000',
-      settlementFeeAmount: '10000',
-      };
+        settlementFeeAmount: '10000',
+      });
 
       const result = engine.submitOrder(borrowMarket);
 

@@ -113,7 +113,8 @@ describe('Message Helpers', () => {
         borrowerIsTaker: true,
         makerFeeAmount: '1000',
         takerFeeAmount: '2000',
-        settlementFeeAmount: '10000',
+        lenderSettlementFeeAmount: '5000',
+        borrowerSettlementFeeAmount: '5000',
       };
       const result: MatchResult = {
         matches: [mockMatch],

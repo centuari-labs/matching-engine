@@ -7,9 +7,14 @@ import {
   type HandlerContext,
 } from '../services/message-handlers';
 import type { LendLimitOrder, BorrowLimitOrder } from '../types/orders';
-import { OrderSide, OrderType, OrderStatus } from '../types/orders';
+import { LendMarketOrder, BorrowMarketOrder, OrderStatus } from '../types/orders';
 import { NATS_TOPICS } from '../config/nats-config';
-import { generateOrderId } from '../utils/helpers';
+import {
+  createLendLimitOrder,
+  createBorrowLimitOrder,
+  createLendMarketOrder,
+  createBorrowMarketOrder,
+} from './factories/order-factory';
 
 /**
  * Create a mock NATS connection for testing
@@ -56,39 +61,34 @@ describe('Order Status Publishing', () => {
   describe('Taker order status publishing', () => {
     it('should publish FILLED status for taker when fully matched', () => {
       // First submit a borrow order to the book
-      const borrowOrder: BorrowLimitOrder = {
-        orderId: generateOrderId(),
+      const borrowOrder: BorrowLimitOrder = createBorrowLimitOrder({
         walletAddress: walletAddress2,
         loanToken,
         maturities: [maturity],
         timestamp: Date.now(),
-        side: OrderSide.Borrow,
-        type: OrderType.Limit,
-        status: OrderStatus.Open,
         originalAmount: '1000000',
         remainingAmount: '1000000',
         settlementFeeAmount: '10000',
         rate: 600,
-      };
+      });
       engine.submitOrder(borrowOrder);
 
       // Now submit a lend order that will fully match
-      const lendOrder = {
-        orderId: generateOrderId(),
+      const lendOrder: LendLimitOrder = createLendLimitOrder({
         walletAddress: walletAddress1,
         loanToken,
         maturities: [maturity],
         timestamp: Date.now() + 1,
-        side: OrderSide.Lend,
-        type: OrderType.Limit,
-        status: OrderStatus.Open,
         originalAmount: '1000000',
         remainingAmount: '1000000',
         settlementFeeAmount: '10000',
         rate: 500,
-      };
+      });
 
-      handleLendLimitOrder(ctx, createOrderBytes(lendOrder));
+      handleLendLimitOrder(
+        ctx,
+        createOrderBytes(JSON.parse(JSON.stringify(lendOrder))),
+      );
 
       // Check that order status was published
       const statusMessages = mockNc.getMessagesForTopic(NATS_TOPICS.ORDERS_STATUS);
@@ -108,39 +108,34 @@ describe('Order Status Publishing', () => {
 
     it('should publish PARTIALLY_FILLED status for taker when partially matched', () => {
       // First submit a smaller borrow order to the book
-      const borrowOrder: BorrowLimitOrder = {
-        orderId: generateOrderId(),
+      const borrowOrder: BorrowLimitOrder = createBorrowLimitOrder({
         walletAddress: walletAddress2,
         loanToken,
         maturities: [maturity],
         timestamp: Date.now(),
-        side: OrderSide.Borrow,
-        type: OrderType.Limit,
-        status: OrderStatus.Open,
         originalAmount: '300000',
         remainingAmount: '300000',
         settlementFeeAmount: '10000',
         rate: 600,
-      };
+      });
       engine.submitOrder(borrowOrder);
 
       // Now submit a larger lend order that will partially match
-      const lendOrder = {
-        orderId: generateOrderId(),
+      const lendOrder: LendLimitOrder = createLendLimitOrder({
         walletAddress: walletAddress1,
         loanToken,
         maturities: [maturity],
         timestamp: Date.now() + 1,
-        side: OrderSide.Lend,
-        type: OrderType.Limit,
-        status: OrderStatus.Open,
         originalAmount: '1000000',
         remainingAmount: '1000000',
         settlementFeeAmount: '10000',
         rate: 500,
-      };
+      });
 
-      handleLendLimitOrder(ctx, createOrderBytes(lendOrder));
+      handleLendLimitOrder(
+        ctx,
+        createOrderBytes(JSON.parse(JSON.stringify(lendOrder))),
+      );
 
       // Check that order status was published
       const statusMessages = mockNc.getMessagesForTopic(NATS_TOPICS.ORDERS_STATUS);
@@ -159,22 +154,21 @@ describe('Order Status Publishing', () => {
 
     it('should publish OPEN status for limit order when added to book without matches', () => {
       // Submit a lend order with no counterparty
-      const lendOrder = {
-        orderId: generateOrderId(),
+      const lendOrder: LendLimitOrder = createLendLimitOrder({
         walletAddress: walletAddress1,
         loanToken,
         maturities: [maturity],
         timestamp: Date.now(),
-        side: OrderSide.Lend,
-        type: OrderType.Limit,
-        status: OrderStatus.Open,
         originalAmount: '1000000',
         remainingAmount: '1000000',
         settlementFeeAmount: '10000',
         rate: 500,
-      };
+      });
 
-      handleLendLimitOrder(ctx, createOrderBytes(lendOrder));
+      handleLendLimitOrder(
+        ctx,
+        createOrderBytes(JSON.parse(JSON.stringify(lendOrder))),
+      );
 
       // Check that order status was published with OPEN status
       const statusMessages = mockNc.getMessagesForTopic(NATS_TOPICS.ORDERS_STATUS);
@@ -190,39 +184,34 @@ describe('Order Status Publishing', () => {
   describe('Maker order status publishing', () => {
     it('should publish FILLED status for maker when fully matched', () => {
       // First submit a lend order to the book
-      const lendOrder: LendLimitOrder = {
-        orderId: generateOrderId(),
+      const lendOrder: LendLimitOrder = createLendLimitOrder({
         walletAddress: walletAddress1,
         loanToken,
         maturities: [maturity],
         timestamp: Date.now(),
-        side: OrderSide.Lend,
-        type: OrderType.Limit,
-        status: OrderStatus.Open,
         originalAmount: '1000000',
         remainingAmount: '1000000',
         settlementFeeAmount: '10000',
         rate: 500,
-      };
+      });
       engine.submitOrder(lendOrder);
 
       // Now submit a borrow order that will fully match the lend order
-      const borrowOrder = {
-        orderId: generateOrderId(),
+      const borrowOrder: BorrowLimitOrder = createBorrowLimitOrder({
         walletAddress: walletAddress2,
         loanToken,
         maturities: [maturity],
         timestamp: Date.now() + 1,
-        side: OrderSide.Borrow,
-        type: OrderType.Limit,
-        status: OrderStatus.Open,
         originalAmount: '1000000',
         remainingAmount: '1000000',
         settlementFeeAmount: '10000',
         rate: 600,
-      };
+      });
 
-      handleBorrowLimitOrder(ctx, createOrderBytes(borrowOrder));
+      handleBorrowLimitOrder(
+        ctx,
+        createOrderBytes(JSON.parse(JSON.stringify(borrowOrder))),
+      );
 
       // Check that maker order status was published
       const statusMessages = mockNc.getMessagesForTopic(NATS_TOPICS.ORDERS_STATUS);
@@ -241,39 +230,34 @@ describe('Order Status Publishing', () => {
 
     it('should publish PARTIALLY_FILLED status for maker when partially matched', () => {
       // First submit a large lend order to the book
-      const lendOrder: LendLimitOrder = {
-        orderId: generateOrderId(),
+      const lendOrder: LendLimitOrder = createLendLimitOrder({
         walletAddress: walletAddress1,
         loanToken,
         maturities: [maturity],
         timestamp: Date.now(),
-        side: OrderSide.Lend,
-        type: OrderType.Limit,
-        status: OrderStatus.Open,
         originalAmount: '1000000',
         remainingAmount: '1000000',
         settlementFeeAmount: '10000',
         rate: 500,
-      };
+      });
       engine.submitOrder(lendOrder);
 
       // Now submit a smaller borrow order
-      const borrowOrder = {
-        orderId: generateOrderId(),
+      const borrowOrder: BorrowLimitOrder = createBorrowLimitOrder({
         walletAddress: walletAddress2,
         loanToken,
         maturities: [maturity],
         timestamp: Date.now() + 1,
-        side: OrderSide.Borrow,
-        type: OrderType.Limit,
-        status: OrderStatus.Open,
         originalAmount: '400000',
         remainingAmount: '400000',
         settlementFeeAmount: '10000',
         rate: 600,
-      };
+      });
 
-      handleBorrowLimitOrder(ctx, createOrderBytes(borrowOrder));
+      handleBorrowLimitOrder(
+        ctx,
+        createOrderBytes(JSON.parse(JSON.stringify(borrowOrder))),
+      );
 
       // Check that maker order status was published
       const statusMessages = mockNc.getMessagesForTopic(NATS_TOPICS.ORDERS_STATUS);
@@ -292,56 +276,47 @@ describe('Order Status Publishing', () => {
 
     it('should publish status for all affected maker orders', () => {
       // Submit multiple lend orders to the book
-      const lendOrder1: LendLimitOrder = {
-        orderId: generateOrderId(),
+      const lendOrder1: LendLimitOrder = createLendLimitOrder({
         walletAddress: walletAddress1,
         loanToken,
         maturities: [maturity],
         timestamp: Date.now(),
-        side: OrderSide.Lend,
-        type: OrderType.Limit,
-        status: OrderStatus.Open,
         originalAmount: '300000',
         remainingAmount: '300000',
         settlementFeeAmount: '10000',
         rate: 400,
-      };
+      });
 
-      const lendOrder2: LendLimitOrder = {
-        orderId: generateOrderId(),
+      const lendOrder2: LendLimitOrder = createLendLimitOrder({
         walletAddress: walletAddress1,
         loanToken,
         maturities: [maturity],
         timestamp: Date.now() + 1,
-        side: OrderSide.Lend,
-        type: OrderType.Limit,
-        status: OrderStatus.Open,
         originalAmount: '400000',
         remainingAmount: '400000',
         settlementFeeAmount: '10000',
         rate: 500,
-      };
+      });
 
       engine.submitOrder(lendOrder1);
       engine.submitOrder(lendOrder2);
 
       // Submit a large borrow order that matches both
-      const borrowOrder = {
-        orderId: generateOrderId(),
+      const borrowOrder: BorrowLimitOrder = createBorrowLimitOrder({
         walletAddress: walletAddress2,
         loanToken,
         maturities: [maturity],
         timestamp: Date.now() + 2,
-        side: OrderSide.Borrow,
-        type: OrderType.Limit,
-        status: OrderStatus.Open,
         originalAmount: '700000',
         remainingAmount: '700000',
         settlementFeeAmount: '10000',
         rate: 600,
-      };
+      });
 
-      handleBorrowLimitOrder(ctx, createOrderBytes(borrowOrder));
+      handleBorrowLimitOrder(
+        ctx,
+        createOrderBytes(JSON.parse(JSON.stringify(borrowOrder))),
+      );
 
       // Check that all maker order statuses were published
       const statusMessages = mockNc.getMessagesForTopic(NATS_TOPICS.ORDERS_STATUS);
@@ -371,38 +346,33 @@ describe('Order Status Publishing', () => {
   describe('Market order status publishing', () => {
     it('should publish FILLED status for market order when fully matched', () => {
       // First submit a borrow order to the book
-      const borrowOrder: BorrowLimitOrder = {
-        orderId: generateOrderId(),
+      const borrowOrder: BorrowLimitOrder = createBorrowLimitOrder({
         walletAddress: walletAddress2,
         loanToken,
         maturities: [maturity],
         timestamp: Date.now(),
-        side: OrderSide.Borrow,
-        type: OrderType.Limit,
-        status: OrderStatus.Open,
         originalAmount: '1000000',
         remainingAmount: '1000000',
         settlementFeeAmount: '10000',
         rate: 600,
-      };
+      });
       engine.submitOrder(borrowOrder);
 
       // Now submit a lend market order
-      const lendMarketOrder = {
-        orderId: generateOrderId(),
+      const lendMarketOrder: LendMarketOrder = createLendMarketOrder({
         walletAddress: walletAddress1,
         loanToken,
         maturities: [maturity],
         timestamp: Date.now() + 1,
-        side: OrderSide.Lend,
-        type: OrderType.Market,
-        status: OrderStatus.Open,
         originalAmount: '1000000',
         remainingAmount: '1000000',
         settlementFeeAmount: '10000',
-      };
+      });
 
-      handleLendMarketOrder(ctx, createOrderBytes(lendMarketOrder));
+      handleLendMarketOrder(
+        ctx,
+        createOrderBytes(JSON.parse(JSON.stringify(lendMarketOrder))),
+      );
 
       // Check that taker (market order) status was published
       const statusMessages = mockNc.getMessagesForTopic(NATS_TOPICS.ORDERS_STATUS);
@@ -419,38 +389,33 @@ describe('Order Status Publishing', () => {
 
     it('should publish status for makers matched by borrow market order', () => {
       // First submit a lend order to the book
-      const lendOrder: LendLimitOrder = {
-        orderId: generateOrderId(),
+      const lendOrder: LendLimitOrder = createLendLimitOrder({
         walletAddress: walletAddress1,
         loanToken,
         maturities: [maturity],
         timestamp: Date.now(),
-        side: OrderSide.Lend,
-        type: OrderType.Limit,
-        status: OrderStatus.Open,
         originalAmount: '500000',
         remainingAmount: '500000',
         settlementFeeAmount: '10000',
         rate: 500,
-      };
+      });
       engine.submitOrder(lendOrder);
 
       // Now submit a borrow market order
-      const borrowMarketOrder = {
-        orderId: generateOrderId(),
+      const borrowMarketOrder: BorrowMarketOrder = createBorrowMarketOrder({
         walletAddress: walletAddress2,
         loanToken,
         maturities: [maturity],
         timestamp: Date.now() + 1,
-        side: OrderSide.Borrow,
-        type: OrderType.Market,
-        status: OrderStatus.Open,
         originalAmount: '500000',
         remainingAmount: '500000',
         settlementFeeAmount: '10000',
-      };
+      });
 
-      handleBorrowMarketOrder(ctx, createOrderBytes(borrowMarketOrder));
+      handleBorrowMarketOrder(
+        ctx,
+        createOrderBytes(JSON.parse(JSON.stringify(borrowMarketOrder))),
+      );
 
       // Check that maker order status was published
       const statusMessages = mockNc.getMessagesForTopic(NATS_TOPICS.ORDERS_STATUS);
@@ -469,39 +434,34 @@ describe('Order Status Publishing', () => {
   describe('Match created message publishing', () => {
     it('should publish matches.created message alongside order status', () => {
       // First submit a lend order to the book
-      const lendOrder: LendLimitOrder = {
-        orderId: generateOrderId(),
+      const lendOrder: LendLimitOrder = createLendLimitOrder({
         walletAddress: walletAddress1,
         loanToken,
         maturities: [maturity],
         timestamp: Date.now(),
-        side: OrderSide.Lend,
-        type: OrderType.Limit,
-        status: OrderStatus.Open,
         originalAmount: '1000000',
         remainingAmount: '1000000',
         settlementFeeAmount: '10000',
         rate: 500,
-      };
+      });
       engine.submitOrder(lendOrder);
 
       // Now submit a borrow order
-      const borrowOrder = {
-        orderId: generateOrderId(),
+      const borrowOrder: BorrowLimitOrder = createBorrowLimitOrder({
         walletAddress: walletAddress2,
         loanToken,
         maturities: [maturity],
         timestamp: Date.now() + 1,
-        side: OrderSide.Borrow,
-        type: OrderType.Limit,
-        status: OrderStatus.Open,
         originalAmount: '1000000',
         remainingAmount: '1000000',
         settlementFeeAmount: '10000',
         rate: 600,
-      };
+      });
 
-      handleBorrowLimitOrder(ctx, createOrderBytes(borrowOrder));
+      handleBorrowLimitOrder(
+        ctx,
+        createOrderBytes(JSON.parse(JSON.stringify(borrowOrder))),
+      );
 
       // Check that matches.created message was published
       const matchMessages = mockNc.getMessagesForTopic(NATS_TOPICS.MATCHES_CREATED);

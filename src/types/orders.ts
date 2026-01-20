@@ -37,7 +37,10 @@ export const ethereumAddressSchema = z
   .regex(/^0x[a-fA-F0-9]{40}$/, 'Invalid Ethereum address format');
 
 /**
- * Base order schema with common fields
+ * Base order schema with common fields.
+ *
+ * All monetary values are represented as decimal strings containing only digits.
+ * This avoids precision issues when dealing with very large integers.
  */
 const baseOrderSchema = z.object({
   orderId: z.string().uuid('Order ID must be a valid UUID'),
@@ -50,8 +53,28 @@ const baseOrderSchema = z.object({
   side: z.nativeEnum(OrderSide),
   type: z.nativeEnum(OrderType),
   status: z.nativeEnum(OrderStatus).default(OrderStatus.Open),
+  /**
+   * Total notional amount for the order if it is fully filled.
+   *
+   * This value never changes over the lifetime of the order and is used as
+   * the reference quantity for fee calculations.
+   */
   originalAmount: z.string().regex(/^\d+$/, 'Amount must be a positive integer string'),
+  /**
+   * Remaining unfilled notional amount for the order.
+   *
+   * This value is decremented as matches execute against the order. When it
+   * reaches zero, the order is considered fully filled and removed from the
+   * book.
+   */
   remainingAmount: z.string().regex(/^\d+$/, 'Amount must be a positive integer string'),
+  /**
+   * Total settlement fee for this order assuming it is fully filled.
+   *
+   * External clients specify this value when submitting the order. Internally,
+   * the engine will allocate pro‑rata settlement fees for each match based on
+   * the matched amount versus the original amount.
+   */
   settlementFeeAmount: z.string().regex(/^\d+$/, 'Fee amount must be a positive integer string'),
   /**
    * Remaining settlement fee pool for this order.

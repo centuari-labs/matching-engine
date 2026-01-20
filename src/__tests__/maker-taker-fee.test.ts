@@ -7,10 +7,16 @@ import type {
 } from '../types/orders';
 import { OrderSide, OrderType, OrderStatus } from '../types/orders';
 import {
-  generateOrderId,
   calculateMakerFee,
   calculateTakerFee,
+  generateOrderId,
 } from '../utils/helpers';
+import {
+  createLendLimitOrder,
+  createBorrowLimitOrder,
+  createLendMarketOrder,
+  createBorrowMarketOrder,
+} from './factories/order-factory';
 
 /**
  * Tests for maker and taker fee calculations
@@ -116,37 +122,29 @@ describe('Maker/Taker Fee Calculations', () => {
   describe('Fee Assignment: Lend Market Order (borrowerIsTaker = false)', () => {
     it('should assign fees correctly when lend market order matches borrow limit order', () => {
       // Borrow limit order is placed first (becomes maker)
-      const borrowOrder: BorrowLimitOrder = {
-        orderId: generateOrderId(),
+      const borrowOrder: BorrowLimitOrder = createBorrowLimitOrder({
         walletAddress: walletAddress2,
         loanToken,
         maturities: [maturity],
         timestamp: Date.now(),
-        side: OrderSide.Borrow,
-        type: OrderType.Limit,
-        status: OrderStatus.Open,
         originalAmount: '1000000',
         remainingAmount: '1000000',
         settlementFeeAmount: '10000',
         rate: 600,
-      };
+      });
 
       engine.submitOrder(borrowOrder);
 
       // Lend market order comes in (becomes taker)
-      const lendMarket: LendMarketOrder = {
-        orderId: generateOrderId(),
+      const lendMarket: LendMarketOrder = createLendMarketOrder({
         walletAddress: walletAddress1,
         loanToken,
         maturities: [maturity],
         timestamp: Date.now() + 1,
-        side: OrderSide.Lend,
-        type: OrderType.Market,
-        status: OrderStatus.Open,
         originalAmount: '1000000',
         remainingAmount: '1000000',
         settlementFeeAmount: '10000',
-      };
+      });
 
       const result = engine.submitOrder(lendMarket);
 
@@ -162,36 +160,28 @@ describe('Maker/Taker Fee Calculations', () => {
     });
 
     it('should calculate fees correctly for amounts not divisible by 1000', () => {
-      const borrowOrder: BorrowLimitOrder = {
-        orderId: generateOrderId(),
+      const borrowOrder: BorrowLimitOrder = createBorrowLimitOrder({
         walletAddress: walletAddress2,
         loanToken,
         maturities: [maturity],
         timestamp: Date.now(),
-        side: OrderSide.Borrow,
-        type: OrderType.Limit,
-        status: OrderStatus.Open,
         originalAmount: '1234567',
         remainingAmount: '1234567',
         settlementFeeAmount: '10000',
         rate: 600,
-      };
+      });
 
       engine.submitOrder(borrowOrder);
 
-      const lendMarket: LendMarketOrder = {
-        orderId: generateOrderId(),
+      const lendMarket: LendMarketOrder = createLendMarketOrder({
         walletAddress: walletAddress1,
         loanToken,
         maturities: [maturity],
         timestamp: Date.now() + 1,
-        side: OrderSide.Lend,
-        type: OrderType.Market,
-        status: OrderStatus.Open,
         originalAmount: '1234567',
         remainingAmount: '1234567',
         settlementFeeAmount: '10000',
-      };
+      });
 
       const result = engine.submitOrder(lendMarket);
 
@@ -205,52 +195,40 @@ describe('Maker/Taker Fee Calculations', () => {
     });
 
     it('should calculate fees correctly for multiple matches', () => {
-      const borrowOrder1: BorrowLimitOrder = {
-        orderId: generateOrderId(),
+      const borrowOrder1: BorrowLimitOrder = createBorrowLimitOrder({
         walletAddress: walletAddress2,
         loanToken,
         maturities: [maturity],
         timestamp: Date.now(),
-        side: OrderSide.Borrow,
-        type: OrderType.Limit,
-        status: OrderStatus.Open,
         originalAmount: '500000',
         remainingAmount: '500000',
         settlementFeeAmount: '10000',
         rate: 800,
-      };
+      });
 
-      const borrowOrder2: BorrowLimitOrder = {
-        orderId: generateOrderId(),
+      const borrowOrder2: BorrowLimitOrder = createBorrowLimitOrder({
         walletAddress: walletAddress2,
         loanToken,
         maturities: [maturity],
         timestamp: Date.now() + 1,
-        side: OrderSide.Borrow,
-        type: OrderType.Limit,
-        status: OrderStatus.Open,
         originalAmount: '500000',
         remainingAmount: '500000',
         settlementFeeAmount: '10000',
         rate: 600,
-      };
+      });
 
       engine.submitOrder(borrowOrder1);
       engine.submitOrder(borrowOrder2);
 
-      const lendMarket: LendMarketOrder = {
-        orderId: generateOrderId(),
+      const lendMarket: LendMarketOrder = createLendMarketOrder({
         walletAddress: walletAddress1,
         loanToken,
         maturities: [maturity],
         timestamp: Date.now() + 2,
-        side: OrderSide.Lend,
-        type: OrderType.Market,
-        status: OrderStatus.Open,
         originalAmount: '1000000',
         remainingAmount: '1000000',
         settlementFeeAmount: '10000',
-      };
+      });
 
       const result = engine.submitOrder(lendMarket);
 
@@ -273,38 +251,30 @@ describe('Maker/Taker Fee Calculations', () => {
   describe('Fee Assignment: Lend Limit Order (borrowerIsTaker = false)', () => {
     it('should assign fees correctly when lend limit order matches borrow limit order', () => {
       // Borrow limit order is placed first (becomes maker)
-      const borrowOrder: BorrowLimitOrder = {
-        orderId: generateOrderId(),
+      const borrowOrder: BorrowLimitOrder = createBorrowLimitOrder({
         walletAddress: walletAddress2,
         loanToken,
         maturities: [maturity],
         timestamp: Date.now(),
-        side: OrderSide.Borrow,
-        type: OrderType.Limit,
-        status: OrderStatus.Open,
         originalAmount: '1000000',
         remainingAmount: '1000000',
         settlementFeeAmount: '10000',
         rate: 600,
-      };
+      });
 
       engine.submitOrder(borrowOrder);
 
       // Lend limit order comes in and matches (becomes taker)
-      const lendOrder: LendLimitOrder = {
-        orderId: generateOrderId(),
+      const lendOrder: LendLimitOrder = createLendLimitOrder({
         walletAddress: walletAddress1,
         loanToken,
         maturities: [maturity],
         timestamp: Date.now() + 1,
-        side: OrderSide.Lend,
-        type: OrderType.Limit,
-        status: OrderStatus.Open,
         originalAmount: '1000000',
         remainingAmount: '1000000',
         settlementFeeAmount: '10000',
         rate: 500,
-      };
+      });
 
       const result = engine.submitOrder(lendOrder);
 
@@ -320,38 +290,30 @@ describe('Maker/Taker Fee Calculations', () => {
     });
 
     it('should calculate fees correctly for partial fills', () => {
-      const borrowOrder: BorrowLimitOrder = {
-        orderId: generateOrderId(),
+      const borrowOrder: BorrowLimitOrder = createBorrowLimitOrder({
         walletAddress: walletAddress2,
         loanToken,
         maturities: [maturity],
         timestamp: Date.now(),
-        side: OrderSide.Borrow,
-        type: OrderType.Limit,
-        status: OrderStatus.Open,
         originalAmount: '1000000',
         remainingAmount: '1000000',
         settlementFeeAmount: '10000',
         rate: 600,
-      };
+      });
 
       engine.submitOrder(borrowOrder);
 
       // Lend order that partially fills
-      const lendOrder: LendLimitOrder = {
-        orderId: generateOrderId(),
+      const lendOrder: LendLimitOrder = createLendLimitOrder({
         walletAddress: walletAddress1,
         loanToken,
         maturities: [maturity],
         timestamp: Date.now() + 1,
-        side: OrderSide.Lend,
-        type: OrderType.Limit,
-        status: OrderStatus.Open,
         originalAmount: '750000',
         remainingAmount: '750000',
         settlementFeeAmount: '10000',
         rate: 500,
-      };
+      });
 
       const result = engine.submitOrder(lendOrder);
 
@@ -369,37 +331,29 @@ describe('Maker/Taker Fee Calculations', () => {
   describe('Fee Assignment: Borrow Market Order (borrowerIsTaker = true)', () => {
     it('should assign fees correctly when borrow market order matches lend limit order', () => {
       // Lend limit order is placed first (becomes maker)
-      const lendOrder: LendLimitOrder = {
-        orderId: generateOrderId(),
+      const lendOrder: LendLimitOrder = createLendLimitOrder({
         walletAddress: walletAddress1,
         loanToken,
         maturities: [maturity],
         timestamp: Date.now(),
-        side: OrderSide.Lend,
-        type: OrderType.Limit,
-        status: OrderStatus.Open,
         originalAmount: '1000000',
         remainingAmount: '1000000',
         settlementFeeAmount: '10000',
         rate: 500,
-      };
+      });
 
       engine.submitOrder(lendOrder);
 
       // Borrow market order comes in (becomes taker)
-      const borrowMarket: BorrowMarketOrder = {
-        orderId: generateOrderId(),
+      const borrowMarket: BorrowMarketOrder = createBorrowMarketOrder({
         walletAddress: walletAddress2,
         loanToken,
         maturities: [maturity],
         timestamp: Date.now() + 1,
-        side: OrderSide.Borrow,
-        type: OrderType.Market,
-        status: OrderStatus.Open,
         originalAmount: '1000000',
         remainingAmount: '1000000',
         settlementFeeAmount: '10000',
-      };
+      });
 
       const result = engine.submitOrder(borrowMarket);
 
@@ -415,36 +369,28 @@ describe('Maker/Taker Fee Calculations', () => {
     });
 
     it('should calculate fees correctly for amounts not divisible by 1000', () => {
-      const lendOrder: LendLimitOrder = {
-        orderId: generateOrderId(),
+      const lendOrder: LendLimitOrder = createLendLimitOrder({
         walletAddress: walletAddress1,
         loanToken,
         maturities: [maturity],
         timestamp: Date.now(),
-        side: OrderSide.Lend,
-        type: OrderType.Limit,
-        status: OrderStatus.Open,
         originalAmount: '1234567',
         remainingAmount: '1234567',
         settlementFeeAmount: '10000',
         rate: 500,
-      };
+      });
 
       engine.submitOrder(lendOrder);
 
-      const borrowMarket: BorrowMarketOrder = {
-        orderId: generateOrderId(),
+      const borrowMarket: BorrowMarketOrder = createBorrowMarketOrder({
         walletAddress: walletAddress2,
         loanToken,
         maturities: [maturity],
         timestamp: Date.now() + 1,
-        side: OrderSide.Borrow,
-        type: OrderType.Market,
-        status: OrderStatus.Open,
         originalAmount: '1234567',
         remainingAmount: '1234567',
         settlementFeeAmount: '10000',
-      };
+      });
 
       const result = engine.submitOrder(borrowMarket);
 
@@ -458,52 +404,40 @@ describe('Maker/Taker Fee Calculations', () => {
     });
 
     it('should calculate fees correctly for multiple matches', () => {
-      const lendOrder1: LendLimitOrder = {
-        orderId: generateOrderId(),
+      const lendOrder1: LendLimitOrder = createLendLimitOrder({
         walletAddress: walletAddress1,
         loanToken,
         maturities: [maturity],
         timestamp: Date.now(),
-        side: OrderSide.Lend,
-        type: OrderType.Limit,
-        status: OrderStatus.Open,
         originalAmount: '500000',
         remainingAmount: '500000',
         settlementFeeAmount: '10000',
         rate: 400,
-      };
+      });
 
-      const lendOrder2: LendLimitOrder = {
-        orderId: generateOrderId(),
+      const lendOrder2: LendLimitOrder = createLendLimitOrder({
         walletAddress: walletAddress1,
         loanToken,
         maturities: [maturity],
         timestamp: Date.now() + 1,
-        side: OrderSide.Lend,
-        type: OrderType.Limit,
-        status: OrderStatus.Open,
         originalAmount: '500000',
         remainingAmount: '500000',
         settlementFeeAmount: '10000',
         rate: 600,
-      };
+      });
 
       engine.submitOrder(lendOrder1);
       engine.submitOrder(lendOrder2);
 
-      const borrowMarket: BorrowMarketOrder = {
-        orderId: generateOrderId(),
+      const borrowMarket: BorrowMarketOrder = createBorrowMarketOrder({
         walletAddress: walletAddress2,
         loanToken,
         maturities: [maturity],
         timestamp: Date.now() + 2,
-        side: OrderSide.Borrow,
-        type: OrderType.Market,
-        status: OrderStatus.Open,
         originalAmount: '1000000',
         remainingAmount: '1000000',
         settlementFeeAmount: '10000',
-      };
+      });
 
       const result = engine.submitOrder(borrowMarket);
 
@@ -526,38 +460,30 @@ describe('Maker/Taker Fee Calculations', () => {
   describe('Fee Assignment: Borrow Limit Order (borrowerIsTaker = true)', () => {
     it('should assign fees correctly when borrow limit order matches lend limit order', () => {
       // Lend limit order is placed first (becomes maker)
-      const lendOrder: LendLimitOrder = {
-        orderId: generateOrderId(),
+      const lendOrder: LendLimitOrder = createLendLimitOrder({
         walletAddress: walletAddress1,
         loanToken,
         maturities: [maturity],
         timestamp: Date.now(),
-        side: OrderSide.Lend,
-        type: OrderType.Limit,
-        status: OrderStatus.Open,
         originalAmount: '1000000',
         remainingAmount: '1000000',
         settlementFeeAmount: '10000',
         rate: 500,
-      };
+      });
 
       engine.submitOrder(lendOrder);
 
       // Borrow limit order comes in and matches (becomes taker)
-      const borrowOrder: BorrowLimitOrder = {
-        orderId: generateOrderId(),
+      const borrowOrder: BorrowLimitOrder = createBorrowLimitOrder({
         walletAddress: walletAddress2,
         loanToken,
         maturities: [maturity],
         timestamp: Date.now() + 1,
-        side: OrderSide.Borrow,
-        type: OrderType.Limit,
-        status: OrderStatus.Open,
         originalAmount: '1000000',
         remainingAmount: '1000000',
         settlementFeeAmount: '10000',
         rate: 600,
-      };
+      });
 
       const result = engine.submitOrder(borrowOrder);
 
@@ -573,38 +499,30 @@ describe('Maker/Taker Fee Calculations', () => {
     });
 
     it('should calculate fees correctly for partial fills', () => {
-      const lendOrder: LendLimitOrder = {
-        orderId: generateOrderId(),
+      const lendOrder: LendLimitOrder = createLendLimitOrder({
         walletAddress: walletAddress1,
         loanToken,
         maturities: [maturity],
         timestamp: Date.now(),
-        side: OrderSide.Lend,
-        type: OrderType.Limit,
-        status: OrderStatus.Open,
         originalAmount: '1000000',
         remainingAmount: '1000000',
         settlementFeeAmount: '10000',
         rate: 500,
-      };
+      });
 
       engine.submitOrder(lendOrder);
 
       // Borrow order that partially fills
-      const borrowOrder: BorrowLimitOrder = {
-        orderId: generateOrderId(),
+      const borrowOrder: BorrowLimitOrder = createBorrowLimitOrder({
         walletAddress: walletAddress2,
         loanToken,
         maturities: [maturity],
         timestamp: Date.now() + 1,
-        side: OrderSide.Borrow,
-        type: OrderType.Limit,
-        status: OrderStatus.Open,
         originalAmount: '750000',
         remainingAmount: '750000',
         settlementFeeAmount: '10000',
         rate: 600,
-      };
+      });
 
       const result = engine.submitOrder(borrowOrder);
 
@@ -621,36 +539,28 @@ describe('Maker/Taker Fee Calculations', () => {
 
   describe('Edge Cases', () => {
     it('should handle very small amounts that produce zero fees', () => {
-      const borrowOrder: BorrowLimitOrder = {
-        orderId: generateOrderId(),
+      const borrowOrder: BorrowLimitOrder = createBorrowLimitOrder({
         walletAddress: walletAddress2,
         loanToken,
         maturities: [maturity],
         timestamp: Date.now(),
-        side: OrderSide.Borrow,
-        type: OrderType.Limit,
-        status: OrderStatus.Open,
         originalAmount: '999',
         remainingAmount: '999',
         settlementFeeAmount: '10000',
         rate: 600,
-      };
+      });
 
       engine.submitOrder(borrowOrder);
 
-      const lendMarket: LendMarketOrder = {
-        orderId: generateOrderId(),
+      const lendMarket: LendMarketOrder = createLendMarketOrder({
         walletAddress: walletAddress1,
         loanToken,
         maturities: [maturity],
         timestamp: Date.now() + 1,
-        side: OrderSide.Lend,
-        type: OrderType.Market,
-        status: OrderStatus.Open,
         originalAmount: '999',
         remainingAmount: '999',
         settlementFeeAmount: '10000',
-      };
+      });
 
       const result = engine.submitOrder(lendMarket);
 
@@ -663,36 +573,28 @@ describe('Maker/Taker Fee Calculations', () => {
     });
 
     it('should handle minimum amounts that produce fees', () => {
-      const borrowOrder: BorrowLimitOrder = {
-        orderId: generateOrderId(),
+      const borrowOrder: BorrowLimitOrder = createBorrowLimitOrder({
         walletAddress: walletAddress2,
         loanToken,
         maturities: [maturity],
         timestamp: Date.now(),
-        side: OrderSide.Borrow,
-        type: OrderType.Limit,
-        status: OrderStatus.Open,
         originalAmount: '1000',
         remainingAmount: '1000',
         settlementFeeAmount: '10000',
         rate: 600,
-      };
+      });
 
       engine.submitOrder(borrowOrder);
 
-      const lendMarket: LendMarketOrder = {
-        orderId: generateOrderId(),
+      const lendMarket: LendMarketOrder = createLendMarketOrder({
         walletAddress: walletAddress1,
         loanToken,
         maturities: [maturity],
         timestamp: Date.now() + 1,
-        side: OrderSide.Lend,
-        type: OrderType.Market,
-        status: OrderStatus.Open,
         originalAmount: '1000',
         remainingAmount: '1000',
         settlementFeeAmount: '10000',
-      };
+      });
 
       const result = engine.submitOrder(lendMarket);
 
@@ -709,36 +611,28 @@ describe('Maker/Taker Fee Calculations', () => {
       const expectedMakerFee = calculateMakerFee(largeAmount);
       const expectedTakerFee = calculateTakerFee(largeAmount);
 
-      const borrowOrder: BorrowLimitOrder = {
-        orderId: generateOrderId(),
+      const borrowOrder: BorrowLimitOrder = createBorrowLimitOrder({
         walletAddress: walletAddress2,
         loanToken,
         maturities: [maturity],
         timestamp: Date.now(),
-        side: OrderSide.Borrow,
-        type: OrderType.Limit,
-        status: OrderStatus.Open,
         originalAmount: largeAmount,
         remainingAmount: largeAmount,
         settlementFeeAmount: '10000',
         rate: 600,
-      };
+      });
 
       engine.submitOrder(borrowOrder);
 
-      const lendMarket: LendMarketOrder = {
-        orderId: generateOrderId(),
+      const lendMarket: LendMarketOrder = createLendMarketOrder({
         walletAddress: walletAddress1,
         loanToken,
         maturities: [maturity],
         timestamp: Date.now() + 1,
-        side: OrderSide.Lend,
-        type: OrderType.Market,
-        status: OrderStatus.Open,
         originalAmount: largeAmount,
         remainingAmount: largeAmount,
         settlementFeeAmount: '10000',
-      };
+      });
 
       const result = engine.submitOrder(lendMarket);
 
@@ -756,52 +650,40 @@ describe('Maker/Taker Fee Calculations', () => {
     });
 
     it('should calculate fees correctly for multiple partial matches with different amounts', () => {
-      const lendOrder1: LendLimitOrder = {
-        orderId: generateOrderId(),
+      const lendOrder1: LendLimitOrder = createLendLimitOrder({
         walletAddress: walletAddress1,
         loanToken,
         maturities: [maturity],
         timestamp: Date.now(),
-        side: OrderSide.Lend,
-        type: OrderType.Limit,
-        status: OrderStatus.Open,
         originalAmount: '333333',
         remainingAmount: '333333',
         settlementFeeAmount: '10000',
         rate: 400,
-      };
+      });
 
-      const lendOrder2: LendLimitOrder = {
-        orderId: generateOrderId(),
+      const lendOrder2: LendLimitOrder = createLendLimitOrder({
         walletAddress: walletAddress1,
         loanToken,
         maturities: [maturity],
         timestamp: Date.now() + 1,
-        side: OrderSide.Lend,
-        type: OrderType.Limit,
-        status: OrderStatus.Open,
         originalAmount: '444444',
         remainingAmount: '444444',
         settlementFeeAmount: '10000',
         rate: 500,
-      };
+      });
 
       engine.submitOrder(lendOrder1);
       engine.submitOrder(lendOrder2);
 
-      const borrowMarket: BorrowMarketOrder = {
-        orderId: generateOrderId(),
+      const borrowMarket: BorrowMarketOrder = createBorrowMarketOrder({
         walletAddress: walletAddress2,
         loanToken,
         maturities: [maturity],
         timestamp: Date.now() + 2,
-        side: OrderSide.Borrow,
-        type: OrderType.Market,
-        status: OrderStatus.Open,
         originalAmount: '777777',
         remainingAmount: '777777',
         settlementFeeAmount: '10000',
-      };
+      });
 
       const result = engine.submitOrder(borrowMarket);
 
@@ -828,20 +710,17 @@ describe('Maker/Taker Fee Calculations', () => {
         {
           name: 'borrowerIsTaker = true',
           setupMaker: () => {
-            const lendOrder: LendLimitOrder = {
+            const lendOrder: LendLimitOrder = createLendLimitOrder({
               orderId: generateOrderId(),
               walletAddress: walletAddress1,
               loanToken,
               maturities: [maturity],
               timestamp: Date.now(),
-              side: OrderSide.Lend,
-              type: OrderType.Limit,
-              status: OrderStatus.Open,
               originalAmount: '1000000',
               remainingAmount: '1000000',
               settlementFeeAmount: '10000',
               rate: 500,
-            };
+            });
             engine.submitOrder(lendOrder);
             return {
               order: {
@@ -864,20 +743,17 @@ describe('Maker/Taker Fee Calculations', () => {
         {
           name: 'borrowerIsTaker = false',
           setupMaker: () => {
-            const borrowOrder: BorrowLimitOrder = {
+            const borrowOrder: BorrowLimitOrder = createBorrowLimitOrder({
               orderId: generateOrderId(),
               walletAddress: walletAddress2,
               loanToken,
               maturities: [maturity],
               timestamp: Date.now(),
-              side: OrderSide.Borrow,
-              type: OrderType.Limit,
-              status: OrderStatus.Open,
               originalAmount: '1000000',
               remainingAmount: '1000000',
               settlementFeeAmount: '10000',
               rate: 600,
-            };
+            });
             engine.submitOrder(borrowOrder);
             return {
               order: {

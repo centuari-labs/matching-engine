@@ -525,6 +525,20 @@ Test coverage includes:
 - Price-time priority
 - Edge cases and error handling
 
+### Test data factories
+
+To keep tests resilient to schema changes, orders and matches should be created
+using the shared factory helpers:
+
+- `src/__tests__/factories/order-factory.ts` – helpers for creating all order
+  types (`createLendLimitOrder`, `createBorrowLimitOrder`, etc.) with sensible
+  defaults for amounts and fee fields.
+- `src/__tests__/factories/match-factory.ts` – helper for creating `Match`
+  instances with default fee fields derived from the matched amount.
+
+New tests that need orders or matches should prefer these factories plus
+per-test overrides instead of constructing objects inline.
+
 ## Integration with Backend
 
 The matching engine is designed to integrate with a backend service via NATS:

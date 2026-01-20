@@ -2,7 +2,10 @@ import { z } from 'zod';
 import { ethereumAddressSchema } from './orders';
 
 /**
- * Match schema representing a successful match between lend and borrow orders
+ * Match schema representing a successful match between lend and borrow orders.
+ *
+ * A match is a single fill between one lend order and one borrow order. Large
+ * orders may be filled by multiple matches over time.
  */
 export const matchSchema = z.object({
   matchId: z.string().uuid('Match ID must be a valid UUID'),
@@ -20,11 +23,37 @@ export const matchSchema = z.object({
   maturity: z.number().int().positive('Maturity must be a positive integer'),
   timestamp: z.number().int().positive('Timestamp must be a positive integer'),
   borrowerIsTaker: z.boolean(),
+  /**
+   * Maker fee charged on this match.
+   *
+   * This is typically a small percentage of matchedAmount, computed using
+   * maker‑fee specific logic in the matching engine.
+   */
   makerFeeAmount: z.string().regex(/^\d+$/, 'Maker fee amount must be a positive integer string'),
+  /**
+   * Taker fee charged on this match.
+   *
+   * This is typically larger than the maker fee and is also expressed as a
+   * percentage of matchedAmount.
+   */
   takerFeeAmount: z.string().regex(/^\d+$/, 'Taker fee amount must be a positive integer string'),
+  /**
+   * Portion of the lender's order‑level settlementFeeAmount that is allocated
+   * to this specific match.
+   *
+   * The matching/settlement logic computes this value using a pro‑rata
+   * calculation based on the matched amount for the lend side.
+   */
   lenderSettlementFeeAmount: z
     .string()
     .regex(/^\d+$/, 'Lender settlement fee amount must be a positive integer string'),
+  /**
+   * Portion of the borrower's order‑level settlementFeeAmount that is allocated
+   * to this specific match.
+   *
+   * The matching/settlement logic computes this value using a pro‑rata
+   * calculation based on the matched amount for the borrow side.
+   */
   borrowerSettlementFeeAmount: z
     .string()
     .regex(/^\d+$/, 'Borrower settlement fee amount must be a positive integer string'),

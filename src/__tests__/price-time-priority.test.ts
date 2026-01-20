@@ -1,7 +1,9 @@
 import { MatchingEngine } from '../core/matching-engine';
 import type { LendLimitOrder, BorrowLimitOrder } from '../types/orders';
-import { OrderSide, OrderType, OrderStatus } from '../types/orders';
-import { generateOrderId } from '../utils/helpers';
+import {
+  createLendLimitOrder,
+  createBorrowLimitOrder,
+} from './factories/order-factory';
 
 describe('Price-Time Priority', () => {
   let engine: MatchingEngine;
@@ -19,70 +21,54 @@ describe('Price-Time Priority', () => {
       const baseTime = Date.now();
 
       // Add lend orders at different rates
-      const lendOrder1: LendLimitOrder = {
-        orderId: generateOrderId(),
+      const lendOrder1: LendLimitOrder = createLendLimitOrder({
         walletAddress: walletAddress1,
         loanToken,
         maturities: [maturity],
         timestamp: baseTime,
-        side: OrderSide.Lend,
-        type: OrderType.Limit,
-        status: OrderStatus.Open,
         originalAmount: '100000',
-      remainingAmount: '100000',
-      settlementFeeAmount: '10000',
-      rate: 600, // Higher rate
-      };
+        remainingAmount: '100000',
+        settlementFeeAmount: '10000',
+        rate: 600, // Higher rate
+      });
 
-      const lendOrder2: LendLimitOrder = {
-        orderId: generateOrderId(),
+      const lendOrder2: LendLimitOrder = createLendLimitOrder({
         walletAddress: walletAddress1,
         loanToken,
         maturities: [maturity],
         timestamp: baseTime + 1,
-        side: OrderSide.Lend,
-        type: OrderType.Limit,
-        status: OrderStatus.Open,
         originalAmount: '100000',
-      remainingAmount: '100000',
-      settlementFeeAmount: '10000',
-      rate: 400, // Lower rate - should match first
-      };
+        remainingAmount: '100000',
+        settlementFeeAmount: '10000',
+        rate: 400, // Lower rate - should match first
+      });
 
-      const lendOrder3: LendLimitOrder = {
-        orderId: generateOrderId(),
+      const lendOrder3: LendLimitOrder = createLendLimitOrder({
         walletAddress: walletAddress1,
         loanToken,
         maturities: [maturity],
         timestamp: baseTime + 2,
-        side: OrderSide.Lend,
-        type: OrderType.Limit,
-        status: OrderStatus.Open,
         originalAmount: '100000',
-      remainingAmount: '100000',
-      settlementFeeAmount: '10000',
-      rate: 500, // Middle rate
-      };
+        remainingAmount: '100000',
+        settlementFeeAmount: '10000',
+        rate: 500, // Middle rate
+      });
 
       engine.submitOrder(lendOrder1);
       engine.submitOrder(lendOrder2);
       engine.submitOrder(lendOrder3);
 
       // Submit borrow order
-      const borrowOrder: BorrowLimitOrder = {
-        orderId: generateOrderId(),
+      const borrowOrder: BorrowLimitOrder = createBorrowLimitOrder({
         walletAddress: walletAddress2,
         loanToken,
         maturities: [maturity],
         timestamp: baseTime + 3,
-        side: OrderSide.Borrow,
-        type: OrderType.Limit,
-        status: OrderStatus.Open,
         originalAmount: '250000',
-      remainingAmount: '250000',
-      settlementFeeAmount: '10000',
-      rate: 700
-      };
+        remainingAmount: '250000',
+        settlementFeeAmount: '10000',
+        rate: 700,
+      });
 
       const result = engine.submitOrder(borrowOrder);
 
@@ -100,70 +86,54 @@ describe('Price-Time Priority', () => {
       const baseTime = Date.now();
 
       // Add borrow orders at different rates
-      const borrowOrder1: BorrowLimitOrder = {
-        orderId: generateOrderId(),
+      const borrowOrder1: BorrowLimitOrder = createBorrowLimitOrder({
         walletAddress: walletAddress2,
         loanToken,
         maturities: [maturity],
         timestamp: baseTime,
-        side: OrderSide.Borrow,
-        type: OrderType.Limit,
-        status: OrderStatus.Open,
         originalAmount: '100000',
-      remainingAmount: '100000',
-      settlementFeeAmount: '10000',
-      rate: 500 // Lower rate
-      };
+        remainingAmount: '100000',
+        settlementFeeAmount: '10000',
+        rate: 500, // Lower rate
+      });
 
-      const borrowOrder2: BorrowLimitOrder = {
-        orderId: generateOrderId(),
+      const borrowOrder2: BorrowLimitOrder = createBorrowLimitOrder({
         walletAddress: walletAddress2,
         loanToken,
         maturities: [maturity],
         timestamp: baseTime + 1,
-        side: OrderSide.Borrow,
-        type: OrderType.Limit,
-        status: OrderStatus.Open,
         originalAmount: '100000',
-      remainingAmount: '100000',
-      settlementFeeAmount: '10000',
-      rate: 800 // Higher rate - should match first
-      };
+        remainingAmount: '100000',
+        settlementFeeAmount: '10000',
+        rate: 800, // Higher rate - should match first
+      });
 
-      const borrowOrder3: BorrowLimitOrder = {
-        orderId: generateOrderId(),
+      const borrowOrder3: BorrowLimitOrder = createBorrowLimitOrder({
         walletAddress: walletAddress2,
         loanToken,
         maturities: [maturity],
         timestamp: baseTime + 2,
-        side: OrderSide.Borrow,
-        type: OrderType.Limit,
-        status: OrderStatus.Open,
         originalAmount: '100000',
-      remainingAmount: '100000',
-      settlementFeeAmount: '10000',
-      rate: 600 // Middle rate
-      };
+        remainingAmount: '100000',
+        settlementFeeAmount: '10000',
+        rate: 600, // Middle rate
+      });
 
       engine.submitOrder(borrowOrder1);
       engine.submitOrder(borrowOrder2);
       engine.submitOrder(borrowOrder3);
 
       // Submit lend order
-      const lendOrder: LendLimitOrder = {
-        orderId: generateOrderId(),
+      const lendOrder: LendLimitOrder = createLendLimitOrder({
         walletAddress: walletAddress1,
         loanToken,
         maturities: [maturity],
         timestamp: baseTime + 3,
-        side: OrderSide.Lend,
-        type: OrderType.Limit,
-        status: OrderStatus.Open,
         originalAmount: '250000',
-      remainingAmount: '250000',
-      settlementFeeAmount: '10000',
-      rate: 400,
-      };
+        remainingAmount: '250000',
+        settlementFeeAmount: '10000',
+        rate: 400,
+      });
 
       const result = engine.submitOrder(lendOrder);
 
@@ -184,70 +154,54 @@ describe('Price-Time Priority', () => {
       const rate = 500;
 
       // Add three lend orders at same rate
-      const lendOrder1: LendLimitOrder = {
-        orderId: generateOrderId(),
+      const lendOrder1: LendLimitOrder = createLendLimitOrder({
         walletAddress: walletAddress1,
         loanToken,
         maturities: [maturity],
         timestamp: baseTime,
-        side: OrderSide.Lend,
-        type: OrderType.Limit,
-        status: OrderStatus.Open,
         originalAmount: '100000',
         remainingAmount: '100000',
         rate,
         settlementFeeAmount: '10000',
-      };
+      });
 
-      const lendOrder2: LendLimitOrder = {
-        orderId: generateOrderId(),
+      const lendOrder2: LendLimitOrder = createLendLimitOrder({
         walletAddress: walletAddress1,
         loanToken,
         maturities: [maturity],
         timestamp: baseTime + 1000, // 1 second later
-        side: OrderSide.Lend,
-        type: OrderType.Limit,
-        status: OrderStatus.Open,
         originalAmount: '100000',
         remainingAmount: '100000',
         rate,
         settlementFeeAmount: '10000',
-      };
+      });
 
-      const lendOrder3: LendLimitOrder = {
-        orderId: generateOrderId(),
+      const lendOrder3: LendLimitOrder = createLendLimitOrder({
         walletAddress: walletAddress1,
         loanToken,
         maturities: [maturity],
         timestamp: baseTime + 2000, // 2 seconds later
-        side: OrderSide.Lend,
-        type: OrderType.Limit,
-        status: OrderStatus.Open,
         originalAmount: '100000',
         remainingAmount: '100000',
         rate,
         settlementFeeAmount: '10000',
-      };
+      });
 
       engine.submitOrder(lendOrder1);
       engine.submitOrder(lendOrder2);
       engine.submitOrder(lendOrder3);
 
       // Submit borrow order
-      const borrowOrder: BorrowLimitOrder = {
-        orderId: generateOrderId(),
+      const borrowOrder: BorrowLimitOrder = createBorrowLimitOrder({
         walletAddress: walletAddress2,
         loanToken,
         maturities: [maturity],
         timestamp: baseTime + 3000,
-        side: OrderSide.Borrow,
-        type: OrderType.Limit,
-        status: OrderStatus.Open,
         originalAmount: '250000',
-      remainingAmount: '250000',
-      settlementFeeAmount: '10000',
-      rate: 600
-      };
+        remainingAmount: '250000',
+        settlementFeeAmount: '10000',
+        rate: 600,
+      });
 
       const result = engine.submitOrder(borrowOrder);
 
@@ -263,74 +217,58 @@ describe('Price-Time Priority', () => {
       const rate = 500;
 
       // Add lend orders
-      const lendOrder1: LendLimitOrder = {
-        orderId: generateOrderId(),
+      const lendOrder1: LendLimitOrder = createLendLimitOrder({
         walletAddress: walletAddress1,
         loanToken,
         maturities: [maturity],
         timestamp: baseTime,
-        side: OrderSide.Lend,
-        type: OrderType.Limit,
-        status: OrderStatus.Open,
         originalAmount: '1000000',
         remainingAmount: '1000000',
         rate,
         settlementFeeAmount: '10000',
-      };
+      });
 
-      const lendOrder2: LendLimitOrder = {
-        orderId: generateOrderId(),
+      const lendOrder2: LendLimitOrder = createLendLimitOrder({
         walletAddress: walletAddress1,
         loanToken,
         maturities: [maturity],
         timestamp: baseTime + 1000,
-        side: OrderSide.Lend,
-        type: OrderType.Limit,
-        status: OrderStatus.Open,
         originalAmount: '1000000',
         remainingAmount: '1000000',
         rate,
         settlementFeeAmount: '10000',
-      };
+      });
 
       engine.submitOrder(lendOrder1);
       engine.submitOrder(lendOrder2);
 
       // First partial fill
-      const borrowOrder1: BorrowLimitOrder = {
-        orderId: generateOrderId(),
+      const borrowOrder1: BorrowLimitOrder = createBorrowLimitOrder({
         walletAddress: walletAddress2,
         loanToken,
         maturities: [maturity],
         timestamp: baseTime + 2000,
-        side: OrderSide.Borrow,
-        type: OrderType.Limit,
-        status: OrderStatus.Open,
         originalAmount: '600000',
         remainingAmount: '600000',
         rate: 600,
         settlementFeeAmount: '10000',
-      };
+      });
 
       const result1 = engine.submitOrder(borrowOrder1);
       expect(result1.matches).toHaveLength(1);
       expect(result1.matches[0].lendOrderId).toBe(lendOrder1.orderId);
 
       // Second borrow should still match with order1 first (it has earlier timestamp)
-      const borrowOrder2: BorrowLimitOrder = {
-        orderId: generateOrderId(),
+      const borrowOrder2: BorrowLimitOrder = createBorrowLimitOrder({
         walletAddress: walletAddress2,
         loanToken,
         maturities: [maturity],
         timestamp: baseTime + 3000,
-        side: OrderSide.Borrow,
-        type: OrderType.Limit,
-        status: OrderStatus.Open,
         originalAmount: '1000000',
-      remainingAmount: '1000000',
-      settlementFeeAmount: '10000',
-      rate: 600
-      };
+        remainingAmount: '1000000',
+        settlementFeeAmount: '10000',
+        rate: 600,
+      });
 
       const result2 = engine.submitOrder(borrowOrder2);
       expect(result2.matches).toHaveLength(2);
@@ -355,39 +293,31 @@ describe('Price-Time Priority', () => {
       const orderIds: string[] = [];
 
       for (const { rate, time, amount } of orders) {
-        const order: LendLimitOrder = {
-          orderId: generateOrderId(),
+        const order: LendLimitOrder = createLendLimitOrder({
           walletAddress: walletAddress1,
           loanToken,
           maturities: [maturity],
           timestamp: time,
-          side: OrderSide.Lend,
-          type: OrderType.Limit,
-          status: OrderStatus.Open,
           originalAmount: amount,
           remainingAmount: amount,
           rate,
           settlementFeeAmount: '10000',
-        };
+        });
         orderIds.push(order.orderId);
         engine.submitOrder(order);
       }
 
       // Submit borrow order to match all
-      const borrowOrder: BorrowLimitOrder = {
-        orderId: generateOrderId(),
+      const borrowOrder: BorrowLimitOrder = createBorrowLimitOrder({
         walletAddress: walletAddress2,
         loanToken,
         maturities: [maturity],
         timestamp: baseTime + 4000,
-        side: OrderSide.Borrow,
-        type: OrderType.Limit,
-        status: OrderStatus.Open,
         originalAmount: '500000',
-      remainingAmount: '500000',
-      settlementFeeAmount: '10000',
-      rate: 700
-      };
+        remainingAmount: '500000',
+        settlementFeeAmount: '10000',
+        rate: 700,
+      });
 
       const result = engine.submitOrder(borrowOrder);
 
