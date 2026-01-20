@@ -15,7 +15,8 @@ import {
   subtractBigNumbers,
   isZero,
   calculateMakerFee,
-  calculateTakerFee
+  calculateTakerFee,
+  calculateProRataSettlementFee,
 } from '../utils/helpers';
 
 //@todo : need to add snapshot for order book, so if the matching-engine is down we can restore the order book from the snapshot.
@@ -35,6 +36,39 @@ export class MatchingEngine {
   constructor(settlementPublisher?: SettlementPublisher) {
     this.orderBook = new OrderBook();
     this.executionEngine = new ExecutionEngine(settlementPublisher);
+  }
+
+  /**
+   * Calculate and deduct the settlement fee for a single match for a given order.
+   *
+   * Uses the order's total settlementFeeAmount as the full-fee pool and
+   * tracks a remaining pool in-memory keyed by orderId. For a match with
+   * matchedAmount, it:
+   *  - Computes a pro-rata fee with rounding up
+   *  - Clamps it to the remaining pool to avoid over-collection
+   *  - Deducts the actual fee from the remaining pool
+   *
+   * @param order - The order paying the settlement fee
+   * @param matchedAmount - Matched amount for this fill
+   * @returns The actual fee charged for this match
+   */
+  private calculateAndConsumeSettlementFee(order: Order, matchedAmount: string): string {
+    const totalFee = order.settlementFeeAmount;
+    const originalAmount = order.originalAmount;
+
+    // Initialize remainingSettlementFeeAmount lazily if it is not set (for
+    // backwards compatibility in tests or any internal callers that only set
+    // settlementFeeAmount).
+    const currentRemaining =
+      (order as any).remainingSettlementFeeAmount ?? order.settlementFeeAmount;
+
+    const proRata = calculateProRataSettlementFee(totalFee, matchedAmount, originalAmount);
+    const actualFee = minBigNumber(proRata, currentRemaining);
+
+    const remainingAfter = subtractBigNumbers(currentRemaining, actualFee);
+    (order as any).remainingSettlementFeeAmount = remainingAfter;
+
+    return actualFee;
   }
 
   /**
@@ -122,10 +156,20 @@ export class MatchingEngine {
         // Calculate match amount
         const matchAmount = minBigNumber(remainingAmount, borrowOrder.remainingAmount);
 
-        // Calculate fees
+        // Calculate trading fees
         const makerFeeAmount = calculateMakerFee(matchAmount);
         const takerFeeAmount = calculateTakerFee(matchAmount);
         // borrowerIsTaker is false, so borrower is maker, lender (order) is taker
+
+        // Calculate settlement fees (both sides pay from their own fee pools)
+        const lenderSettlementFeeAmount = this.calculateAndConsumeSettlementFee(
+          order,
+          matchAmount
+        );
+        const borrowerSettlementFeeAmount = this.calculateAndConsumeSettlementFee(
+          borrowOrder,
+          matchAmount
+        );
 
         // Create match at borrow order's rate
         const match = this.executionEngine.recordMatch({
@@ -140,7 +184,8 @@ export class MatchingEngine {
           borrowerIsTaker: false,
           makerFeeAmount,
           takerFeeAmount,
-          settlementFeeAmount: order.settlementFeeAmount,
+          lenderSettlementFeeAmount,
+          borrowerSettlementFeeAmount,
         });
 
         matches.push(match);
@@ -227,10 +272,20 @@ export class MatchingEngine {
         // Calculate match amount
         const matchAmount = minBigNumber(remainingAmount, borrowOrder.remainingAmount);
 
-        // Calculate fees
+        // Calculate trading fees
         const makerFeeAmount = calculateMakerFee(matchAmount);
         const takerFeeAmount = calculateTakerFee(matchAmount);
         // borrowerIsTaker is false, so borrower is maker, lender (order) is taker
+
+        // Calculate settlement fees (both sides pay from their own fee pools)
+        const lenderSettlementFeeAmount = this.calculateAndConsumeSettlementFee(
+          order,
+          matchAmount
+        );
+        const borrowerSettlementFeeAmount = this.calculateAndConsumeSettlementFee(
+          borrowOrder,
+          matchAmount
+        );
 
         const match = this.executionEngine.recordMatch({
           lendOrderId: order.orderId,
@@ -244,7 +299,8 @@ export class MatchingEngine {
           borrowerIsTaker: false,
           makerFeeAmount,
           takerFeeAmount,
-          settlementFeeAmount: order.settlementFeeAmount,
+          lenderSettlementFeeAmount,
+          borrowerSettlementFeeAmount,
         });
 
         matches.push(match);
@@ -329,10 +385,20 @@ export class MatchingEngine {
         // Calculate match amount
         const matchAmount = minBigNumber(remainingAmount, lendOrder.remainingAmount);
 
-        // Calculate fees
+        // Calculate trading fees
         const makerFeeAmount = calculateMakerFee(matchAmount);
         const takerFeeAmount = calculateTakerFee(matchAmount);
         // borrowerIsTaker is true, so borrower (order) is taker, lender is maker
+
+        // Calculate settlement fees (both sides pay from their own fee pools)
+        const lenderSettlementFeeAmount = this.calculateAndConsumeSettlementFee(
+          lendOrder,
+          matchAmount
+        );
+        const borrowerSettlementFeeAmount = this.calculateAndConsumeSettlementFee(
+          order,
+          matchAmount
+        );
 
         // Create match at lend order's rate
         const match = this.executionEngine.recordMatch({
@@ -347,7 +413,8 @@ export class MatchingEngine {
           borrowerIsTaker: true,
           makerFeeAmount,
           takerFeeAmount,
-          settlementFeeAmount: order.settlementFeeAmount,
+          lenderSettlementFeeAmount,
+          borrowerSettlementFeeAmount,
         });
 
         matches.push(match);
@@ -431,10 +498,20 @@ export class MatchingEngine {
         // Calculate match amount
         const matchAmount = minBigNumber(remainingAmount, lendOrder.remainingAmount);
 
-        // Calculate fees
+        // Calculate trading fees
         const makerFeeAmount = calculateMakerFee(matchAmount);
         const takerFeeAmount = calculateTakerFee(matchAmount);
         // borrowerIsTaker is true, so borrower (order) is taker, lender is maker
+
+        // Calculate settlement fees (both sides pay from their own fee pools)
+        const lenderSettlementFeeAmount = this.calculateAndConsumeSettlementFee(
+          lendOrder,
+          matchAmount
+        );
+        const borrowerSettlementFeeAmount = this.calculateAndConsumeSettlementFee(
+          order,
+          matchAmount
+        );
 
         const match = this.executionEngine.recordMatch({
           lendOrderId: lendOrder.orderId,
@@ -448,7 +525,8 @@ export class MatchingEngine {
           borrowerIsTaker: true,
           makerFeeAmount,
           takerFeeAmount,
-          settlementFeeAmount: order.settlementFeeAmount,
+          lenderSettlementFeeAmount,
+          borrowerSettlementFeeAmount,
         });
 
         matches.push(match);

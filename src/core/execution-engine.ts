@@ -55,7 +55,8 @@ export class ExecutionEngine {
     borrowerIsTaker: boolean;
     makerFeeAmount: string;
     takerFeeAmount: string;
-    settlementFeeAmount: string;
+    lenderSettlementFeeAmount: string;
+    borrowerSettlementFeeAmount: string;
   }): Match {
     const match: Match = {
       matchId: generateMatchId(),
@@ -71,7 +72,8 @@ export class ExecutionEngine {
       borrowerIsTaker: params.borrowerIsTaker,
       makerFeeAmount: params.makerFeeAmount,
       takerFeeAmount: params.takerFeeAmount,
-      settlementFeeAmount: params.settlementFeeAmount,
+      lenderSettlementFeeAmount: params.lenderSettlementFeeAmount,
+      borrowerSettlementFeeAmount: params.borrowerSettlementFeeAmount,
     };
 
     // Validate match against schema

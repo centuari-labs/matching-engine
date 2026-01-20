@@ -83,7 +83,8 @@ describe('SettlementPublisher Integration', () => {
         borrowerIsTaker: true,
         makerFeeAmount: calculateMakerFee(matchedAmount),
         takerFeeAmount: calculateTakerFee(matchedAmount),
-        settlementFeeAmount: '10000',
+        lenderSettlementFeeAmount: '5000',
+        borrowerSettlementFeeAmount: '5000',
       });
 
       // Wait for async publish to complete
@@ -110,7 +111,8 @@ describe('SettlementPublisher Integration', () => {
         borrowerIsTaker: false,
         makerFeeAmount: calculateMakerFee(matchedAmount),
         takerFeeAmount: calculateTakerFee(matchedAmount),
-        settlementFeeAmount: '10000',
+        lenderSettlementFeeAmount: '6000',
+        borrowerSettlementFeeAmount: '4000',
       });
 
       await new Promise((resolve) => setTimeout(resolve, 10));
@@ -143,7 +145,8 @@ describe('SettlementPublisher Integration', () => {
         borrowerIsTaker: true,
         makerFeeAmount: calculateMakerFee(matchedAmount),
         takerFeeAmount: calculateTakerFee(matchedAmount),
-        settlementFeeAmount: '10000',
+        lenderSettlementFeeAmount: '5000',
+        borrowerSettlementFeeAmount: '5000',
       });
 
       // Match should be in memory immediately
@@ -174,7 +177,8 @@ describe('SettlementPublisher Integration', () => {
         borrowerIsTaker: true,
         makerFeeAmount: calculateMakerFee(matchedAmount),
         takerFeeAmount: calculateTakerFee(matchedAmount),
-        settlementFeeAmount: '10000',
+        lenderSettlementFeeAmount: '5000',
+        borrowerSettlementFeeAmount: '5000',
       });
 
       // Wait for async publish attempt
@@ -232,7 +236,8 @@ describe('SettlementPublisher Integration', () => {
         borrowerIsTaker: true,
         makerFeeAmount: calculateMakerFee(matchedAmount1),
         takerFeeAmount: calculateTakerFee(matchedAmount1),
-        settlementFeeAmount: '10000',
+        lenderSettlementFeeAmount: '5000',
+        borrowerSettlementFeeAmount: '5000',
       });
 
       const matchedAmount2 = '2000000';
@@ -248,7 +253,8 @@ describe('SettlementPublisher Integration', () => {
         borrowerIsTaker: false,
         makerFeeAmount: calculateMakerFee(matchedAmount2),
         takerFeeAmount: calculateTakerFee(matchedAmount2),
-        settlementFeeAmount: '10000',
+        lenderSettlementFeeAmount: '6000',
+        borrowerSettlementFeeAmount: '4000',
       });
 
       await new Promise((resolve) => setTimeout(resolve, 50));
@@ -274,7 +280,8 @@ describe('SettlementPublisher Integration', () => {
         borrowerIsTaker: true,
         makerFeeAmount: calculateMakerFee(matchedAmount),
         takerFeeAmount: calculateTakerFee(matchedAmount),
-        settlementFeeAmount: '10000',
+        lenderSettlementFeeAmount: '5000',
+        borrowerSettlementFeeAmount: '5000',
       });
 
       // Matches should be indexed
@@ -311,7 +318,8 @@ describe('SettlementPublisher Integration', () => {
         borrowerIsTaker: true,
         makerFeeAmount: calculateMakerFee(matchedAmount),
         takerFeeAmount: calculateTakerFee(matchedAmount),
-        settlementFeeAmount: '10000',
+        lenderSettlementFeeAmount: '5000',
+        borrowerSettlementFeeAmount: '5000',
       });
 
       expect(match).toBeDefined();
@@ -332,7 +340,8 @@ describe('SettlementPublisher Integration', () => {
         borrowerIsTaker: true,
         makerFeeAmount: calculateMakerFee(matchedAmount),
         takerFeeAmount: calculateTakerFee(matchedAmount),
-        settlementFeeAmount: '10000',
+        lenderSettlementFeeAmount: '5000',
+        borrowerSettlementFeeAmount: '5000',
       });
 
       await new Promise((resolve) => setTimeout(resolve, 50));
@@ -530,8 +539,9 @@ describe('SettlementPublisher Integration', () => {
           maturity,
           borrowerIsTaker: true,
           makerFeeAmount: calculateMakerFee(matchedAmount),
-          takerFeeAmount: calculateTakerFee(matchedAmount),
-          settlementFeeAmount: '10000',
+        takerFeeAmount: calculateTakerFee(matchedAmount),
+        lenderSettlementFeeAmount: '5000',
+        borrowerSettlementFeeAmount: '5000',
         });
       }
 
@@ -576,8 +586,9 @@ describe('SettlementPublisher Integration', () => {
           maturity,
           borrowerIsTaker: true,
           makerFeeAmount: calculateMakerFee(matchedAmount),
-          takerFeeAmount: calculateTakerFee(matchedAmount),
-          settlementFeeAmount: '10000',
+        takerFeeAmount: calculateTakerFee(matchedAmount),
+        lenderSettlementFeeAmount: '5000',
+        borrowerSettlementFeeAmount: '5000',
         });
       }
 

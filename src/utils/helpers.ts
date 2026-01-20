@@ -192,3 +192,30 @@ export function calculateTakerFee(matchedAmount: string): string {
   return ((BigInt(matchedAmount) * 2n) / 1000n).toString();
 }
 
+/**
+ * Calculate pro-rata settlement fee with rounding up
+ *
+ * Uses BigInt arithmetic to compute:
+ *   ceil(totalFee * matchedAmount / originalAmount)
+ *
+ * @param totalFee - Total settlement fee for a fully filled order (as string)
+ * @param matchedAmount - Matched amount for this fill (as string)
+ * @param originalAmount - Original order amount (as string)
+ * @returns Pro-rata settlement fee for this match (as string, rounded up)
+ */
+export function calculateProRataSettlementFee(
+  totalFee: string,
+  matchedAmount: string,
+  originalAmount: string
+): string {
+  const totalFeeBigInt = BigInt(totalFee);
+  const matchedAmountBigInt = BigInt(matchedAmount);
+  const originalAmountBigInt = BigInt(originalAmount);
+
+  if (originalAmountBigInt === 0n) {
+    return '0';
+  }
+
+  const numerator = totalFeeBigInt * matchedAmountBigInt + (originalAmountBigInt - 1n);
+  return (numerator / originalAmountBigInt).toString();
+}

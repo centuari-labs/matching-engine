@@ -53,6 +53,17 @@ const baseOrderSchema = z.object({
   originalAmount: z.string().regex(/^\d+$/, 'Amount must be a positive integer string'),
   remainingAmount: z.string().regex(/^\d+$/, 'Amount must be a positive integer string'),
   settlementFeeAmount: z.string().regex(/^\d+$/, 'Fee amount must be a positive integer string'),
+  /**
+   * Remaining settlement fee pool for this order.
+   *
+   * This is an internal field; external clients only provide settlementFeeAmount.
+   * It is initialized from settlementFeeAmount when the order is first ingested
+   * and then decremented as matches are executed.
+   */
+  remainingSettlementFeeAmount: z
+    .string()
+    .regex(/^\d+$/, 'Fee amount must be a positive integer string')
+    .optional(),
 });
 
 /**
