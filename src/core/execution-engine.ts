@@ -342,5 +342,52 @@ export class ExecutionEngine {
   get matchCount(): number {
     return this.matches.size;
   }
+
+  /**
+   * Get all unpublished matches
+   *
+   * Returns matches that haven't been successfully published to the settlement publisher.
+   * Used for snapshot serialization to persist matches that failed to publish.
+   *
+   * @returns Array of unpublished matches
+   */
+  getUnpublishedMatches(): Match[] {
+    // All matches in memory are unpublished (they get removed after successful publish)
+    return this.getAllMatches();
+  }
+
+  /**
+   * Restore matches to execution engine
+   *
+   * Restores matches from snapshot. Used for snapshot restoration.
+   * Rebuilds match indexes for quick lookups.
+   *
+   * @param matches - Array of matches to restore
+   */
+  restoreMatches(matches: Match[]): void {
+    // Clear existing state
+    this.clear();
+
+    // Restore each match
+    for (const match of matches) {
+      // Validate match
+      matchSchema.parse(match);
+
+      // Store match
+      this.matches.set(match.matchId, match);
+
+      // Rebuild lend order index
+      if (!this.matchesByLendOrder.has(match.lendOrderId)) {
+        this.matchesByLendOrder.set(match.lendOrderId, []);
+      }
+      this.matchesByLendOrder.get(match.lendOrderId)!.push(match.matchId);
+
+      // Rebuild borrow order index
+      if (!this.matchesByBorrowOrder.has(match.borrowOrderId)) {
+        this.matchesByBorrowOrder.set(match.borrowOrderId, []);
+      }
+      this.matchesByBorrowOrder.get(match.borrowOrderId)!.push(match.matchId);
+    }
+  }
 }
 

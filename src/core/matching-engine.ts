@@ -10,6 +10,7 @@ import type {
 import { OrderSide, OrderStatus, OrderType, isLimitOrder } from '../types/orders';
 import type { Match, MatchResult, OrderBookSnapshot, AffectedOrder } from '../types/matches';
 import type { SettlementPublisher } from '../types/settlement';
+import type { SnapshotService } from '../services/snapshot-service';
 import {
   minBigNumber,
   subtractBigNumbers,
@@ -19,23 +20,24 @@ import {
   calculateProRataSettlementFee,
 } from '../utils/helpers';
 
-//@todo : need to add snapshot for order book, so if the matching-engine is down we can restore the order book from the snapshot.
-
 /**
  * MatchingEngine is the core component that matches lend and borrow orders
  */
 export class MatchingEngine {
   private orderBook: OrderBook;
   private executionEngine: ExecutionEngine;
+  private snapshotService: SnapshotService | null;
 
   /**
    * Create a new MatchingEngine instance
    *
    * @param settlementPublisher - Optional publisher for settlement matches (e.g., Redis)
+   * @param snapshotService - Optional snapshot service for state persistence
    */
-  constructor(settlementPublisher?: SettlementPublisher) {
+  constructor(settlementPublisher?: SettlementPublisher, snapshotService?: SnapshotService) {
     this.orderBook = new OrderBook();
     this.executionEngine = new ExecutionEngine(settlementPublisher);
+    this.snapshotService = snapshotService ?? null;
   }
 
   /**
@@ -110,6 +112,9 @@ export class MatchingEngine {
         status: currentOrder.status,
       };
     }
+
+    // Save snapshot after order submission (non-blocking)
+    this.saveSnapshotAsync();
 
     return {
       matches,
@@ -595,6 +600,10 @@ export class MatchingEngine {
 
     // Remove from order book
     this.orderBook.removeOrder(orderId);
+
+    // Save snapshot after order cancellation (non-blocking)
+    this.saveSnapshotAsync();
+
     return true;
   }
 
@@ -666,6 +675,79 @@ export class MatchingEngine {
   clear(): void {
     this.orderBook.clear();
     this.executionEngine.clear();
+  }
+
+  /**
+   * Save snapshot of current state
+   *
+   * Saves the current order book and execution engine state to persistent storage.
+   * This is called automatically after critical operations, but can also be called manually.
+   *
+   * @returns Promise that resolves when snapshot is saved
+   */
+  async saveSnapshot(): Promise<void> {
+    if (!this.snapshotService) {
+      return;
+    }
+
+    try {
+      await this.snapshotService.saveSnapshot(this.orderBook, this.executionEngine);
+    } catch (error) {
+      // Log but don't throw - snapshot failures shouldn't block operations
+      console.error('Failed to save snapshot:', error);
+    }
+  }
+
+  /**
+   * Save snapshot asynchronously (fire-and-forget)
+   *
+   * Non-blocking version of saveSnapshot for use after critical operations.
+   */
+  private saveSnapshotAsync(): void {
+    if (!this.snapshotService) {
+      return;
+    }
+
+    // Fire-and-forget - don't await
+    this.saveSnapshot().catch((error) => {
+      // Already logged in saveSnapshot, but catch to prevent unhandled rejection
+      console.warn('Async snapshot save failed:', error);
+    });
+  }
+
+  /**
+   * Restore state from snapshot
+   *
+   * Loads and restores the order book and execution engine state from persistent storage.
+   * Should be called on startup to resume operations from the last saved state.
+   *
+   * @returns True if snapshot was successfully restored, false otherwise
+   */
+  async restoreFromSnapshot(): Promise<boolean> {
+    if (!this.snapshotService) {
+      return false;
+    }
+
+    try {
+      const snapshotData = await this.snapshotService.loadSnapshot();
+      if (!snapshotData) {
+        return false;
+      }
+
+      // Restore order book
+      this.orderBook.restoreFromOrders(snapshotData.orders);
+
+      // Restore execution engine
+      this.executionEngine.restoreMatches(snapshotData.matches);
+
+      console.log(
+        `State restored from snapshot: ${snapshotData.metadata.orderCount} orders, ${snapshotData.metadata.matchCount} matches`
+      );
+      return true;
+    } catch (error) {
+      console.error('Failed to restore from snapshot:', error);
+      return false;
+    }
   }
 }
 

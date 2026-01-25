@@ -131,7 +131,7 @@ export class OrderBook {
     // Remove old order
     this.removeOrder(orderId);
 
-    // Create updated order
+    // Create updated order - preserve all fields from the original order
     const updatedOrder: Order = {
       ...metadata.order,
       remainingAmount: newRemainingAmount,
@@ -269,6 +269,38 @@ export class OrderBook {
    */
   get orderCount(): number {
     return this.orderIndex.size;
+  }
+
+  /**
+   * Get all orders from the order book
+   *
+   * Used for snapshot serialization. Returns all orders with their current state.
+   *
+   * @returns Array of all orders in the order book
+   */
+  getAllOrders(): Order[] {
+    return Array.from(this.orderIndex.values()).map((metadata) => metadata.order);
+  }
+
+  /**
+   * Restore order book from serialized orders
+   *
+   * Rebuilds the order book structure (Red-Black Trees) from a list of orders.
+   * Used for snapshot restoration. Clears existing orders before restoring.
+   *
+   * @param orders - Array of orders to restore
+   */
+  restoreFromOrders(orders: Order[]): void {
+    // Clear existing state
+    this.clear();
+
+    // Restore each order
+    for (const order of orders) {
+      // Only restore orders that are not fully filled
+      if (!isZero(order.remainingAmount)) {
+        this.addOrder(order);
+      }
+    }
   }
 }
 

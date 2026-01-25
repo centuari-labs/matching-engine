@@ -8,6 +8,7 @@
 import { MatchingEngine } from '../core/matching-engine';
 import { NatsService } from './nats-service';
 import { RedisService } from './redis-service';
+import { SnapshotService } from './snapshot-service';
 import * as dotenv from 'dotenv';
 
 // Load environment variables from .env file
@@ -18,6 +19,9 @@ dotenv.config();
  */
 let natsService: NatsService | null = null;
 let redisService: RedisService | null = null;
+let matchingEngine: MatchingEngine | null = null;
+let snapshotService: SnapshotService | null = null;
+let snapshotTimer: NodeJS.Timeout | null = null;
 let isShuttingDown = false;
 
 /**
@@ -35,6 +39,23 @@ async function handleShutdown(signal: string): Promise<void> {
   console.log(`\n${signal} received. Shutting down gracefully...`);
 
   try {
+    // Stop periodic snapshot timer
+    if (snapshotTimer) {
+      clearInterval(snapshotTimer);
+      snapshotTimer = null;
+    }
+
+    // Save final snapshot before shutdown
+    if (matchingEngine && snapshotService) {
+      console.log('Saving final snapshot before shutdown...');
+      try {
+        await matchingEngine.saveSnapshot();
+        console.log('✓ Final snapshot saved');
+      } catch (error) {
+        console.warn('Failed to save final snapshot:', error);
+      }
+    }
+
     // Disconnect from NATS
     if (natsService) {
       await natsService.disconnect();
@@ -96,10 +117,40 @@ async function main(): Promise<void> {
       redisService = null;
     }
 
-    // Initialize matching engine with optional settlement publisher (Redis)
+    // Initialize snapshot service (if enabled)
+    const snapshotEnabled = process.env.SNAPSHOT_ENABLED !== 'false';
+    const snapshotDir = process.env.SNAPSHOT_DIR || './snapshots';
+    const snapshotRedisEnabled = process.env.SNAPSHOT_REDIS_ENABLED === 'true';
+
+    if (snapshotEnabled) {
+      console.log('Initializing snapshot service...');
+      snapshotService = new SnapshotService(
+        snapshotDir,
+        redisService ?? null,
+        snapshotRedisEnabled
+      );
+      console.log(`  Snapshot directory: ${snapshotDir}`);
+      console.log(`  Redis backup: ${snapshotRedisEnabled ? 'Enabled' : 'Disabled'}`);
+      console.log('✓ Snapshot service initialized\n');
+    } else {
+      console.log('Snapshot service: Disabled\n');
+    }
+
+    // Initialize matching engine with optional settlement publisher (Redis) and snapshot service
     console.log('Initializing matching engine...');
-    const matchingEngine = new MatchingEngine(redisService ?? undefined);
+    matchingEngine = new MatchingEngine(redisService ?? undefined, snapshotService ?? undefined);
     console.log('✓ Matching engine initialized\n');
+
+    // Restore state from snapshot if available
+    if (snapshotService) {
+      console.log('Attempting to restore state from snapshot...');
+      const restored = await matchingEngine.restoreFromSnapshot();
+      if (restored) {
+        console.log('✓ State restored from snapshot\n');
+      } else {
+        console.log('  No snapshot found or restore failed, starting with empty state\n');
+      }
+    }
 
     // Initialize NATS service
     console.log('Initializing NATS service...');
@@ -130,6 +181,22 @@ async function main(): Promise<void> {
       }
     } else {
       console.log('  Redis: Disabled (settlement publishing disabled)');
+    }
+
+    // Start periodic snapshot timer if enabled
+    if (snapshotService && matchingEngine) {
+      const snapshotIntervalSeconds = parseInt(
+        process.env.SNAPSHOT_INTERVAL_SECONDS || '30',
+        10
+      );
+      if (snapshotIntervalSeconds > 0) {
+        snapshotTimer = setInterval(() => {
+          matchingEngine!.saveSnapshot().catch((error) => {
+            console.warn('Periodic snapshot failed:', error);
+          });
+        }, snapshotIntervalSeconds * 1000);
+        console.log(`  Periodic snapshots: Every ${snapshotIntervalSeconds} seconds`);
+      }
     }
 
     console.log();
