@@ -83,6 +83,7 @@ function publishError(ctx: HandlerContext, error: ErrorMessage): void {
  * @param ctx - Handler context
  * @param message - Match created message
  */
+//@todo : remove this method since we already have redis to publish match result
 function publishMatchResult(ctx: HandlerContext, message: MatchCreatedMessage): void {
   try {
     const data = JSON.stringify(message);

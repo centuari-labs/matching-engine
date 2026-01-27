@@ -227,6 +227,14 @@ export class RedisService implements SettlementPublisher {
       match.timestamp.toString(),
       'borrowerIsTaker',
       match.borrowerIsTaker.toString(),
+      'makerFeeAmount',
+      match.makerFeeAmount,
+      'takerFeeAmount',
+      match.takerFeeAmount,
+      'lenderSettlementFeeAmount',
+      match.lenderSettlementFeeAmount,
+      'borrowerSettlementFeeAmount',
+      match.borrowerSettlementFeeAmount,
     ];
   }
 

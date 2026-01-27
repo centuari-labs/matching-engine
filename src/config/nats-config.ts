@@ -6,6 +6,9 @@
  */
 
 import { z } from 'zod';
+import dotenv from 'dotenv';
+
+dotenv.config();
 
 /**
  * Schema for NATS configuration validation

@@ -6,6 +6,9 @@
  */
 
 import { z } from 'zod';
+import dotenv from 'dotenv';
+
+dotenv.config();
 
 /**
  * Schema for Redis configuration validation
@@ -120,6 +123,15 @@ export const REDIS_CONSUMER_GROUPS = {
    * Consumer group name for Settlement Engine
    */
   SETTLEMENT_ENGINE: 'settlement-engine',
+  /**
+   * Consumer group name for DB Writer service
+   *
+   * This group allows the DB Writer to consume the same settlement
+   * stream independently of the Settlement Engine. Each consumer
+   * group maintains its own offsets, so acknowledgements from the
+   * DB Writer do not affect delivery to other services.
+   */
+  DB_WRITER: 'db-writer',
 } as const;
 
 /**

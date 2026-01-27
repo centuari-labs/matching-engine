@@ -69,6 +69,12 @@ export type MatchCreatedMessage = z.infer<typeof matchCreatedMessageSchema>;
 
 /**
  * Schema for order status update notifications
+ *
+ * This topic is used by downstream services (including DB Writer) to
+ * persist order state in the database. To support this, the schema
+ * includes additional optional fields that allow consumers to compute
+ * filled quantities and fees without having to look up the original
+ * order payload.
  */
 export const orderStatusMessageSchema = z.object({
   /**
@@ -85,6 +91,34 @@ export const orderStatusMessageSchema = z.object({
    * Remaining amount in the order
    */
   remainingAmount: z.string(),
+
+  /**
+   * Total order quantity (original notional amount).
+   *
+   * Used by DB Writer to compute filled_quantity.
+   */
+  quantity: z.string().optional(),
+
+  /**
+   * Total filled quantity so far.
+   *
+   * If omitted, consumers can derive it from quantity - remainingAmount
+   * when quantity is present.
+   */
+  filledQuantity: z.string().optional(),
+
+  /**
+   * Total settlement fee amount for this order assuming it is fully filled.
+   */
+  settlementFeeAmount: z.string().optional(),
+
+  /**
+   * Total filled settlement fee so far.
+   *
+   * If omitted, consumers can derive it from settlementFeeAmount and any
+   * remaining settlement-fee pool they track.
+   */
+  filledSettlementFeeAmount: z.string().optional(),
 
   /**
    * Timestamp of the status update
@@ -241,10 +275,29 @@ export function createMatchCreatedMessage(orderId: string, result: MatchResult):
  * @returns Formatted order status message
  */
 export function createOrderStatusMessage(order: Order): OrderStatusMessage {
+  const originalAmount = order.originalAmount;
+  const remainingAmount = order.remainingAmount;
+  const settlementFeeAmount = order.settlementFeeAmount;
+  const remainingSettlementFeeAmount = order.remainingSettlementFeeAmount;
+
+  const filledQuantity =
+    originalAmount !== undefined
+      ? (BigInt(originalAmount) - BigInt(remainingAmount)).toString()
+      : undefined;
+
+  const filledSettlementFeeAmount =
+    settlementFeeAmount !== undefined && remainingSettlementFeeAmount !== undefined
+      ? (BigInt(settlementFeeAmount) - BigInt(remainingSettlementFeeAmount)).toString()
+      : undefined;
+
   return {
     orderId: order.orderId,
     status: order.status,
     remainingAmount: order.remainingAmount.toString(),
+    quantity: originalAmount,
+    filledQuantity,
+    settlementFeeAmount,
+    filledSettlementFeeAmount,
     timestamp: Date.now(),
   };
 }
@@ -262,6 +315,9 @@ export function createOrderStatusMessageFromAffected(
     orderId: affected.orderId,
     status: affected.status as OrderStatusMessage['status'],
     remainingAmount: affected.remainingAmount,
+    // quantity / fee fields are not available for generic affected orders;
+    // downstream services should already have these from the original order.
+    //@todo : add quantity, filled quantity, settlement_fee, and filled settlement fee
     timestamp: Date.now(),
   };
 }
