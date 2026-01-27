@@ -7,7 +7,9 @@
   "scripts": {
     "build": "tsc",
     "dev": "tsc --watch",
-    "start": "ts-node src/services/main.ts",
+    "start": "npm run start:matching-engine & npm run start:db-writer",
+    "start:matching-engine": "ts-node src/services/main.ts",
+    "start:db-writer": "ts-node src/services/db-writer-main.ts",
     "start:prod": "node dist/services/main.js",
     "test": "jest --silent",
     "test:verbose": "jest --verbose",
