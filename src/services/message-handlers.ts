@@ -16,7 +16,7 @@ import {
 import {
   cancelOrderMessageSchema,
   createErrorMessage,
-  createOrderStatusMessageFromAffected,
+  createOrderStatusMessage,
   ERROR_CODES,
   type ErrorMessage,
 } from '../types/messages';
@@ -111,7 +111,7 @@ function publishOrderStatusUpdates(
 
     // Publish status updates for all affected maker orders
     for (const affectedOrder of result.affectedMakerOrders) {
-      const statusMessage = createOrderStatusMessageFromAffected(affectedOrder);
+      const statusMessage = createOrderStatusMessage(affectedOrder);
       ctx.nc.publish(NATS_TOPICS.ORDERS_STATUS, JSON.stringify(statusMessage));
     }
   } catch (err) {

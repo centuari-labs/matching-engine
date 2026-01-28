@@ -6,8 +6,7 @@
  */
 
 import { z } from 'zod';
-import type { MatchResult, AffectedOrder } from './matches';
-import type { Order } from './orders';
+import type { MatchResult } from './matches';
 import { ethereumAddressSchema } from './orders';
 
 /**
@@ -269,16 +268,41 @@ export function createMatchCreatedMessage(orderId: string, result: MatchResult):
 }
 
 /**
- * Create an order status message
+ * Source shape for creating an order status message.
  *
- * @param order - Order object
+ * This is intentionally minimal and satisfied by both full `Order` objects
+ * and `AffectedOrder` instances produced by the matching engine.
+ */
+export interface OrderStatusSource {
+  /** ID of the order */
+  orderId: string;
+  /** Current status of the order */
+  status: string;
+  /** Remaining unfilled amount */
+  remainingAmount: string;
+  /** Original notional amount for the order */
+  originalAmount: string;
+  /** Total settlement fee amount assuming full fill */
+  settlementFeeAmount: string;
+  /** Remaining settlement fee pool (may be lazily initialized) */
+  remainingSettlementFeeAmount?: string;
+}
+
+/**
+ * Create an order status message from a unified order-like source.
+ *
+ * @param source - Order-like object containing the fields needed to derive status.
  * @returns Formatted order status message
  */
-export function createOrderStatusMessage(order: Order): OrderStatusMessage {
-  const originalAmount = order.originalAmount;
-  const remainingAmount = order.remainingAmount;
-  const settlementFeeAmount = order.settlementFeeAmount;
-  const remainingSettlementFeeAmount = order.remainingSettlementFeeAmount;
+export function createOrderStatusMessage(source: OrderStatusSource): OrderStatusMessage {
+  const {
+    orderId,
+    status,
+    remainingAmount,
+    originalAmount,
+    settlementFeeAmount,
+    remainingSettlementFeeAmount,
+  } = source;
 
   const filledQuantity =
     originalAmount !== undefined
@@ -291,33 +315,13 @@ export function createOrderStatusMessage(order: Order): OrderStatusMessage {
       : undefined;
 
   return {
-    orderId: order.orderId,
-    status: order.status,
-    remainingAmount: order.remainingAmount.toString(),
+    orderId,
+    status: status as OrderStatusMessage['status'],
+    remainingAmount,
     quantity: originalAmount,
     filledQuantity,
     settlementFeeAmount,
     filledSettlementFeeAmount,
-    timestamp: Date.now(),
-  };
-}
-
-/**
- * Create an order status message from an affected order
- *
- * @param affected - Affected order containing orderId, status, and remainingAmount
- * @returns Formatted order status message
- */
-export function createOrderStatusMessageFromAffected(
-  affected: AffectedOrder
-): OrderStatusMessage {
-  return {
-    orderId: affected.orderId,
-    status: affected.status as OrderStatusMessage['status'],
-    remainingAmount: affected.remainingAmount,
-    // quantity / fee fields are not available for generic affected orders;
-    // downstream services should already have these from the original order.
-    //@todo : add quantity, filled quantity, settlement_fee, and filled settlement fee
     timestamp: Date.now(),
   };
 }

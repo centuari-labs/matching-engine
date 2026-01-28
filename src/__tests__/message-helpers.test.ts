@@ -1,5 +1,5 @@
 import {
-  createOrderStatusMessageFromAffected,
+  createOrderStatusMessage,
   createMatchCreatedMessage,
   createErrorMessage,
   ERROR_CODES,
@@ -8,15 +8,18 @@ import type { AffectedOrder, MatchResult } from '../types/matches';
 import { OrderStatus } from '../types/orders';
 
 describe('Message Helpers', () => {
-  describe('createOrderStatusMessageFromAffected', () => {
+  describe('createOrderStatusMessage', () => {
     it('should create correct message structure from AffectedOrder', () => {
       const affected: AffectedOrder = {
         orderId: '123e4567-e89b-12d3-a456-426614174000',
         status: OrderStatus.Filled,
         remainingAmount: '0',
+        originalAmount: '1000000',
+        settlementFeeAmount: '1000',
+        remainingSettlementFeeAmount: '0',
       };
 
-      const message = createOrderStatusMessageFromAffected(affected);
+      const message = createOrderStatusMessage(affected);
 
       expect(message.orderId).toBe(affected.orderId);
       expect(message.status).toBe(OrderStatus.Filled);
@@ -32,9 +35,12 @@ describe('Message Helpers', () => {
         orderId: '123e4567-e89b-12d3-a456-426614174000',
         status: OrderStatus.PartiallyFilled,
         remainingAmount: '500000',
+        originalAmount: '1000000',
+        settlementFeeAmount: '1000',
+        remainingSettlementFeeAmount: '500',
       };
 
-      const message = createOrderStatusMessageFromAffected(affected);
+      const message = createOrderStatusMessage(affected);
       const afterTime = Date.now();
 
       expect(message.timestamp).toBeGreaterThanOrEqual(beforeTime);
@@ -46,9 +52,12 @@ describe('Message Helpers', () => {
         orderId: '123e4567-e89b-12d3-a456-426614174000',
         status: OrderStatus.Filled,
         remainingAmount: '0',
+        originalAmount: '1000000',
+        settlementFeeAmount: '1000',
+        remainingSettlementFeeAmount: '0',
       };
 
-      const message = createOrderStatusMessageFromAffected(affected);
+      const message = createOrderStatusMessage(affected);
 
       expect(message.status).toBe('FILLED');
     });
@@ -58,9 +67,12 @@ describe('Message Helpers', () => {
         orderId: '123e4567-e89b-12d3-a456-426614174000',
         status: OrderStatus.PartiallyFilled,
         remainingAmount: '700000',
+        originalAmount: '1000000',
+        settlementFeeAmount: '1000',
+        remainingSettlementFeeAmount: '700',
       };
 
-      const message = createOrderStatusMessageFromAffected(affected);
+      const message = createOrderStatusMessage(affected);
 
       expect(message.status).toBe('PARTIALLY_FILLED');
     });
@@ -71,9 +83,12 @@ describe('Message Helpers', () => {
         orderId: '123e4567-e89b-12d3-a456-426614174000',
         status: OrderStatus.PartiallyFilled,
         remainingAmount: largeAmount,
+        originalAmount: '1999999999999999999999999',
+        settlementFeeAmount: '1000',
+        remainingSettlementFeeAmount: '500',
       };
 
-      const message = createOrderStatusMessageFromAffected(affected);
+      const message = createOrderStatusMessage(affected);
 
       expect(message.remainingAmount).toBe(largeAmount);
       expect(typeof message.remainingAmount).toBe('string');

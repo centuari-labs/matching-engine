@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { ethereumAddressSchema } from './orders';
+import type { OrderStatus } from './orders';
 
 /**
  * Match schema representing a successful match between lend and borrow orders.
@@ -73,9 +74,29 @@ export interface AffectedOrder {
   /** The order ID */
   orderId: string;
   /** The order's status after the match */
-  status: string;
+  status: OrderStatus;
   /** The order's remaining amount after the match */
   remainingAmount: string;
+  /**
+   * Total original notional amount for the order.
+   *
+   * Mirrors `Order.originalAmount` so downstream consumers can compute
+   * filled quantities from status messages using only this structure.
+   */
+  originalAmount: string;
+  /**
+   * Total settlement fee amount for this order assuming it is fully filled.
+   *
+   * Mirrors `Order.settlementFeeAmount` for consistent status publishing.
+   */
+  settlementFeeAmount: string;
+  /**
+   * Remaining settlement fee pool for this order.
+   *
+   * Mirrors `Order.remainingSettlementFeeAmount` and is optional because
+   * it may be lazily initialized in some flows.
+   */
+  remainingSettlementFeeAmount?: string;
 }
 
 /**
