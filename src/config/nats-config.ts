@@ -116,7 +116,6 @@ export const NATS_TOPICS = {
   ORDERS_CANCEL: 'orders.cancel',
 
   // Output topics (publish)
-  MATCHES_CREATED: 'matches.created',
   ORDERS_STATUS: 'orders.status',
   ERRORS: 'errors',
 } as const;

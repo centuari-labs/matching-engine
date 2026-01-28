@@ -430,46 +430,4 @@ describe('Order Status Publishing', () => {
       expect(parsedMakerStatus.status).toBe(OrderStatus.Filled);
     });
   });
-
-  describe('Match created message publishing', () => {
-    it('should publish matches.created message alongside order status', () => {
-      // First submit a lend order to the book
-      const lendOrder: LendLimitOrder = createLendLimitOrder({
-        walletAddress: walletAddress1,
-        loanToken,
-        maturities: [maturity],
-        timestamp: Date.now(),
-        originalAmount: '1000000',
-        remainingAmount: '1000000',
-        settlementFeeAmount: '10000',
-        rate: 500,
-      });
-      engine.submitOrder(lendOrder);
-
-      // Now submit a borrow order
-      const borrowOrder: BorrowLimitOrder = createBorrowLimitOrder({
-        walletAddress: walletAddress2,
-        loanToken,
-        maturities: [maturity],
-        timestamp: Date.now() + 1,
-        originalAmount: '1000000',
-        remainingAmount: '1000000',
-        settlementFeeAmount: '10000',
-        rate: 600,
-      });
-
-      handleBorrowLimitOrder(
-        ctx,
-        createOrderBytes(JSON.parse(JSON.stringify(borrowOrder))),
-      );
-
-      // Check that matches.created message was published
-      const matchMessages = mockNc.getMessagesForTopic(NATS_TOPICS.MATCHES_CREATED);
-      expect(matchMessages).toHaveLength(1);
-
-      const parsedMatch = JSON.parse(matchMessages[0].data);
-      expect(parsedMatch.orderId).toBe(borrowOrder.orderId);
-      expect(parsedMatch.matches).toHaveLength(1);
-    });
-  });
 });

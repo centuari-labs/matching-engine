@@ -15,12 +15,10 @@ import {
 } from '../types/orders';
 import {
   cancelOrderMessageSchema,
-  createMatchCreatedMessage,
   createErrorMessage,
   createOrderStatusMessageFromAffected,
   ERROR_CODES,
   type ErrorMessage,
-  type MatchCreatedMessage,
 } from '../types/messages';
 import type { MatchResult } from '../types/matches';
 import { OrderStatus } from '../types/orders';
@@ -74,30 +72,6 @@ function publishError(ctx: HandlerContext, error: ErrorMessage): void {
     ctx.nc.publish(NATS_TOPICS.ERRORS, message);
   } catch (err) {
     console.error('Failed to publish error message:', err);
-  }
-}
-
-/**
- * Publish a match result to the matches topic
- *
- * @param ctx - Handler context
- * @param message - Match created message
- */
-//@todo : remove this method since we already have redis to publish match result
-function publishMatchResult(ctx: HandlerContext, message: MatchCreatedMessage): void {
-  try {
-    const data = JSON.stringify(message);
-    ctx.nc.publish(NATS_TOPICS.MATCHES_CREATED, data);
-  } catch (err) {
-    console.error('Failed to publish match result:', err);
-    publishError(
-      ctx,
-      createErrorMessage(
-        ERROR_CODES.INTERNAL_ERROR,
-        'Failed to publish match result',
-        message.orderId
-      )
-    );
   }
 }
 
@@ -171,10 +145,6 @@ export function handleLendMarketOrder(ctx: HandlerContext, data: Uint8Array): vo
     // Submit to matching engine
     const result = ctx.engine.submitOrder(order);
 
-    // Publish match result
-    const message = createMatchCreatedMessage(order.orderId, result);
-    publishMatchResult(ctx, message);
-
     // Publish order status updates for taker and affected maker orders
     publishOrderStatusUpdates(ctx, order.orderId, result);
 
@@ -209,10 +179,6 @@ export function handleLendLimitOrder(ctx: HandlerContext, data: Uint8Array): voi
 
     // Submit to matching engine
     const result = ctx.engine.submitOrder(order);
-
-    // Publish match result
-    const message = createMatchCreatedMessage(order.orderId, result);
-    publishMatchResult(ctx, message);
 
     // Publish order status updates for taker and affected maker orders
     publishOrderStatusUpdates(ctx, order.orderId, result);
@@ -249,10 +215,6 @@ export function handleBorrowMarketOrder(ctx: HandlerContext, data: Uint8Array): 
     // Submit to matching engine
     const result = ctx.engine.submitOrder(order);
 
-    // Publish match result
-    const message = createMatchCreatedMessage(order.orderId, result);
-    publishMatchResult(ctx, message);
-
     // Publish order status updates for taker and affected maker orders
     publishOrderStatusUpdates(ctx, order.orderId, result);
 
@@ -287,10 +249,6 @@ export function handleBorrowLimitOrder(ctx: HandlerContext, data: Uint8Array): v
 
     // Submit to matching engine
     const result = ctx.engine.submitOrder(order);
-
-    // Publish match result
-    const message = createMatchCreatedMessage(order.orderId, result);
-    publishMatchResult(ctx, message);
 
     // Publish order status updates for taker and affected maker orders
     publishOrderStatusUpdates(ctx, order.orderId, result);
