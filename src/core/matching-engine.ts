@@ -28,6 +28,9 @@ export class MatchingEngine {
   private executionEngine: ExecutionEngine;
   private snapshotService: SnapshotService | null;
 
+  /** Serializes snapshot saves to avoid concurrent writes racing on the same files. */
+  private saveSnapshotQueue: Promise<void> = Promise.resolve();
+
   /**
    * Create a new MatchingEngine instance
    *
@@ -714,11 +717,20 @@ export class MatchingEngine {
       return;
     }
 
+    const previous = this.saveSnapshotQueue;
+    let resolveNext!: () => void;
+    this.saveSnapshotQueue = new Promise<void>((resolve) => {
+      resolveNext = resolve;
+    });
+
+    await previous;
     try {
       await this.snapshotService.saveSnapshot(this.orderBook, this.executionEngine);
     } catch (error) {
       // Log but don't throw - snapshot failures shouldn't block operations
       console.error('Failed to save snapshot:', error);
+    } finally {
+      resolveNext();
     }
   }
 

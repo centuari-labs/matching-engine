@@ -119,6 +119,11 @@ describe('Snapshot Integration', () => {
       // Manually save snapshot (matches are in execution engine)
       await engine1.saveSnapshot();
 
+      // Verify snapshot was persisted before restore (fails fast if save threw silently)
+      const metadataBeforeRestore = await snapshotService.getSnapshotMetadata();
+      expect(metadataBeforeRestore).not.toBeNull();
+      expect(metadataBeforeRestore!.matchCount).toBeGreaterThan(0);
+
       // Create new engine and restore
       const engine2 = new MatchingEngine(undefined, snapshotService);
       const restored = await engine2.restoreFromSnapshot();
