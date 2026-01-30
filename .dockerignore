@@ -1,0 +1,34 @@
+# Dependencies and build output
+node_modules
+dist
+
+# Git
+.git
+.gitignore
+
+# Environment and secrets
+.env
+.env.*
+!.env.example
+
+# Tests and tooling
+src/__tests__
+jest.config.js
+*.test.ts
+*.spec.ts
+
+# Documentation (not needed at runtime)
+docs
+CHANGELOG.md
+*.md
+!README.md
+
+# Editor and lint
+.prettierrc
+.eslintrc*
+.cursor
+
+# Misc
+LICENSE
+pnpm-debug.log*
+.npmrc

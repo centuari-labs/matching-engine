@@ -558,6 +558,46 @@ nats.subscribe('orders.submit', async (msg) => {
 });
 ```
 
+## Running with Docker
+
+The project provides a single Dockerfile that builds one image. You can run either the matching engine or the DB writer from that image.
+
+**Build the image:**
+
+```bash
+docker build -t matching-engine .
+```
+
+**Run the matching engine (default):**
+
+```bash
+docker run --env-file .env matching-engine
+```
+
+**Run the DB writer (override command):**
+
+```bash
+docker run --env-file .env matching-engine node dist/services/db-writer-main.js
+```
+
+Both services require the same environment variables: `NATS_URL`, `REDIS_URL`, `DB_URL`, and related options. See `env.example` for the full list. Do not bake secrets into the image; pass them at runtime via `--env-file` or `-e`.
+
+**Connect to existing NATS / Redis / Postgres containers**
+
+If NATS, Redis, and Postgres are already running in Docker (with ports published to the host), the matching-engine container cannot use `localhost`—inside the container that points to the container itself. Use `host.docker.internal` (Docker Desktop on Mac or Windows) so the app reaches the host, where your other containers’ ports are published:
+
+```bash
+docker run --env-file .env \
+  -e NATS_URL=nats://host.docker.internal:4222 \
+  -e REDIS_URL=redis://host.docker.internal:6379 \
+  -e DB_URL=postgres://USER:PASSWORD@host.docker.internal:5432/DATABASE \
+  matching-engine
+```
+
+Replace `USER`, `PASSWORD`, and `DATABASE` with your Postgres credentials (e.g. the same as used by `centuari-postgres`). The `-e` flags override any `NATS_URL`/`REDIS_URL`/`DB_URL` in `.env`, so you can keep `localhost` in `.env` for local (non-Docker) runs.
+
+For running both services as separate containers (e.g. in Dokploy or Docker Compose), use the same image twice: one deployment with the default command (matching engine), the other with command `node dist/services/db-writer-main.js`.
+
 ## License
 
 MIT
