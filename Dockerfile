@@ -1,7 +1,8 @@
 # Matching Engine and DB Writer
-# One image, two run modes:
-#   - Matching engine (default): docker run --env-file .env <image>
-#   - DB writer: docker run --env-file .env <image> node dist/services/db-writer-main.js
+# One image, run modes:
+#   - Both (default): docker run --env-file .env <image>
+#   - Matching engine only: docker run --env-file .env <image> node dist/services/main.js
+#   - DB writer only: docker run --env-file .env <image> node dist/services/db-writer-main.js
 # Requires NATS, Redis, and Postgres; set NATS_URL, REDIS_URL, DB_URL and related env (see env.example).
 
 # -----------------------------------------------------------------------------
@@ -33,8 +34,11 @@ RUN corepack enable && corepack prepare pnpm@latest --activate
 
 COPY --from=builder /app/package.json /app/pnpm-lock.yaml ./
 COPY --from=builder /app/dist ./dist
+COPY docker-entrypoint.sh ./
 
-RUN pnpm install --frozen-lockfile --prod
+RUN pnpm install --frozen-lockfile --prod && chmod +x docker-entrypoint.sh
 
-# Default: run matching engine. Override with: node dist/services/db-writer-main.js
-CMD ["node", "dist/services/main.js"]
+# Default: run both matching engine and DB writer. Override CMD to run one:
+#   node dist/services/main.js
+#   node dist/services/db-writer-main.js
+CMD ["./docker-entrypoint.sh"]
