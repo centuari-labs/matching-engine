@@ -212,8 +212,8 @@ export class PostgresDbClient implements DbClient {
         `,
         [
           event.matchId,
-          event.lendOrderId,
-          event.borrowOrderId,
+          event.lendOrderId, //@todo : change into order market id
+          event.borrowOrderId,//@todo : change into order market id
           assetId,
           lenderAccountId,
           borrowerAccountId,

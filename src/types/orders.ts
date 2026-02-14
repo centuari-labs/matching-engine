@@ -44,9 +44,9 @@ export const ethereumAddressSchema = z
  */
 const baseOrderSchema = z.object({
   orderId: z.string().uuid('Order ID must be a valid UUID'),
-  walletAddress: ethereumAddressSchema,
-  loanToken: ethereumAddressSchema,
-  maturities: z
+  walletAddress: ethereumAddressSchema, //@todo : should use account id
+  loanToken: ethereumAddressSchema,//@todo : should use asset id
+  maturities: z //@todo : should use market id
     .array(z.number().int().positive('Maturity must be a positive integer'))
     .min(1, 'At least one maturity date is required'),
   timestamp: z.number().int().positive('Timestamp must be a positive integer'),

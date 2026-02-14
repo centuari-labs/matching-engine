@@ -1,5 +1,6 @@
 import { v4 as uuidv4 } from 'uuid';
 import type { Order, OrderSide } from '../types/orders';
+import { loadFeeConfig } from '../config/fee-config';
 
 /**
  * Generate a unique order ID
@@ -171,25 +172,29 @@ export function isZero(a: string): boolean {
 }
 
 /**
- * Calculate maker fee (0.1% of matched amount)
+ * Calculate maker fee as a percentage of matched amount
  *
  * @param matchedAmount - The matched amount as a string
+ * @param makerFeeBps - Optional maker fee in basis points (100 bps = 1%). Uses config when omitted.
  * @returns Maker fee amount as a string (floor division)
  */
-export function calculateMakerFee(matchedAmount: string): string {
-  // 0.1% = 1/1000
-  return ((BigInt(matchedAmount) * 1n) / 1000n).toString();
+export function calculateMakerFee(matchedAmount: string, makerFeeBps?: number): string {
+  const bps =
+    makerFeeBps !== undefined ? makerFeeBps : loadFeeConfig().makerFeeBps;
+  return ((BigInt(matchedAmount) * BigInt(bps)) / 10000n).toString();
 }
 
 /**
- * Calculate taker fee (0.2% of matched amount)
+ * Calculate taker fee as a percentage of matched amount
  *
  * @param matchedAmount - The matched amount as a string
+ * @param takerFeeBps - Optional taker fee in basis points (100 bps = 1%). Uses config when omitted.
  * @returns Taker fee amount as a string (floor division)
  */
-export function calculateTakerFee(matchedAmount: string): string {
-  // 0.2% = 2/1000
-  return ((BigInt(matchedAmount) * 2n) / 1000n).toString();
+export function calculateTakerFee(matchedAmount: string, takerFeeBps?: number): string {
+  const bps =
+    takerFeeBps !== undefined ? takerFeeBps : loadFeeConfig().takerFeeBps;
+  return ((BigInt(matchedAmount) * BigInt(bps)) / 10000n).toString();
 }
 
 /**

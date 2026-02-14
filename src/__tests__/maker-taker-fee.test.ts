@@ -43,66 +43,66 @@ describe('Maker/Taker Fee Calculations', () => {
   describe('Fee Calculation Helper Functions', () => {
     describe('calculateMakerFee', () => {
       it('should calculate 0.1% fee for exact divisible amounts', () => {
-        expect(calculateMakerFee('1000000')).toBe('1000'); // 0.1% of 1,000,000
-        expect(calculateMakerFee('10000000')).toBe('10000'); // 0.1% of 10,000,000
-        expect(calculateMakerFee('100000')).toBe('100'); // 0.1% of 100,000
+        expect(calculateMakerFee('1000000', 10)).toBe('1000'); // 0.1% of 1,000,000
+        expect(calculateMakerFee('10000000', 10)).toBe('10000'); // 0.1% of 10,000,000
+        expect(calculateMakerFee('100000', 10)).toBe('100'); // 0.1% of 100,000
       });
 
       it('should use floor division for amounts not divisible by 1000', () => {
         // 1,234,567 * 0.1% = 1234.567, should floor to 1234
-        expect(calculateMakerFee('1234567')).toBe('1234');
+        expect(calculateMakerFee('1234567', 10)).toBe('1234');
         // 999 * 0.1% = 0.999, should floor to 0
-        expect(calculateMakerFee('999')).toBe('0');
+        expect(calculateMakerFee('999', 10)).toBe('0');
         // 1001 * 0.1% = 1.001, should floor to 1
-        expect(calculateMakerFee('1001')).toBe('1');
+        expect(calculateMakerFee('1001', 10)).toBe('1');
       });
 
       it('should handle small amounts correctly', () => {
-        expect(calculateMakerFee('1000')).toBe('1'); // Minimum that produces fee
-        expect(calculateMakerFee('999')).toBe('0'); // Below minimum
-        expect(calculateMakerFee('1')).toBe('0'); // Very small
+        expect(calculateMakerFee('1000', 10)).toBe('1'); // Minimum that produces fee
+        expect(calculateMakerFee('999', 10)).toBe('0'); // Below minimum
+        expect(calculateMakerFee('1', 10)).toBe('0'); // Very small
       });
 
       it('should handle large amounts correctly', () => {
         const largeAmount = '1000000000000000000'; // 1e18
         const expectedFee = '1000000000000000'; // 0.1% of 1e18
-        expect(calculateMakerFee(largeAmount)).toBe(expectedFee);
+        expect(calculateMakerFee(largeAmount, 10)).toBe(expectedFee);
       });
     });
 
     describe('calculateTakerFee', () => {
       it('should calculate 0.2% fee for exact divisible amounts', () => {
-        expect(calculateTakerFee('1000000')).toBe('2000'); // 0.2% of 1,000,000
-        expect(calculateTakerFee('10000000')).toBe('20000'); // 0.2% of 10,000,000
-        expect(calculateTakerFee('100000')).toBe('200'); // 0.2% of 100,000
+        expect(calculateTakerFee('1000000', 20)).toBe('2000'); // 0.2% of 1,000,000
+        expect(calculateTakerFee('10000000', 20)).toBe('20000'); // 0.2% of 10,000,000
+        expect(calculateTakerFee('100000', 20)).toBe('200'); // 0.2% of 100,000
       });
 
       it('should use floor division for amounts not divisible by 1000', () => {
         // 1,234,567 * 0.2% = 2469.134, should floor to 2469
-        expect(calculateTakerFee('1234567')).toBe('2469');
+        expect(calculateTakerFee('1234567', 20)).toBe('2469');
         // 999 * 0.2% = 1.998, should floor to 1
-        expect(calculateTakerFee('999')).toBe('1');
+        expect(calculateTakerFee('999', 20)).toBe('1');
         // 1001 * 0.2% = 2.002, should floor to 2
-        expect(calculateTakerFee('1001')).toBe('2');
+        expect(calculateTakerFee('1001', 20)).toBe('2');
       });
 
       it('should handle small amounts correctly', () => {
-        expect(calculateTakerFee('500')).toBe('1'); // Minimum that produces fee
-        expect(calculateTakerFee('499')).toBe('0'); // Below minimum
-        expect(calculateTakerFee('1')).toBe('0'); // Very small
+        expect(calculateTakerFee('500', 20)).toBe('1'); // Minimum that produces fee
+        expect(calculateTakerFee('499', 20)).toBe('0'); // Below minimum
+        expect(calculateTakerFee('1', 20)).toBe('0'); // Very small
       });
 
       it('should handle large amounts correctly', () => {
         const largeAmount = '1000000000000000000'; // 1e18
         const expectedFee = '2000000000000000'; // 0.2% of 1e18
-        expect(calculateTakerFee(largeAmount)).toBe(expectedFee);
+        expect(calculateTakerFee(largeAmount, 20)).toBe(expectedFee);
       });
 
       it('should calculate taker fee as approximately double maker fee (within floor division precision)', () => {
         const testAmounts = ['1000000', '1234567', '999', '1001', '1000000000000000000'];
         for (const amount of testAmounts) {
-          const makerFee = calculateMakerFee(amount);
-          const takerFee = calculateTakerFee(amount);
+          const makerFee = calculateMakerFee(amount, 10);
+          const takerFee = calculateTakerFee(amount, 20);
           // Due to floor division, taker fee may not be exactly 2x maker fee
           // But it should be calculated as floor(amount * 2 / 1000)
           const expectedTakerFee = ((BigInt(amount) * 2n) / 1000n).toString();
@@ -152,10 +152,10 @@ describe('Maker/Taker Fee Calculations', () => {
       const match = result.matches[0];
       expect(match.borrowerIsTaker).toBe(false);
       // Borrower is maker → pays 0.1% maker fee
-      expect(match.makerFeeAmount).toBe(calculateMakerFee('1000000'));
+      expect(match.makerFeeAmount).toBe(calculateMakerFee('1000000', 10));
       expect(match.makerFeeAmount).toBe('1000');
       // Lender is taker → pays 0.2% taker fee
-      expect(match.takerFeeAmount).toBe(calculateTakerFee('1000000'));
+      expect(match.takerFeeAmount).toBe(calculateTakerFee('1000000', 20));
       expect(match.takerFeeAmount).toBe('2000');
     });
 
@@ -188,9 +188,9 @@ describe('Maker/Taker Fee Calculations', () => {
       expect(result.matches).toHaveLength(1);
       const match = result.matches[0];
       expect(match.borrowerIsTaker).toBe(false);
-      expect(match.makerFeeAmount).toBe(calculateMakerFee('1234567'));
+      expect(match.makerFeeAmount).toBe(calculateMakerFee('1234567', 10));
       expect(match.makerFeeAmount).toBe('1234');
-      expect(match.takerFeeAmount).toBe(calculateTakerFee('1234567'));
+      expect(match.takerFeeAmount).toBe(calculateTakerFee('1234567', 20));
       expect(match.takerFeeAmount).toBe('2469');
     });
 
@@ -235,15 +235,15 @@ describe('Maker/Taker Fee Calculations', () => {
       expect(result.matches).toHaveLength(2);
       // First match: 500,000
       expect(result.matches[0].borrowerIsTaker).toBe(false);
-      expect(result.matches[0].makerFeeAmount).toBe(calculateMakerFee('500000'));
+      expect(result.matches[0].makerFeeAmount).toBe(calculateMakerFee('500000', 10));
       expect(result.matches[0].makerFeeAmount).toBe('500');
-      expect(result.matches[0].takerFeeAmount).toBe(calculateTakerFee('500000'));
+      expect(result.matches[0].takerFeeAmount).toBe(calculateTakerFee('500000', 20));
       expect(result.matches[0].takerFeeAmount).toBe('1000');
       // Second match: 500,000
       expect(result.matches[1].borrowerIsTaker).toBe(false);
-      expect(result.matches[1].makerFeeAmount).toBe(calculateMakerFee('500000'));
+      expect(result.matches[1].makerFeeAmount).toBe(calculateMakerFee('500000', 10));
       expect(result.matches[1].makerFeeAmount).toBe('500');
-      expect(result.matches[1].takerFeeAmount).toBe(calculateTakerFee('500000'));
+      expect(result.matches[1].takerFeeAmount).toBe(calculateTakerFee('500000', 20));
       expect(result.matches[1].takerFeeAmount).toBe('1000');
     });
   });
@@ -282,10 +282,10 @@ describe('Maker/Taker Fee Calculations', () => {
       const match = result.matches[0];
       expect(match.borrowerIsTaker).toBe(false);
       // Borrower is maker → pays 0.1% maker fee
-      expect(match.makerFeeAmount).toBe(calculateMakerFee('1000000'));
+      expect(match.makerFeeAmount).toBe(calculateMakerFee('1000000', 10));
       expect(match.makerFeeAmount).toBe('1000');
       // Lender is taker → pays 0.2% taker fee
-      expect(match.takerFeeAmount).toBe(calculateTakerFee('1000000'));
+      expect(match.takerFeeAmount).toBe(calculateTakerFee('1000000', 20));
       expect(match.takerFeeAmount).toBe('2000');
     });
 
@@ -321,9 +321,9 @@ describe('Maker/Taker Fee Calculations', () => {
       const match = result.matches[0];
       expect(match.borrowerIsTaker).toBe(false);
       expect(match.matchedAmount).toBe('750000');
-      expect(match.makerFeeAmount).toBe(calculateMakerFee('750000'));
+      expect(match.makerFeeAmount).toBe(calculateMakerFee('750000', 10));
       expect(match.makerFeeAmount).toBe('750');
-      expect(match.takerFeeAmount).toBe(calculateTakerFee('750000'));
+      expect(match.takerFeeAmount).toBe(calculateTakerFee('750000', 20));
       expect(match.takerFeeAmount).toBe('1500');
     });
   });
@@ -361,10 +361,10 @@ describe('Maker/Taker Fee Calculations', () => {
       const match = result.matches[0];
       expect(match.borrowerIsTaker).toBe(true);
       // Lender is maker → pays 0.1% maker fee
-      expect(match.makerFeeAmount).toBe(calculateMakerFee('1000000'));
+      expect(match.makerFeeAmount).toBe(calculateMakerFee('1000000', 10));
       expect(match.makerFeeAmount).toBe('1000');
       // Borrower is taker → pays 0.2% taker fee
-      expect(match.takerFeeAmount).toBe(calculateTakerFee('1000000'));
+      expect(match.takerFeeAmount).toBe(calculateTakerFee('1000000', 20));
       expect(match.takerFeeAmount).toBe('2000');
     });
 
@@ -397,9 +397,9 @@ describe('Maker/Taker Fee Calculations', () => {
       expect(result.matches).toHaveLength(1);
       const match = result.matches[0];
       expect(match.borrowerIsTaker).toBe(true);
-      expect(match.makerFeeAmount).toBe(calculateMakerFee('1234567'));
+      expect(match.makerFeeAmount).toBe(calculateMakerFee('1234567', 10));
       expect(match.makerFeeAmount).toBe('1234');
-      expect(match.takerFeeAmount).toBe(calculateTakerFee('1234567'));
+      expect(match.takerFeeAmount).toBe(calculateTakerFee('1234567', 20));
       expect(match.takerFeeAmount).toBe('2469');
     });
 
@@ -444,15 +444,15 @@ describe('Maker/Taker Fee Calculations', () => {
       expect(result.matches).toHaveLength(2);
       // First match: 500,000
       expect(result.matches[0].borrowerIsTaker).toBe(true);
-      expect(result.matches[0].makerFeeAmount).toBe(calculateMakerFee('500000'));
+      expect(result.matches[0].makerFeeAmount).toBe(calculateMakerFee('500000', 10));
       expect(result.matches[0].makerFeeAmount).toBe('500');
-      expect(result.matches[0].takerFeeAmount).toBe(calculateTakerFee('500000'));
+      expect(result.matches[0].takerFeeAmount).toBe(calculateTakerFee('500000', 20));
       expect(result.matches[0].takerFeeAmount).toBe('1000');
       // Second match: 500,000
       expect(result.matches[1].borrowerIsTaker).toBe(true);
-      expect(result.matches[1].makerFeeAmount).toBe(calculateMakerFee('500000'));
+      expect(result.matches[1].makerFeeAmount).toBe(calculateMakerFee('500000', 10));
       expect(result.matches[1].makerFeeAmount).toBe('500');
-      expect(result.matches[1].takerFeeAmount).toBe(calculateTakerFee('500000'));
+      expect(result.matches[1].takerFeeAmount).toBe(calculateTakerFee('500000', 20));
       expect(result.matches[1].takerFeeAmount).toBe('1000');
     });
   });
@@ -491,10 +491,10 @@ describe('Maker/Taker Fee Calculations', () => {
       const match = result.matches[0];
       expect(match.borrowerIsTaker).toBe(true);
       // Lender is maker → pays 0.1% maker fee
-      expect(match.makerFeeAmount).toBe(calculateMakerFee('1000000'));
+      expect(match.makerFeeAmount).toBe(calculateMakerFee('1000000', 10));
       expect(match.makerFeeAmount).toBe('1000');
       // Borrower is taker → pays 0.2% taker fee
-      expect(match.takerFeeAmount).toBe(calculateTakerFee('1000000'));
+      expect(match.takerFeeAmount).toBe(calculateTakerFee('1000000', 20));
       expect(match.takerFeeAmount).toBe('2000');
     });
 
@@ -530,9 +530,9 @@ describe('Maker/Taker Fee Calculations', () => {
       const match = result.matches[0];
       expect(match.borrowerIsTaker).toBe(true);
       expect(match.matchedAmount).toBe('750000');
-      expect(match.makerFeeAmount).toBe(calculateMakerFee('750000'));
+      expect(match.makerFeeAmount).toBe(calculateMakerFee('750000', 10));
       expect(match.makerFeeAmount).toBe('750');
-      expect(match.takerFeeAmount).toBe(calculateTakerFee('750000'));
+      expect(match.takerFeeAmount).toBe(calculateTakerFee('750000', 20));
       expect(match.takerFeeAmount).toBe('1500');
     });
   });
@@ -608,8 +608,8 @@ describe('Maker/Taker Fee Calculations', () => {
 
     it('should handle very large amounts correctly', () => {
       const largeAmount = '1000000000000000000'; // 1e18
-      const expectedMakerFee = calculateMakerFee(largeAmount);
-      const expectedTakerFee = calculateTakerFee(largeAmount);
+      const expectedMakerFee = calculateMakerFee(largeAmount, 10);
+      const expectedTakerFee = calculateTakerFee(largeAmount, 20);
 
       const borrowOrder: BorrowLimitOrder = createBorrowLimitOrder({
         walletAddress: walletAddress2,
@@ -691,16 +691,16 @@ describe('Maker/Taker Fee Calculations', () => {
       // First match: 333,333
       expect(result.matches[0].borrowerIsTaker).toBe(true);
       expect(result.matches[0].matchedAmount).toBe('333333');
-      expect(result.matches[0].makerFeeAmount).toBe(calculateMakerFee('333333'));
+      expect(result.matches[0].makerFeeAmount).toBe(calculateMakerFee('333333', 10));
       expect(result.matches[0].makerFeeAmount).toBe('333');
-      expect(result.matches[0].takerFeeAmount).toBe(calculateTakerFee('333333'));
+      expect(result.matches[0].takerFeeAmount).toBe(calculateTakerFee('333333', 20));
       expect(result.matches[0].takerFeeAmount).toBe('666');
       // Second match: 444,444
       expect(result.matches[1].borrowerIsTaker).toBe(true);
       expect(result.matches[1].matchedAmount).toBe('444444');
-      expect(result.matches[1].makerFeeAmount).toBe(calculateMakerFee('444444'));
+      expect(result.matches[1].makerFeeAmount).toBe(calculateMakerFee('444444', 10));
       expect(result.matches[1].makerFeeAmount).toBe('444');
-      expect(result.matches[1].takerFeeAmount).toBe(calculateTakerFee('444444'));
+      expect(result.matches[1].takerFeeAmount).toBe(calculateTakerFee('444444', 20));
       expect(result.matches[1].takerFeeAmount).toBe('888');
     });
 
@@ -785,8 +785,8 @@ describe('Maker/Taker Fee Calculations', () => {
         expect(match.borrowerIsTaker).toBe(expectedBorrowerIsTaker);
 
         // Verify fees are always calculated correctly
-        expect(match.makerFeeAmount).toBe(calculateMakerFee(match.matchedAmount));
-        expect(match.takerFeeAmount).toBe(calculateTakerFee(match.matchedAmount));
+        expect(match.makerFeeAmount).toBe(calculateMakerFee(match.matchedAmount, 10));
+        expect(match.takerFeeAmount).toBe(calculateTakerFee(match.matchedAmount, 20));
 
         // Verify taker fee is approximately double maker fee (within 1 due to floor division)
         const makerFeeBigInt = BigInt(match.makerFeeAmount);
