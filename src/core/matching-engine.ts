@@ -655,6 +655,16 @@ export class MatchingEngine {
   }
 
   /**
+   * Get an order by ID
+   *
+   * @param orderId - The order ID
+   * @returns The order if found, null otherwise
+   */
+  getOrder(orderId: string): Order | null {
+    return this.orderBook.getOrder(orderId);
+  }
+
+  /**
    * Get order book snapshot
    *
    * @param loanToken - The loan token address

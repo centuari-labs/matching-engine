@@ -76,6 +76,47 @@ function publishError(ctx: HandlerContext, error: ErrorMessage): void {
 }
 
 /**
+ * Publish orderbook snapshot for affected maturities after an order event.
+ *
+ * For each maturity, fetches the best order on each side (depth=1) and
+ * publishes a snapshot to NATS so downstream consumers (e.g. WebSocket
+ * gateway) can push real-time best-price updates to clients.
+ */
+function publishOrderbookSnapshot(
+  ctx: HandlerContext,
+  loanToken: string,
+  maturities: number[]
+): void {
+  try {
+    for (const maturity of maturities) {
+      const snapshot = ctx.engine.getOrderBook(loanToken, maturity, 1);
+
+      const bestLend = snapshot.lendOrders[0];
+      const bestBorrow = snapshot.borrowOrders[0];
+
+      const payload = {
+        loanToken,
+        maturity,
+        lend: bestLend
+          ? { price: bestLend.rate ?? 0, apr: '-', amount: bestLend.amount }
+          : null,
+        borrow: bestBorrow
+          ? { price: bestBorrow.rate ?? 0, apr: '-', amount: bestBorrow.amount }
+          : null,
+        timestamp: Date.now(),
+      };
+
+      ctx.nc.publish(
+        NATS_TOPICS.ORDERBOOK_SNAPSHOT,
+        JSON.stringify(payload)
+      );
+    }
+  } catch (err) {
+    console.error('Failed to publish orderbook snapshot:', err);
+  }
+}
+
+/**
  * Publish order status updates for taker and affected maker orders
  *
  * @param ctx - Handler context
@@ -147,6 +188,7 @@ export function handleLendMarketOrder(ctx: HandlerContext, data: Uint8Array): vo
 
     // Publish order status updates for taker and affected maker orders
     publishOrderStatusUpdates(ctx, order.orderId, result);
+    publishOrderbookSnapshot(ctx, order.loanToken, order.maturities);
 
     console.log(
       `Lend market order ${order.orderId} processed: ${result.matches.length} matches`
@@ -182,6 +224,7 @@ export function handleLendLimitOrder(ctx: HandlerContext, data: Uint8Array): voi
 
     // Publish order status updates for taker and affected maker orders
     publishOrderStatusUpdates(ctx, order.orderId, result);
+    publishOrderbookSnapshot(ctx, order.loanToken, order.maturities);
 
     console.log(
       `Lend limit order ${order.orderId} processed: ${result.matches.length} matches`
@@ -217,6 +260,7 @@ export function handleBorrowMarketOrder(ctx: HandlerContext, data: Uint8Array): 
 
     // Publish order status updates for taker and affected maker orders
     publishOrderStatusUpdates(ctx, order.orderId, result);
+    publishOrderbookSnapshot(ctx, order.loanToken, order.maturities);
 
     console.log(
       `Borrow market order ${order.orderId} processed: ${result.matches.length} matches`
@@ -252,6 +296,7 @@ export function handleBorrowLimitOrder(ctx: HandlerContext, data: Uint8Array): v
 
     // Publish order status updates for taker and affected maker orders
     publishOrderStatusUpdates(ctx, order.orderId, result);
+    publishOrderbookSnapshot(ctx, order.loanToken, order.maturities);
 
     console.log(
       `Borrow limit order ${order.orderId} processed: ${result.matches.length} matches`
@@ -280,8 +325,9 @@ export function handleCancelOrder(ctx: HandlerContext, data: Uint8Array): void {
 
     console.log(`Processing cancel request for order: ${request.orderId} from wallet: ${request.walletAddress}`);
 
-    // Check if order exists first
-    if (!ctx.engine.hasOrder(request.orderId)) {
+    // Read the order before cancellation to get loanToken/maturities for snapshot
+    const order = ctx.engine.getOrder(request.orderId);
+    if (!order) {
       console.warn(`Order ${request.orderId} not found for cancellation`);
       publishError(
         ctx,
@@ -299,7 +345,7 @@ export function handleCancelOrder(ctx: HandlerContext, data: Uint8Array): void {
 
     if (success) {
       console.log(`Order ${request.orderId} cancelled successfully`);
-      
+
       // Publish status update
       ctx.nc.publish(
         NATS_TOPICS.ORDERS_STATUS,
@@ -309,6 +355,8 @@ export function handleCancelOrder(ctx: HandlerContext, data: Uint8Array): void {
           timestamp: Date.now(),
         })
       );
+
+      publishOrderbookSnapshot(ctx, order.loanToken, order.maturities);
     } else {
       console.warn(`Wallet address mismatch for order ${request.orderId}`);
       publishError(

@@ -117,6 +117,7 @@ export const NATS_TOPICS = {
 
   // Output topics (publish)
   ORDERS_STATUS: 'orders.status',
+  ORDERBOOK_SNAPSHOT: 'orderbook.snapshot',
   ERRORS: 'errors',
 } as const;
 
