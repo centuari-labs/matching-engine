@@ -4,6 +4,7 @@ import { OrderSide } from '../types/orders';
 import {
   createLendLimitOrder,
   createBorrowLimitOrder,
+  marketsFromMaturities,
 } from './factories/order-factory';
 
 describe('Multiple Maturities Matching', () => {
@@ -24,7 +25,7 @@ describe('Multiple Maturities Matching', () => {
     const lendOrder: LendLimitOrder = createLendLimitOrder({
       walletAddress: walletAddress1,
       loanToken,
-      maturities: [maturity1],
+      markets: marketsFromMaturities([maturity1]),
       timestamp: Date.now(),
       originalAmount: '1000000',
       remainingAmount: '1000000',
@@ -38,7 +39,7 @@ describe('Multiple Maturities Matching', () => {
     const borrowOrder: BorrowLimitOrder = createBorrowLimitOrder({
       walletAddress: walletAddress2,
       loanToken,
-      maturities: [maturity1, maturity2, maturity3],
+      markets: marketsFromMaturities([maturity1, maturity2, maturity3]),
       timestamp: Date.now() + 1,
       side: OrderSide.Borrow,
       originalAmount: '500000',
@@ -61,7 +62,7 @@ describe('Multiple Maturities Matching', () => {
     const lendOrder1: LendLimitOrder = createLendLimitOrder({
       walletAddress: walletAddress1,
       loanToken,
-      maturities: [maturity1],
+      markets: marketsFromMaturities([maturity1]),
       timestamp: Date.now(),
       originalAmount: '300000',
       remainingAmount: '300000',
@@ -72,7 +73,7 @@ describe('Multiple Maturities Matching', () => {
     const lendOrder2: LendLimitOrder = createLendLimitOrder({
       walletAddress: walletAddress1,
       loanToken,
-      maturities: [maturity2],
+      markets: marketsFromMaturities([maturity2]),
       timestamp: Date.now() + 1,
       originalAmount: '400000',
       remainingAmount: '400000',
@@ -83,7 +84,7 @@ describe('Multiple Maturities Matching', () => {
     const lendOrder3: LendLimitOrder = createLendLimitOrder({
       walletAddress: walletAddress1,
       loanToken,
-      maturities: [maturity3],
+      markets: marketsFromMaturities([maturity3]),
       timestamp: Date.now() + 2,
       originalAmount: '500000',
       remainingAmount: '500000',
@@ -99,7 +100,7 @@ describe('Multiple Maturities Matching', () => {
     const borrowOrder: BorrowLimitOrder = createBorrowLimitOrder({
       walletAddress: walletAddress2,
       loanToken,
-      maturities: [maturity1, maturity2, maturity3],
+      markets: marketsFromMaturities([maturity1, maturity2, maturity3]),
       timestamp: Date.now() + 3,
       originalAmount: '1000000',
       remainingAmount: '1000000',
@@ -130,7 +131,7 @@ describe('Multiple Maturities Matching', () => {
     const lendOrder: LendLimitOrder = createLendLimitOrder({
       walletAddress: walletAddress1,
       loanToken,
-      maturities: [maturity1, maturity2],
+      markets: marketsFromMaturities([maturity1, maturity2]),
       timestamp: Date.now(),
       originalAmount: '1000000',
       remainingAmount: '1000000',
@@ -144,7 +145,7 @@ describe('Multiple Maturities Matching', () => {
     const borrowOrder: BorrowLimitOrder = createBorrowLimitOrder({
       walletAddress: walletAddress2,
       loanToken,
-      maturities: [maturity2, maturity3],
+      markets: marketsFromMaturities([maturity2, maturity3]),
       timestamp: Date.now() + 1,
       originalAmount: '500000',
       remainingAmount: '500000',
@@ -164,7 +165,7 @@ describe('Multiple Maturities Matching', () => {
     const lendOrder: LendLimitOrder = createLendLimitOrder({
       walletAddress: walletAddress1,
       loanToken,
-      maturities: [maturity1],
+      markets: marketsFromMaturities([maturity1]),
       timestamp: Date.now(),
       originalAmount: '1000000',
       remainingAmount: '1000000',
@@ -178,7 +179,7 @@ describe('Multiple Maturities Matching', () => {
     const borrowOrder: BorrowLimitOrder = createBorrowLimitOrder({
       walletAddress: walletAddress2,
       loanToken,
-      maturities: [maturity2],
+      markets: marketsFromMaturities([maturity2]),
       timestamp: Date.now() + 1,
       originalAmount: '500000',
       remainingAmount: '500000',
@@ -199,7 +200,7 @@ describe('Multiple Maturities Matching', () => {
     const lendOrder1: LendLimitOrder = createLendLimitOrder({
       walletAddress: walletAddress1,
       loanToken,
-      maturities: [maturity1],
+      markets: marketsFromMaturities([maturity1]),
       timestamp: Date.now(),
       originalAmount: '300000',
       remainingAmount: '300000',
@@ -210,7 +211,7 @@ describe('Multiple Maturities Matching', () => {
     const lendOrder2: LendLimitOrder = createLendLimitOrder({
       walletAddress: walletAddress1,
       loanToken,
-      maturities: [maturity1],
+      markets: marketsFromMaturities([maturity1]),
       timestamp: Date.now() + 1,
       originalAmount: '400000',
       remainingAmount: '400000',
@@ -225,7 +226,7 @@ describe('Multiple Maturities Matching', () => {
     const borrowOrder: BorrowLimitOrder = createBorrowLimitOrder({
       walletAddress: walletAddress2,
       loanToken,
-      maturities: [maturity1, maturity2],
+      markets: marketsFromMaturities([maturity1, maturity2]),
       timestamp: Date.now() + 2,
       originalAmount: '1000000',
       remainingAmount: '1000000',
@@ -245,7 +246,7 @@ describe('Multiple Maturities Matching', () => {
     const order: LendLimitOrder = createLendLimitOrder({
       walletAddress: walletAddress1,
       loanToken,
-      maturities: [maturity1, maturity2, maturity3],
+      markets: marketsFromMaturities([maturity1, maturity2, maturity3]),
       timestamp: Date.now(),
       originalAmount: '1000000',
       remainingAmount: '1000000',

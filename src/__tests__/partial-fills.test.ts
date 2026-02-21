@@ -3,6 +3,7 @@ import type { LendLimitOrder, BorrowLimitOrder } from '../types/orders';
 import {
   createLendLimitOrder,
   createBorrowLimitOrder,
+  marketsFromMaturities,
 } from './factories/order-factory';
 
 describe('Partial Fills', () => {
@@ -21,7 +22,7 @@ describe('Partial Fills', () => {
     const lendOrder1: LendLimitOrder = createLendLimitOrder({
       walletAddress: walletAddress1,
       loanToken,
-      maturities: [maturity],
+      markets: marketsFromMaturities([maturity]),
       timestamp: Date.now(),
       originalAmount: '300000',
       remainingAmount: '300000',
@@ -32,7 +33,7 @@ describe('Partial Fills', () => {
     const lendOrder2: LendLimitOrder = createLendLimitOrder({
       walletAddress: walletAddress1,
       loanToken,
-      maturities: [maturity],
+      markets: marketsFromMaturities([maturity]),
       timestamp: Date.now() + 1,
       originalAmount: '200000',
       remainingAmount: '200000',
@@ -43,7 +44,7 @@ describe('Partial Fills', () => {
     const lendOrder3: LendLimitOrder = createLendLimitOrder({
       walletAddress: walletAddress1,
       loanToken,
-      maturities: [maturity],
+      markets: marketsFromMaturities([maturity]),
       timestamp: Date.now() + 2,
       originalAmount: '400000',
       remainingAmount: '400000',
@@ -59,7 +60,7 @@ describe('Partial Fills', () => {
     const borrowOrder: BorrowLimitOrder = createBorrowLimitOrder({
       walletAddress: walletAddress2,
       loanToken,
-      maturities: [maturity],
+      markets: marketsFromMaturities([maturity]),
       timestamp: Date.now() + 3,
       originalAmount: '1000000',
       remainingAmount: '1000000',
@@ -85,7 +86,7 @@ describe('Partial Fills', () => {
     const lendOrder: LendLimitOrder = createLendLimitOrder({
       walletAddress: walletAddress1,
       loanToken,
-      maturities: [maturity],
+      markets: marketsFromMaturities([maturity]),
       timestamp: Date.now(),
       originalAmount: '5000000',
       remainingAmount: '5000000',
@@ -99,7 +100,7 @@ describe('Partial Fills', () => {
     const borrowOrder: BorrowLimitOrder = createBorrowLimitOrder({
       walletAddress: walletAddress2,
       loanToken,
-      maturities: [maturity],
+      markets: marketsFromMaturities([maturity]),
       timestamp: Date.now() + 1,
       originalAmount: '1000000',
       remainingAmount: '1000000',
@@ -125,7 +126,7 @@ describe('Partial Fills', () => {
     const lendOrder: LendLimitOrder = createLendLimitOrder({
       walletAddress: walletAddress1,
       loanToken,
-      maturities: [maturity],
+      markets: marketsFromMaturities([maturity]),
       timestamp: Date.now(),
       originalAmount: '1000000',
       remainingAmount: '1000000',
@@ -139,7 +140,7 @@ describe('Partial Fills', () => {
     const borrowOrder1: BorrowLimitOrder = createBorrowLimitOrder({
       walletAddress: walletAddress2,
       loanToken,
-      maturities: [maturity],
+      markets: marketsFromMaturities([maturity]),
       timestamp: Date.now() + 1,
       originalAmount: '300000',
       remainingAmount: '300000',
@@ -155,7 +156,7 @@ describe('Partial Fills', () => {
     const borrowOrder2: BorrowLimitOrder = createBorrowLimitOrder({
       walletAddress: walletAddress2,
       loanToken,
-      maturities: [maturity],
+      markets: marketsFromMaturities([maturity]),
       timestamp: Date.now() + 2,
       originalAmount: '400000',
       remainingAmount: '400000',
@@ -171,7 +172,7 @@ describe('Partial Fills', () => {
     const borrowOrder3: BorrowLimitOrder = createBorrowLimitOrder({
       walletAddress: walletAddress2,
       loanToken,
-      maturities: [maturity],
+      markets: marketsFromMaturities([maturity]),
       timestamp: Date.now() + 3,
       originalAmount: '300000',
       remainingAmount: '300000',
@@ -204,7 +205,7 @@ describe('Partial Fills', () => {
     const lendOrder: LendLimitOrder = createLendLimitOrder({
       walletAddress: walletAddress1,
       loanToken,
-      maturities: [maturity],
+      markets: marketsFromMaturities([maturity]),
       timestamp: Date.now(),
       originalAmount: amount,
       remainingAmount: amount,
@@ -215,7 +216,7 @@ describe('Partial Fills', () => {
     const borrowOrder: BorrowLimitOrder = createBorrowLimitOrder({
       walletAddress: walletAddress2,
       loanToken,
-      maturities: [maturity],
+      markets: marketsFromMaturities([maturity]),
       timestamp: Date.now() + 1,
       originalAmount: amount,
       remainingAmount: amount,
@@ -242,7 +243,7 @@ describe('Partial Fills', () => {
     const lendOrder: LendLimitOrder = createLendLimitOrder({
       walletAddress: walletAddress1,
       loanToken,
-      maturities: [maturity],
+      markets: marketsFromMaturities([maturity]),
       timestamp: Date.now(),
       originalAmount: largeAmount,
       remainingAmount: largeAmount,
@@ -253,7 +254,7 @@ describe('Partial Fills', () => {
     const borrowOrder: BorrowLimitOrder = createBorrowLimitOrder({
       walletAddress: walletAddress2,
       loanToken,
-      maturities: [maturity],
+      markets: marketsFromMaturities([maturity]),
       timestamp: Date.now() + 1,
       originalAmount: '1000',
       remainingAmount: '1000',

@@ -19,6 +19,7 @@ import {
   createBorrowLimitOrder,
   DEFAULT_LOAN_TOKEN,
   DEFAULT_MATURITY,
+  marketsFromMaturities,
 } from './factories/order-factory';
 
 /**
@@ -376,7 +377,7 @@ describe('SettlementPublisher Integration', () => {
       const lendOrder: LendLimitOrder = createLendLimitOrder({
         walletAddress: walletAddress1,
         loanToken,
-        maturities: [maturity],
+        markets: marketsFromMaturities([maturity]),
         timestamp: Date.now(),
         originalAmount: '1000000',
         remainingAmount: '1000000',
@@ -388,7 +389,7 @@ describe('SettlementPublisher Integration', () => {
       const borrowOrder: BorrowLimitOrder = createBorrowLimitOrder({
         walletAddress: walletAddress2,
         loanToken,
-        maturities: [maturity],
+        markets: marketsFromMaturities([maturity]),
         timestamp: Date.now() + 1,
         originalAmount: '1000000',
         remainingAmount: '1000000',
@@ -420,7 +421,7 @@ describe('SettlementPublisher Integration', () => {
       const lendOrder: LendLimitOrder = createLendLimitOrder({
         walletAddress: walletAddress1,
         loanToken,
-        maturities: [maturity],
+        markets: marketsFromMaturities([maturity]),
         timestamp: Date.now(),
         originalAmount: '2000000',
         remainingAmount: '2000000',
@@ -432,7 +433,7 @@ describe('SettlementPublisher Integration', () => {
       const borrowOrder: BorrowLimitOrder = createBorrowLimitOrder({
         walletAddress: walletAddress2,
         loanToken,
-        maturities: [maturity],
+        markets: marketsFromMaturities([maturity]),
         timestamp: Date.now() + 1,
         originalAmount: '1000000',
         remainingAmount: '1000000',
@@ -462,7 +463,7 @@ describe('SettlementPublisher Integration', () => {
       const lendOrder: LendLimitOrder = createLendLimitOrder({
         walletAddress: walletAddress1,
         loanToken,
-        maturities: [maturity],
+        markets: marketsFromMaturities([maturity]),
         timestamp: Date.now(),
         originalAmount: '1000000',
         remainingAmount: '1000000',
@@ -473,7 +474,7 @@ describe('SettlementPublisher Integration', () => {
       const borrowOrder: BorrowLimitOrder = createBorrowLimitOrder({
         walletAddress: walletAddress2,
         loanToken,
-        maturities: [maturity],
+        markets: marketsFromMaturities([maturity]),
         timestamp: Date.now() + 1,
         originalAmount: '1000000',
         remainingAmount: '1000000',

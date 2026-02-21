@@ -16,6 +16,7 @@ import {
   createBorrowLimitOrder,
   createLendMarketOrder,
   createBorrowMarketOrder,
+  marketsFromMaturities,
 } from './factories/order-factory';
 
 /**
@@ -125,7 +126,7 @@ describe('Maker/Taker Fee Calculations', () => {
       const borrowOrder: BorrowLimitOrder = createBorrowLimitOrder({
         walletAddress: walletAddress2,
         loanToken,
-        maturities: [maturity],
+        markets: marketsFromMaturities([maturity]),
         timestamp: Date.now(),
         originalAmount: '1000000',
         remainingAmount: '1000000',
@@ -139,7 +140,7 @@ describe('Maker/Taker Fee Calculations', () => {
       const lendMarket: LendMarketOrder = createLendMarketOrder({
         walletAddress: walletAddress1,
         loanToken,
-        maturities: [maturity],
+        markets: marketsFromMaturities([maturity]),
         timestamp: Date.now() + 1,
         originalAmount: '1000000',
         remainingAmount: '1000000',
@@ -163,7 +164,7 @@ describe('Maker/Taker Fee Calculations', () => {
       const borrowOrder: BorrowLimitOrder = createBorrowLimitOrder({
         walletAddress: walletAddress2,
         loanToken,
-        maturities: [maturity],
+        markets: marketsFromMaturities([maturity]),
         timestamp: Date.now(),
         originalAmount: '1234567',
         remainingAmount: '1234567',
@@ -176,7 +177,7 @@ describe('Maker/Taker Fee Calculations', () => {
       const lendMarket: LendMarketOrder = createLendMarketOrder({
         walletAddress: walletAddress1,
         loanToken,
-        maturities: [maturity],
+        markets: marketsFromMaturities([maturity]),
         timestamp: Date.now() + 1,
         originalAmount: '1234567',
         remainingAmount: '1234567',
@@ -198,7 +199,7 @@ describe('Maker/Taker Fee Calculations', () => {
       const borrowOrder1: BorrowLimitOrder = createBorrowLimitOrder({
         walletAddress: walletAddress2,
         loanToken,
-        maturities: [maturity],
+        markets: marketsFromMaturities([maturity]),
         timestamp: Date.now(),
         originalAmount: '500000',
         remainingAmount: '500000',
@@ -209,7 +210,7 @@ describe('Maker/Taker Fee Calculations', () => {
       const borrowOrder2: BorrowLimitOrder = createBorrowLimitOrder({
         walletAddress: walletAddress2,
         loanToken,
-        maturities: [maturity],
+        markets: marketsFromMaturities([maturity]),
         timestamp: Date.now() + 1,
         originalAmount: '500000',
         remainingAmount: '500000',
@@ -223,7 +224,7 @@ describe('Maker/Taker Fee Calculations', () => {
       const lendMarket: LendMarketOrder = createLendMarketOrder({
         walletAddress: walletAddress1,
         loanToken,
-        maturities: [maturity],
+        markets: marketsFromMaturities([maturity]),
         timestamp: Date.now() + 2,
         originalAmount: '1000000',
         remainingAmount: '1000000',
@@ -254,7 +255,7 @@ describe('Maker/Taker Fee Calculations', () => {
       const borrowOrder: BorrowLimitOrder = createBorrowLimitOrder({
         walletAddress: walletAddress2,
         loanToken,
-        maturities: [maturity],
+        markets: marketsFromMaturities([maturity]),
         timestamp: Date.now(),
         originalAmount: '1000000',
         remainingAmount: '1000000',
@@ -268,7 +269,7 @@ describe('Maker/Taker Fee Calculations', () => {
       const lendOrder: LendLimitOrder = createLendLimitOrder({
         walletAddress: walletAddress1,
         loanToken,
-        maturities: [maturity],
+        markets: marketsFromMaturities([maturity]),
         timestamp: Date.now() + 1,
         originalAmount: '1000000',
         remainingAmount: '1000000',
@@ -293,7 +294,7 @@ describe('Maker/Taker Fee Calculations', () => {
       const borrowOrder: BorrowLimitOrder = createBorrowLimitOrder({
         walletAddress: walletAddress2,
         loanToken,
-        maturities: [maturity],
+        markets: marketsFromMaturities([maturity]),
         timestamp: Date.now(),
         originalAmount: '1000000',
         remainingAmount: '1000000',
@@ -307,7 +308,7 @@ describe('Maker/Taker Fee Calculations', () => {
       const lendOrder: LendLimitOrder = createLendLimitOrder({
         walletAddress: walletAddress1,
         loanToken,
-        maturities: [maturity],
+        markets: marketsFromMaturities([maturity]),
         timestamp: Date.now() + 1,
         originalAmount: '750000',
         remainingAmount: '750000',
@@ -334,7 +335,7 @@ describe('Maker/Taker Fee Calculations', () => {
       const lendOrder: LendLimitOrder = createLendLimitOrder({
         walletAddress: walletAddress1,
         loanToken,
-        maturities: [maturity],
+        markets: marketsFromMaturities([maturity]),
         timestamp: Date.now(),
         originalAmount: '1000000',
         remainingAmount: '1000000',
@@ -348,7 +349,7 @@ describe('Maker/Taker Fee Calculations', () => {
       const borrowMarket: BorrowMarketOrder = createBorrowMarketOrder({
         walletAddress: walletAddress2,
         loanToken,
-        maturities: [maturity],
+        markets: marketsFromMaturities([maturity]),
         timestamp: Date.now() + 1,
         originalAmount: '1000000',
         remainingAmount: '1000000',
@@ -372,7 +373,7 @@ describe('Maker/Taker Fee Calculations', () => {
       const lendOrder: LendLimitOrder = createLendLimitOrder({
         walletAddress: walletAddress1,
         loanToken,
-        maturities: [maturity],
+        markets: marketsFromMaturities([maturity]),
         timestamp: Date.now(),
         originalAmount: '1234567',
         remainingAmount: '1234567',
@@ -385,7 +386,7 @@ describe('Maker/Taker Fee Calculations', () => {
       const borrowMarket: BorrowMarketOrder = createBorrowMarketOrder({
         walletAddress: walletAddress2,
         loanToken,
-        maturities: [maturity],
+        markets: marketsFromMaturities([maturity]),
         timestamp: Date.now() + 1,
         originalAmount: '1234567',
         remainingAmount: '1234567',
@@ -407,7 +408,7 @@ describe('Maker/Taker Fee Calculations', () => {
       const lendOrder1: LendLimitOrder = createLendLimitOrder({
         walletAddress: walletAddress1,
         loanToken,
-        maturities: [maturity],
+        markets: marketsFromMaturities([maturity]),
         timestamp: Date.now(),
         originalAmount: '500000',
         remainingAmount: '500000',
@@ -418,7 +419,7 @@ describe('Maker/Taker Fee Calculations', () => {
       const lendOrder2: LendLimitOrder = createLendLimitOrder({
         walletAddress: walletAddress1,
         loanToken,
-        maturities: [maturity],
+        markets: marketsFromMaturities([maturity]),
         timestamp: Date.now() + 1,
         originalAmount: '500000',
         remainingAmount: '500000',
@@ -432,7 +433,7 @@ describe('Maker/Taker Fee Calculations', () => {
       const borrowMarket: BorrowMarketOrder = createBorrowMarketOrder({
         walletAddress: walletAddress2,
         loanToken,
-        maturities: [maturity],
+        markets: marketsFromMaturities([maturity]),
         timestamp: Date.now() + 2,
         originalAmount: '1000000',
         remainingAmount: '1000000',
@@ -463,7 +464,7 @@ describe('Maker/Taker Fee Calculations', () => {
       const lendOrder: LendLimitOrder = createLendLimitOrder({
         walletAddress: walletAddress1,
         loanToken,
-        maturities: [maturity],
+        markets: marketsFromMaturities([maturity]),
         timestamp: Date.now(),
         originalAmount: '1000000',
         remainingAmount: '1000000',
@@ -477,7 +478,7 @@ describe('Maker/Taker Fee Calculations', () => {
       const borrowOrder: BorrowLimitOrder = createBorrowLimitOrder({
         walletAddress: walletAddress2,
         loanToken,
-        maturities: [maturity],
+        markets: marketsFromMaturities([maturity]),
         timestamp: Date.now() + 1,
         originalAmount: '1000000',
         remainingAmount: '1000000',
@@ -502,7 +503,7 @@ describe('Maker/Taker Fee Calculations', () => {
       const lendOrder: LendLimitOrder = createLendLimitOrder({
         walletAddress: walletAddress1,
         loanToken,
-        maturities: [maturity],
+        markets: marketsFromMaturities([maturity]),
         timestamp: Date.now(),
         originalAmount: '1000000',
         remainingAmount: '1000000',
@@ -516,7 +517,7 @@ describe('Maker/Taker Fee Calculations', () => {
       const borrowOrder: BorrowLimitOrder = createBorrowLimitOrder({
         walletAddress: walletAddress2,
         loanToken,
-        maturities: [maturity],
+        markets: marketsFromMaturities([maturity]),
         timestamp: Date.now() + 1,
         originalAmount: '750000',
         remainingAmount: '750000',
@@ -542,7 +543,7 @@ describe('Maker/Taker Fee Calculations', () => {
       const borrowOrder: BorrowLimitOrder = createBorrowLimitOrder({
         walletAddress: walletAddress2,
         loanToken,
-        maturities: [maturity],
+        markets: marketsFromMaturities([maturity]),
         timestamp: Date.now(),
         originalAmount: '999',
         remainingAmount: '999',
@@ -555,7 +556,7 @@ describe('Maker/Taker Fee Calculations', () => {
       const lendMarket: LendMarketOrder = createLendMarketOrder({
         walletAddress: walletAddress1,
         loanToken,
-        maturities: [maturity],
+        markets: marketsFromMaturities([maturity]),
         timestamp: Date.now() + 1,
         originalAmount: '999',
         remainingAmount: '999',
@@ -576,7 +577,7 @@ describe('Maker/Taker Fee Calculations', () => {
       const borrowOrder: BorrowLimitOrder = createBorrowLimitOrder({
         walletAddress: walletAddress2,
         loanToken,
-        maturities: [maturity],
+        markets: marketsFromMaturities([maturity]),
         timestamp: Date.now(),
         originalAmount: '1000',
         remainingAmount: '1000',
@@ -589,7 +590,7 @@ describe('Maker/Taker Fee Calculations', () => {
       const lendMarket: LendMarketOrder = createLendMarketOrder({
         walletAddress: walletAddress1,
         loanToken,
-        maturities: [maturity],
+        markets: marketsFromMaturities([maturity]),
         timestamp: Date.now() + 1,
         originalAmount: '1000',
         remainingAmount: '1000',
@@ -614,7 +615,7 @@ describe('Maker/Taker Fee Calculations', () => {
       const borrowOrder: BorrowLimitOrder = createBorrowLimitOrder({
         walletAddress: walletAddress2,
         loanToken,
-        maturities: [maturity],
+        markets: marketsFromMaturities([maturity]),
         timestamp: Date.now(),
         originalAmount: largeAmount,
         remainingAmount: largeAmount,
@@ -627,7 +628,7 @@ describe('Maker/Taker Fee Calculations', () => {
       const lendMarket: LendMarketOrder = createLendMarketOrder({
         walletAddress: walletAddress1,
         loanToken,
-        maturities: [maturity],
+        markets: marketsFromMaturities([maturity]),
         timestamp: Date.now() + 1,
         originalAmount: largeAmount,
         remainingAmount: largeAmount,
@@ -653,7 +654,7 @@ describe('Maker/Taker Fee Calculations', () => {
       const lendOrder1: LendLimitOrder = createLendLimitOrder({
         walletAddress: walletAddress1,
         loanToken,
-        maturities: [maturity],
+        markets: marketsFromMaturities([maturity]),
         timestamp: Date.now(),
         originalAmount: '333333',
         remainingAmount: '333333',
@@ -664,7 +665,7 @@ describe('Maker/Taker Fee Calculations', () => {
       const lendOrder2: LendLimitOrder = createLendLimitOrder({
         walletAddress: walletAddress1,
         loanToken,
-        maturities: [maturity],
+        markets: marketsFromMaturities([maturity]),
         timestamp: Date.now() + 1,
         originalAmount: '444444',
         remainingAmount: '444444',
@@ -678,7 +679,7 @@ describe('Maker/Taker Fee Calculations', () => {
       const borrowMarket: BorrowMarketOrder = createBorrowMarketOrder({
         walletAddress: walletAddress2,
         loanToken,
-        maturities: [maturity],
+        markets: marketsFromMaturities([maturity]),
         timestamp: Date.now() + 2,
         originalAmount: '777777',
         remainingAmount: '777777',
@@ -714,7 +715,7 @@ describe('Maker/Taker Fee Calculations', () => {
               orderId: generateOrderId(),
               walletAddress: walletAddress1,
               loanToken,
-              maturities: [maturity],
+              markets: marketsFromMaturities([maturity]),
               timestamp: Date.now(),
               originalAmount: '1000000',
               remainingAmount: '1000000',
@@ -727,7 +728,7 @@ describe('Maker/Taker Fee Calculations', () => {
                 orderId: generateOrderId(),
                 walletAddress: walletAddress2,
                 loanToken,
-                maturities: [maturity],
+                markets: marketsFromMaturities([maturity]),
                 timestamp: Date.now() + 1,
                 side: OrderSide.Borrow,
                 type: OrderType.Market,
@@ -747,7 +748,7 @@ describe('Maker/Taker Fee Calculations', () => {
               orderId: generateOrderId(),
               walletAddress: walletAddress2,
               loanToken,
-              maturities: [maturity],
+              markets: marketsFromMaturities([maturity]),
               timestamp: Date.now(),
               originalAmount: '1000000',
               remainingAmount: '1000000',
@@ -760,7 +761,7 @@ describe('Maker/Taker Fee Calculations', () => {
                 orderId: generateOrderId(),
                 walletAddress: walletAddress1,
                 loanToken,
-                maturities: [maturity],
+                markets: marketsFromMaturities([maturity]),
                 timestamp: Date.now() + 1,
                 side: OrderSide.Lend,
                 type: OrderType.Market,

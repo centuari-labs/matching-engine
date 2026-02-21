@@ -12,6 +12,7 @@ import {
   createLendLimitOrder,
   createBorrowMarketOrder,
   createBorrowLimitOrder,
+  marketsFromMaturities,
 } from './factories/order-factory';
 
 describe('Order Validation', () => {
@@ -23,7 +24,7 @@ describe('Order Validation', () => {
       const order = createLendMarketOrder({
         walletAddress: validWalletAddress,
         loanToken: validLoanToken,
-        maturities: [1704067200],
+        markets: marketsFromMaturities([1704067200]),
       });
 
       expect(() => lendMarketOrderSchema.parse(order)).not.toThrow();
@@ -34,7 +35,7 @@ describe('Order Validation', () => {
         orderId: '550e8400-e29b-41d4-a716-446655440000',
         walletAddress: validWalletAddress,
         loanToken: validLoanToken,
-        maturities: [1704067200],
+        markets: marketsFromMaturities([1704067200]),
         timestamp: Date.now(),
         side: OrderSide.Lend,
         type: OrderType.Market,
@@ -53,7 +54,7 @@ describe('Order Validation', () => {
         orderId: '550e8400-e29b-41d4-a716-446655440000',
         walletAddress: validWalletAddress,
         loanToken: 'invalid-address',
-        maturities: [1704067200],
+        markets: marketsFromMaturities([1704067200]),
         timestamp: Date.now(),
         side: OrderSide.Lend,
         type: OrderType.Market,
@@ -66,12 +67,12 @@ describe('Order Validation', () => {
       expect(() => lendMarketOrderSchema.parse(order)).toThrow();
     });
 
-    it('should reject empty maturities array', () => {
+    it('should reject empty markets array', () => {
       const order = {
         orderId: '550e8400-e29b-41d4-a716-446655440000',
         walletAddress: validWalletAddress,
         loanToken: validLoanToken,
-        maturities: [],
+        markets: [],
         timestamp: Date.now(),
         side: OrderSide.Lend,
         type: OrderType.Market,
@@ -90,7 +91,7 @@ describe('Order Validation', () => {
       const order = createLendLimitOrder({
         walletAddress: validWalletAddress,
         loanToken: validLoanToken,
-        maturities: [1704067200, 1735689600],
+        markets: marketsFromMaturities([1704067200, 1735689600]),
         rate: 500,
       });
 
@@ -102,7 +103,7 @@ describe('Order Validation', () => {
         orderId: '550e8400-e29b-41d4-a716-446655440000',
         walletAddress: validWalletAddress,
         loanToken: validLoanToken,
-        maturities: [1704067200],
+        markets: marketsFromMaturities([1704067200]),
         timestamp: Date.now(),
         side: OrderSide.Lend,
         type: OrderType.Limit,
@@ -120,7 +121,7 @@ describe('Order Validation', () => {
         orderId: '550e8400-e29b-41d4-a716-446655440000',
         walletAddress: validWalletAddress,
         loanToken: validLoanToken,
-        maturities: [1704067200],
+        markets: marketsFromMaturities([1704067200]),
         timestamp: Date.now(),
         side: OrderSide.Lend,
         type: OrderType.Limit,
@@ -139,7 +140,7 @@ describe('Order Validation', () => {
         orderId: '550e8400-e29b-41d4-a716-446655440000',
         walletAddress: validWalletAddress,
         loanToken: validLoanToken,
-        maturities: [1704067200],
+        markets: marketsFromMaturities([1704067200]),
         timestamp: Date.now(),
         side: OrderSide.Lend,
         type: OrderType.Limit,
@@ -159,7 +160,7 @@ describe('Order Validation', () => {
       const order = createBorrowMarketOrder({
         walletAddress: validWalletAddress,
         loanToken: validLoanToken,
-        maturities: [1704067200],
+        markets: marketsFromMaturities([1704067200]),
       });
 
       expect(() => borrowMarketOrderSchema.parse(order)).not.toThrow();
@@ -171,7 +172,7 @@ describe('Order Validation', () => {
       const order = createBorrowLimitOrder({
         walletAddress: validWalletAddress,
         loanToken: validLoanToken,
-        maturities: [1704067200],
+        markets: marketsFromMaturities([1704067200]),
         rate: 750,
       });
 
@@ -183,7 +184,7 @@ describe('Order Validation', () => {
         orderId: '550e8400-e29b-41d4-a716-446655440000',
         walletAddress: validWalletAddress,
         loanToken: validLoanToken,
-        maturities: [1704067200],
+        markets: marketsFromMaturities([1704067200]),
         timestamp: Date.now(),
         side: OrderSide.Borrow,
         type: OrderType.Limit,

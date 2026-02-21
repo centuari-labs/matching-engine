@@ -137,8 +137,9 @@ export class MatchingEngine {
   ): void {
     let remainingAmount = order.remainingAmount;
 
-    // Try to match with each maturity
-    for (const maturity of order.maturities) {
+    // Try to match with each market (maturity)
+    for (const market of order.markets) {
+      const maturity = market.maturity;
       if (isZero(remainingAmount)) break;
 
       // Get borrow orders for this maturity (sorted by rate descending - highest first)
@@ -248,8 +249,9 @@ export class MatchingEngine {
   ): void {
     let remainingAmount = order.remainingAmount;
 
-    // Try to match with each maturity
-    for (const maturity of order.maturities) {
+    // Try to match with each market (maturity)
+    for (const market of order.markets) {
+      const maturity = market.maturity;
       if (isZero(remainingAmount)) break;
 
       // Get borrow orders for this maturity (sorted by rate descending - highest first)
@@ -378,8 +380,9 @@ export class MatchingEngine {
   ): void {
     let remainingAmount = order.remainingAmount;
 
-    // Try to match with each maturity
-    for (const maturity of order.maturities) {
+    // Try to match with each market (maturity)
+    for (const market of order.markets) {
+      const maturity = market.maturity;
       if (isZero(remainingAmount)) break;
 
       // Get lend orders for this maturity (sorted by rate ascending - lowest first)
@@ -486,8 +489,9 @@ export class MatchingEngine {
   ): void {
     let remainingAmount = order.remainingAmount;
 
-    // Try to match with each maturity
-    for (const maturity of order.maturities) {
+    // Try to match with each market (maturity)
+    for (const market of order.markets) {
+      const maturity = market.maturity;
       if (isZero(remainingAmount)) break;
 
       // Get lend orders for this maturity (sorted by rate ascending - lowest first)
