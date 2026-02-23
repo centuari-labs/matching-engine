@@ -17,7 +17,7 @@ import { loadDbConfig } from '../../config/db-config';
  *   borrower_account_id UUID, match_amount NUMERIC, rate NUMERIC,
  *   is_borrower_taker BOOLEAN, maker_fee NUMERIC, taker_fee NUMERIC,
  *   lender_settlement_fee NUMERIC, borrower_settlement_fee NUMERIC,
- *   created_at TIMESTAMP, updated_at TIMESTAMP);
+ *   maturity TIMESTAMP, created_at TIMESTAMP, updated_at TIMESTAMP);
  *
  * Column names can be adjusted later without changing the DbWriterService.
  */
@@ -172,7 +172,6 @@ export class PostgresDbClient implements DbClient {
         event.borrowerWallet
       );
 
-      //@todo : add maturity here
       await client.query(
         `
         INSERT INTO matches (
@@ -189,6 +188,7 @@ export class PostgresDbClient implements DbClient {
           taker_fee,
           lender_settlement_fee,
           borrower_settlement_fee,
+          maturity,
           created_at,
           updated_at
         )
@@ -207,7 +207,8 @@ export class PostgresDbClient implements DbClient {
           $12,
           $13,
           to_timestamp($14 / 1000.0),
-          to_timestamp($14 / 1000.0)
+          to_timestamp($15 / 1000.0),
+          to_timestamp($15 / 1000.0)
         )
         ON CONFLICT (id) DO NOTHING
         `,
@@ -225,6 +226,7 @@ export class PostgresDbClient implements DbClient {
           event.takerFeeAmount,
           event.lenderSettlementFeeAmount,
           event.borrowerSettlementFeeAmount,
+          event.maturity,
           event.timestamp,
         ]
       );
