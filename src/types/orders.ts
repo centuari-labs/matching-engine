@@ -61,8 +61,8 @@ export type MarketSlot = z.infer<typeof marketSlotSchema>;
  */
 const baseOrderSchema = z.object({
   orderId: z.string().uuid('Order ID must be a valid UUID'),
-  walletAddress: ethereumAddressSchema, //@todo : should use account id
-  loanToken: ethereumAddressSchema,//@todo : should use asset id
+  walletAddress: ethereumAddressSchema, //@note : later change into account id
+  loanToken: ethereumAddressSchema, //@note : later change into asset id
   markets: z
     .array(marketSlotSchema)
     .min(1, 'At least one market slot is required'),

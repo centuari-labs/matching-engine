@@ -172,6 +172,7 @@ export class PostgresDbClient implements DbClient {
         event.borrowerWallet
       );
 
+      //@todo : add maturity here
       await client.query(
         `
         INSERT INTO matches (
@@ -212,8 +213,8 @@ export class PostgresDbClient implements DbClient {
         `,
         [
           event.matchId,
-          event.lendOrderId, //@todo : change into order market id
-          event.borrowOrderId,//@todo : change into order market id
+          event.lendOrderId, //@note : later change into order market id
+          event.borrowOrderId,//@note : later change into order market id
           assetId,
           lenderAccountId,
           borrowerAccountId,
