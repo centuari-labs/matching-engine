@@ -7,7 +7,6 @@
 
 import { z } from 'zod';
 import type { MatchResult } from './matches';
-import { ethereumAddressSchema } from './orders';
 
 /**
  * Schema for order cancellation requests
@@ -19,9 +18,9 @@ export const cancelOrderMessageSchema = z.object({
   orderId: z.string().uuid(),
 
   /**
-   * Wallet address of the order owner
+   * Account ID of the order owner
    */
-  walletAddress: ethereumAddressSchema,
+  accountId: z.string().uuid(),
 
   /**
    * Timestamp of the cancellation request

@@ -17,8 +17,8 @@ import type { LendLimitOrder, BorrowLimitOrder } from '../types/orders';
 import {
   createLendLimitOrder,
   createBorrowLimitOrder,
-  DEFAULT_LOAN_TOKEN,
-  DEFAULT_MATURITY,
+  DEFAULT_ASSET_ID,
+  DEFAULT_MARKET_ID,
 } from './factories/order-factory';
 
 /**
@@ -56,10 +56,10 @@ class MockSettlementPublisher implements SettlementPublisher {
 }
 
 describe('SettlementPublisher Integration', () => {
-  const loanToken = DEFAULT_LOAN_TOKEN;
-  const walletAddress1 = '0x1111111111111111111111111111111111111111';
-  const walletAddress2 = '0x2222222222222222222222222222222222222222';
-  const maturity = DEFAULT_MATURITY;
+  const assetId = DEFAULT_ASSET_ID;
+  const accountId1 = '550e8400-e29b-41d4-a716-446655440002';
+  const accountId2 = '550e8400-e29b-41d4-a716-446655440003';
+  const marketId = DEFAULT_MARKET_ID;
 
   describe('ExecutionEngine with SettlementPublisher', () => {
     let mockPublisher: MockSettlementPublisher;
@@ -79,12 +79,12 @@ describe('SettlementPublisher Integration', () => {
       const match = executionEngine.recordMatch({
         lendOrderId: generateOrderId(),
         borrowOrderId: generateOrderId(),
-        lenderWallet: walletAddress1,
-        borrowerWallet: walletAddress2,
+        lenderAccountId: accountId1,
+        borrowerAccountId: accountId2,
         matchedAmount,
         rate: 500,
-        loanToken,
-        maturity,
+        assetId,
+        marketId,
         borrowerIsTaker: true,
         makerFeeAmount: calculateMakerFee(matchedAmount),
         takerFeeAmount: calculateTakerFee(matchedAmount),
@@ -107,12 +107,12 @@ describe('SettlementPublisher Integration', () => {
       executionEngine.recordMatch({
         lendOrderId,
         borrowOrderId,
-        lenderWallet: walletAddress1,
-        borrowerWallet: walletAddress2,
+        lenderAccountId: accountId1,
+        borrowerAccountId: accountId2,
         matchedAmount,
         rate: 750,
-        loanToken,
-        maturity,
+        assetId,
+        marketId,
         borrowerIsTaker: false,
         makerFeeAmount: calculateMakerFee(matchedAmount),
         takerFeeAmount: calculateTakerFee(matchedAmount),
@@ -125,12 +125,12 @@ describe('SettlementPublisher Integration', () => {
       const publishedMatch = mockPublisher.publishedMatches[0];
       expect(publishedMatch.lendOrderId).toBe(lendOrderId);
       expect(publishedMatch.borrowOrderId).toBe(borrowOrderId);
-      expect(publishedMatch.lenderWallet).toBe(walletAddress1);
-      expect(publishedMatch.borrowerWallet).toBe(walletAddress2);
+      expect(publishedMatch.lenderAccountId).toBe(accountId1);
+      expect(publishedMatch.borrowerAccountId).toBe(accountId2);
       expect(publishedMatch.matchedAmount).toBe('5000000');
       expect(publishedMatch.rate).toBe(750);
-      expect(publishedMatch.loanToken).toBe(loanToken);
-      expect(publishedMatch.maturity).toBe(maturity);
+      expect(publishedMatch.assetId).toBe(assetId);
+      expect(publishedMatch.marketId).toBe(marketId);
       expect(publishedMatch.borrowerIsTaker).toBe(false);
       expect(publishedMatch.timestamp).toBeDefined();
       expect(publishedMatch.matchId).toBeDefined();
@@ -141,12 +141,12 @@ describe('SettlementPublisher Integration', () => {
       const match = executionEngine.recordMatch({
         lendOrderId: generateOrderId(),
         borrowOrderId: generateOrderId(),
-        lenderWallet: walletAddress1,
-        borrowerWallet: walletAddress2,
+        lenderAccountId: accountId1,
+        borrowerAccountId: accountId2,
         matchedAmount,
         rate: 500,
-        loanToken,
-        maturity,
+        assetId,
+        marketId,
         borrowerIsTaker: true,
         makerFeeAmount: calculateMakerFee(matchedAmount),
         takerFeeAmount: calculateTakerFee(matchedAmount),
@@ -173,12 +173,12 @@ describe('SettlementPublisher Integration', () => {
       const match = executionEngine.recordMatch({
         lendOrderId: generateOrderId(),
         borrowOrderId: generateOrderId(),
-        lenderWallet: walletAddress1,
-        borrowerWallet: walletAddress2,
+        lenderAccountId: accountId1,
+        borrowerAccountId: accountId2,
         matchedAmount,
         rate: 500,
-        loanToken,
-        maturity,
+        assetId,
+        marketId,
         borrowerIsTaker: true,
         makerFeeAmount: calculateMakerFee(matchedAmount),
         takerFeeAmount: calculateTakerFee(matchedAmount),
@@ -205,12 +205,12 @@ describe('SettlementPublisher Integration', () => {
       const match = executionEngine.recordMatch({
         lendOrderId: generateOrderId(),
         borrowOrderId: generateOrderId(),
-        lenderWallet: walletAddress1,
-        borrowerWallet: walletAddress2,
+        lenderAccountId: accountId1,
+        borrowerAccountId: accountId2,
         matchedAmount,
         rate: 500,
-        loanToken,
-        maturity,
+        assetId,
+        marketId,
         borrowerIsTaker: true,
         makerFeeAmount: calculateMakerFee(matchedAmount),
         takerFeeAmount: calculateTakerFee(matchedAmount),
@@ -233,12 +233,12 @@ describe('SettlementPublisher Integration', () => {
       executionEngine.recordMatch({
         lendOrderId: generateOrderId(),
         borrowOrderId: generateOrderId(),
-        lenderWallet: walletAddress1,
-        borrowerWallet: walletAddress2,
+        lenderAccountId: accountId1,
+        borrowerAccountId: accountId2,
         matchedAmount: matchedAmount1,
         rate: 500,
-        loanToken,
-        maturity,
+        assetId,
+        marketId,
         borrowerIsTaker: true,
         makerFeeAmount: calculateMakerFee(matchedAmount1),
         takerFeeAmount: calculateTakerFee(matchedAmount1),
@@ -250,12 +250,12 @@ describe('SettlementPublisher Integration', () => {
       executionEngine.recordMatch({
         lendOrderId: generateOrderId(),
         borrowOrderId: generateOrderId(),
-        lenderWallet: walletAddress1,
-        borrowerWallet: walletAddress2,
+        lenderAccountId: accountId1,
+        borrowerAccountId: accountId2,
         matchedAmount: matchedAmount2,
         rate: 600,
-        loanToken,
-        maturity,
+        assetId,
+        marketId,
         borrowerIsTaker: false,
         makerFeeAmount: calculateMakerFee(matchedAmount2),
         takerFeeAmount: calculateTakerFee(matchedAmount2),
@@ -277,12 +277,12 @@ describe('SettlementPublisher Integration', () => {
       executionEngine.recordMatch({
         lendOrderId,
         borrowOrderId,
-        lenderWallet: walletAddress1,
-        borrowerWallet: walletAddress2,
+        lenderAccountId: accountId1,
+        borrowerAccountId: accountId2,
         matchedAmount,
         rate: 500,
-        loanToken,
-        maturity,
+        assetId,
+        marketId,
         borrowerIsTaker: true,
         makerFeeAmount: calculateMakerFee(matchedAmount),
         takerFeeAmount: calculateTakerFee(matchedAmount),
@@ -315,12 +315,12 @@ describe('SettlementPublisher Integration', () => {
       const match = executionEngine.recordMatch({
         lendOrderId: generateOrderId(),
         borrowOrderId: generateOrderId(),
-        lenderWallet: walletAddress1,
-        borrowerWallet: walletAddress2,
+        lenderAccountId: accountId1,
+        borrowerAccountId: accountId2,
         matchedAmount,
         rate: 500,
-        loanToken,
-        maturity,
+        assetId,
+        marketId,
         borrowerIsTaker: true,
         makerFeeAmount: calculateMakerFee(matchedAmount),
         takerFeeAmount: calculateTakerFee(matchedAmount),
@@ -337,12 +337,12 @@ describe('SettlementPublisher Integration', () => {
       const match = executionEngine.recordMatch({
         lendOrderId: generateOrderId(),
         borrowOrderId: generateOrderId(),
-        lenderWallet: walletAddress1,
-        borrowerWallet: walletAddress2,
+        lenderAccountId: accountId1,
+        borrowerAccountId: accountId2,
         matchedAmount,
         rate: 500,
-        loanToken,
-        maturity,
+        assetId,
+        marketId,
         borrowerIsTaker: true,
         makerFeeAmount: calculateMakerFee(matchedAmount),
         takerFeeAmount: calculateTakerFee(matchedAmount),
@@ -374,9 +374,9 @@ describe('SettlementPublisher Integration', () => {
     it('should publish matches created through order matching', async () => {
       // Create lend limit order
       const lendOrder: LendLimitOrder = createLendLimitOrder({
-        walletAddress: walletAddress1,
-        loanToken,
-        maturities: [maturity],
+        accountId: accountId1,
+        assetId,
+        marketIds: [marketId],
         timestamp: Date.now(),
         originalAmount: '1000000',
         remainingAmount: '1000000',
@@ -386,9 +386,9 @@ describe('SettlementPublisher Integration', () => {
 
       // Create borrow limit order that will match
       const borrowOrder: BorrowLimitOrder = createBorrowLimitOrder({
-        walletAddress: walletAddress2,
-        loanToken,
-        maturities: [maturity],
+        accountId: accountId2,
+        assetId,
+        marketIds: [marketId],
         timestamp: Date.now() + 1,
         originalAmount: '1000000',
         remainingAmount: '1000000',
@@ -411,16 +411,16 @@ describe('SettlementPublisher Integration', () => {
       expect(mockPublisher.publishedMatches).toHaveLength(1);
       expect(mockPublisher.publishedMatches[0].lendOrderId).toBe(lendOrder.orderId);
       expect(mockPublisher.publishedMatches[0].borrowOrderId).toBe(borrowOrder.orderId);
-      expect(mockPublisher.publishedMatches[0].lenderWallet).toBe(walletAddress1);
-      expect(mockPublisher.publishedMatches[0].borrowerWallet).toBe(walletAddress2);
+      expect(mockPublisher.publishedMatches[0].lenderAccountId).toBe(accountId1);
+      expect(mockPublisher.publishedMatches[0].borrowerAccountId).toBe(accountId2);
     });
 
     it('should publish partial fill matches', async () => {
       // Create lend order for 2000000
       const lendOrder: LendLimitOrder = createLendLimitOrder({
-        walletAddress: walletAddress1,
-        loanToken,
-        maturities: [maturity],
+        accountId: accountId1,
+        assetId,
+        marketIds: [marketId],
         timestamp: Date.now(),
         originalAmount: '2000000',
         remainingAmount: '2000000',
@@ -430,9 +430,9 @@ describe('SettlementPublisher Integration', () => {
 
       // Create borrow order for 1000000 (partial match)
       const borrowOrder: BorrowLimitOrder = createBorrowLimitOrder({
-        walletAddress: walletAddress2,
-        loanToken,
-        maturities: [maturity],
+        accountId: accountId2,
+        assetId,
+        marketIds: [marketId],
         timestamp: Date.now() + 1,
         originalAmount: '1000000',
         remainingAmount: '1000000',
@@ -460,9 +460,9 @@ describe('SettlementPublisher Integration', () => {
       console.error = jest.fn();
 
       const lendOrder: LendLimitOrder = createLendLimitOrder({
-        walletAddress: walletAddress1,
-        loanToken,
-        maturities: [maturity],
+        accountId: accountId1,
+        assetId,
+        marketIds: [marketId],
         timestamp: Date.now(),
         originalAmount: '1000000',
         remainingAmount: '1000000',
@@ -471,9 +471,9 @@ describe('SettlementPublisher Integration', () => {
       });
 
       const borrowOrder: BorrowLimitOrder = createBorrowLimitOrder({
-        walletAddress: walletAddress2,
-        loanToken,
-        maturities: [maturity],
+        accountId: accountId2,
+        assetId,
+        marketIds: [marketId],
         timestamp: Date.now() + 1,
         originalAmount: '1000000',
         remainingAmount: '1000000',
@@ -513,12 +513,12 @@ describe('SettlementPublisher Integration', () => {
         executionEngine.recordMatch({
           lendOrderId: generateOrderId(),
           borrowOrderId: generateOrderId(),
-          lenderWallet: walletAddress1,
-          borrowerWallet: walletAddress2,
+          lenderAccountId: accountId1,
+          borrowerAccountId: accountId2,
           matchedAmount,
           rate: 500 + i,
-          loanToken,
-          maturity,
+          assetId,
+          marketId,
           borrowerIsTaker: true,
           makerFeeAmount: calculateMakerFee(matchedAmount),
         takerFeeAmount: calculateTakerFee(matchedAmount),
@@ -560,12 +560,12 @@ describe('SettlementPublisher Integration', () => {
         executionEngine.recordMatch({
           lendOrderId: generateOrderId(),
           borrowOrderId: generateOrderId(),
-          lenderWallet: walletAddress1,
-          borrowerWallet: walletAddress2,
+          lenderAccountId: accountId1,
+          borrowerAccountId: accountId2,
           matchedAmount,
           rate: 500 + i,
-          loanToken,
-          maturity,
+          assetId,
+          marketId,
           borrowerIsTaker: true,
           makerFeeAmount: calculateMakerFee(matchedAmount),
         takerFeeAmount: calculateTakerFee(matchedAmount),

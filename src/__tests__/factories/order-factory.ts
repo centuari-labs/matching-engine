@@ -14,14 +14,14 @@ import {
 import { generateOrderId } from '../../utils/helpers';
 
 /**
- * Default loan token address used in tests.
+ * Default asset ID (UUID) used in tests.
  */
-export const DEFAULT_LOAN_TOKEN = '0x1234567890123456789012345678901234567890';
+export const DEFAULT_ASSET_ID = '550e8400-e29b-41d4-a716-446655440001';
 
 /**
- * Default maturity timestamp used in tests.
+ * Default market ID (UUID) used in tests.
  */
-export const DEFAULT_MATURITY = 1704067200;
+export const DEFAULT_MARKET_ID = '550e8400-e29b-41d4-a716-446655440010';
 
 /**
  * Default settlement fee amount used in tests.
@@ -41,9 +41,9 @@ export const DEFAULT_ORDER_AMOUNT = '1000000';
 function createBaseOrder() {
   return {
     orderId: generateOrderId(),
-    walletAddress: '0x1111111111111111111111111111111111111111',
-    loanToken: DEFAULT_LOAN_TOKEN,
-    maturities: [DEFAULT_MATURITY],
+    accountId: '550e8400-e29b-41d4-a716-446655440002',
+    assetId: DEFAULT_ASSET_ID,
+    marketIds: [DEFAULT_MARKET_ID],
     timestamp: Date.now(),
     status: OrderStatus.Open,
     originalAmount: DEFAULT_ORDER_AMOUNT,

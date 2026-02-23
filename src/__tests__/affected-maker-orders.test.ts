@@ -15,10 +15,10 @@ import {
 
 describe('Affected Maker Orders', () => {
   let engine: MatchingEngine;
-  const loanToken = '0x1234567890123456789012345678901234567890';
-  const walletAddress1 = '0x1111111111111111111111111111111111111111';
-  const walletAddress2 = '0x2222222222222222222222222222222222222222';
-  const maturity = 1704067200;
+  const assetId = '550e8400-e29b-41d4-a716-446655440001';
+  const accountId1 = '550e8400-e29b-41d4-a716-446655440002';
+  const accountId2 = '550e8400-e29b-41d4-a716-446655440003';
+  const marketId = '550e8400-e29b-41d4-a716-446655440010';
 
   beforeEach(() => {
     engine = new MatchingEngine();
@@ -28,9 +28,9 @@ describe('Affected Maker Orders', () => {
     it('should track affected borrow order when fully filled', () => {
       // Create borrow order (maker)
       const borrowOrder: BorrowLimitOrder = createBorrowLimitOrder({
-        walletAddress: walletAddress2,
-        loanToken,
-        maturities: [maturity],
+        accountId: accountId2,
+        assetId,
+        marketIds: [marketId],
         timestamp: Date.now(),
         originalAmount: '1000000',
         remainingAmount: '1000000',
@@ -42,9 +42,9 @@ describe('Affected Maker Orders', () => {
 
       // Create lend order (taker) that fully fills the borrow order
       const lendOrder: LendLimitOrder = createLendLimitOrder({
-        walletAddress: walletAddress1,
-        loanToken,
-        maturities: [maturity],
+        accountId: accountId1,
+        assetId,
+        marketIds: [marketId],
         timestamp: Date.now() + 1,
         originalAmount: '1000000',
         remainingAmount: '1000000',
@@ -64,9 +64,9 @@ describe('Affected Maker Orders', () => {
     it('should track affected borrow order when partially filled', () => {
       // Create borrow order (maker) with larger amount
       const borrowOrder: BorrowLimitOrder = createBorrowLimitOrder({
-        walletAddress: walletAddress2,
-        loanToken,
-        maturities: [maturity],
+        accountId: accountId2,
+        assetId,
+        marketIds: [marketId],
         timestamp: Date.now(),
         originalAmount: '1000000',
         remainingAmount: '1000000',
@@ -78,9 +78,9 @@ describe('Affected Maker Orders', () => {
 
       // Create smaller lend order (taker) that partially fills the borrow order
       const lendOrder: LendLimitOrder = createLendLimitOrder({
-        walletAddress: walletAddress1,
-        loanToken,
-        maturities: [maturity],
+        accountId: accountId1,
+        assetId,
+        marketIds: [marketId],
         timestamp: Date.now() + 1,
         originalAmount: '300000',
         remainingAmount: '300000',
@@ -100,9 +100,9 @@ describe('Affected Maker Orders', () => {
     it('should track multiple affected borrow orders', () => {
       // Create multiple borrow orders (makers)
       const borrowOrder1: BorrowLimitOrder = createBorrowLimitOrder({
-        walletAddress: walletAddress2,
-        loanToken,
-        maturities: [maturity],
+        accountId: accountId2,
+        assetId,
+        marketIds: [marketId],
         timestamp: Date.now(),
         originalAmount: '300000',
         remainingAmount: '300000',
@@ -111,9 +111,9 @@ describe('Affected Maker Orders', () => {
       });
 
       const borrowOrder2: BorrowLimitOrder = createBorrowLimitOrder({
-        walletAddress: walletAddress2,
-        loanToken,
-        maturities: [maturity],
+        accountId: accountId2,
+        assetId,
+        marketIds: [marketId],
         timestamp: Date.now() + 1,
         originalAmount: '400000',
         remainingAmount: '400000',
@@ -126,9 +126,9 @@ describe('Affected Maker Orders', () => {
 
       // Create lend order (taker) that matches both
       const lendOrder: LendLimitOrder = createLendLimitOrder({
-        walletAddress: walletAddress1,
-        loanToken,
-        maturities: [maturity],
+        accountId: accountId1,
+        assetId,
+        marketIds: [marketId],
         timestamp: Date.now() + 2,
         originalAmount: '700000',
         remainingAmount: '700000',
@@ -156,9 +156,9 @@ describe('Affected Maker Orders', () => {
     it('should track affected lend order when fully filled', () => {
       // Create lend order (maker)
       const lendOrder: LendLimitOrder = createLendLimitOrder({
-        walletAddress: walletAddress1,
-        loanToken,
-        maturities: [maturity],
+        accountId: accountId1,
+        assetId,
+        marketIds: [marketId],
         timestamp: Date.now(),
         originalAmount: '1000000',
         remainingAmount: '1000000',
@@ -170,9 +170,9 @@ describe('Affected Maker Orders', () => {
 
       // Create borrow order (taker) that fully fills the lend order
       const borrowOrder: BorrowLimitOrder = createBorrowLimitOrder({
-        walletAddress: walletAddress2,
-        loanToken,
-        maturities: [maturity],
+        accountId: accountId2,
+        assetId,
+        marketIds: [marketId],
         timestamp: Date.now() + 1,
         originalAmount: '1000000',
         remainingAmount: '1000000',
@@ -192,9 +192,9 @@ describe('Affected Maker Orders', () => {
     it('should track affected lend order when partially filled', () => {
       // Create lend order (maker) with larger amount
       const lendOrder: LendLimitOrder = createLendLimitOrder({
-        walletAddress: walletAddress1,
-        loanToken,
-        maturities: [maturity],
+        accountId: accountId1,
+        assetId,
+        marketIds: [marketId],
         timestamp: Date.now(),
         originalAmount: '1000000',
         remainingAmount: '1000000',
@@ -206,9 +206,9 @@ describe('Affected Maker Orders', () => {
 
       // Create smaller borrow order (taker) that partially fills the lend order
       const borrowOrder: BorrowLimitOrder = createBorrowLimitOrder({
-        walletAddress: walletAddress2,
-        loanToken,
-        maturities: [maturity],
+        accountId: accountId2,
+        assetId,
+        marketIds: [marketId],
         timestamp: Date.now() + 1,
         originalAmount: '400000',
         remainingAmount: '400000',
@@ -228,9 +228,9 @@ describe('Affected Maker Orders', () => {
     it('should track multiple affected lend orders', () => {
       // Create multiple lend orders (makers)
       const lendOrder1: LendLimitOrder = createLendLimitOrder({
-        walletAddress: walletAddress1,
-        loanToken,
-        maturities: [maturity],
+        accountId: accountId1,
+        assetId,
+        marketIds: [marketId],
         timestamp: Date.now(),
         originalAmount: '200000',
         remainingAmount: '200000',
@@ -239,9 +239,9 @@ describe('Affected Maker Orders', () => {
       });
 
       const lendOrder2: LendLimitOrder = createLendLimitOrder({
-        walletAddress: walletAddress1,
-        loanToken,
-        maturities: [maturity],
+        accountId: accountId1,
+        assetId,
+        marketIds: [marketId],
         timestamp: Date.now() + 1,
         originalAmount: '300000',
         remainingAmount: '300000',
@@ -254,9 +254,9 @@ describe('Affected Maker Orders', () => {
 
       // Create borrow order (taker) that matches both
       const borrowOrder: BorrowLimitOrder = createBorrowLimitOrder({
-        walletAddress: walletAddress2,
-        loanToken,
-        maturities: [maturity],
+        accountId: accountId2,
+        assetId,
+        marketIds: [marketId],
         timestamp: Date.now() + 2,
         originalAmount: '500000',
         remainingAmount: '500000',
@@ -284,9 +284,9 @@ describe('Affected Maker Orders', () => {
     it('should track affected orders when lend market order matches multiple borrow orders', () => {
       // Create multiple borrow orders
       const borrowOrder1: BorrowLimitOrder = createBorrowLimitOrder({
-        walletAddress: walletAddress2,
-        loanToken,
-        maturities: [maturity],
+        accountId: accountId2,
+        assetId,
+        marketIds: [marketId],
         timestamp: Date.now(),
         originalAmount: '500000',
         remainingAmount: '500000',
@@ -295,9 +295,9 @@ describe('Affected Maker Orders', () => {
       });
 
       const borrowOrder2: BorrowLimitOrder = createBorrowLimitOrder({
-        walletAddress: walletAddress2,
-        loanToken,
-        maturities: [maturity],
+        accountId: accountId2,
+        assetId,
+        marketIds: [marketId],
         timestamp: Date.now() + 1,
         originalAmount: '500000',
         remainingAmount: '500000',
@@ -310,9 +310,9 @@ describe('Affected Maker Orders', () => {
 
       // Submit lend market order
       const lendMarket: LendMarketOrder = createLendMarketOrder({
-        walletAddress: walletAddress1,
-        loanToken,
-        maturities: [maturity],
+        accountId: accountId1,
+        assetId,
+        marketIds: [marketId],
         timestamp: Date.now() + 2,
         originalAmount: '1000000',
         remainingAmount: '1000000',
@@ -332,9 +332,9 @@ describe('Affected Maker Orders', () => {
     it('should track affected orders when borrow market order matches multiple lend orders', () => {
       // Create multiple lend orders
       const lendOrder1: LendLimitOrder = createLendLimitOrder({
-        walletAddress: walletAddress1,
-        loanToken,
-        maturities: [maturity],
+        accountId: accountId1,
+        assetId,
+        marketIds: [marketId],
         timestamp: Date.now(),
         originalAmount: '400000',
         remainingAmount: '400000',
@@ -343,9 +343,9 @@ describe('Affected Maker Orders', () => {
       });
 
       const lendOrder2: LendLimitOrder = createLendLimitOrder({
-        walletAddress: walletAddress1,
-        loanToken,
-        maturities: [maturity],
+        accountId: accountId1,
+        assetId,
+        marketIds: [marketId],
         timestamp: Date.now() + 1,
         originalAmount: '600000',
         remainingAmount: '600000',
@@ -358,9 +358,9 @@ describe('Affected Maker Orders', () => {
 
       // Submit borrow market order
       const borrowMarket: BorrowMarketOrder = createBorrowMarketOrder({
-        walletAddress: walletAddress2,
-        loanToken,
-        maturities: [maturity],
+        accountId: accountId2,
+        assetId,
+        marketIds: [marketId],
         timestamp: Date.now() + 2,
         originalAmount: '1000000',
         remainingAmount: '1000000',
@@ -382,9 +382,9 @@ describe('Affected Maker Orders', () => {
     it('should return empty affectedMakerOrders when no matches occur', () => {
       // Create lend order
       const lendOrder: LendLimitOrder = createLendLimitOrder({
-        walletAddress: walletAddress1,
-        loanToken,
-        maturities: [maturity],
+        accountId: accountId1,
+        assetId,
+        marketIds: [marketId],
         timestamp: Date.now(),
         originalAmount: '1000000',
         remainingAmount: '1000000',
@@ -394,9 +394,9 @@ describe('Affected Maker Orders', () => {
 
       // Create borrow order with rate too low to match
       const borrowOrder: BorrowLimitOrder = createBorrowLimitOrder({
-        walletAddress: walletAddress2,
-        loanToken,
-        maturities: [maturity],
+        accountId: accountId2,
+        assetId,
+        marketIds: [marketId],
         timestamp: Date.now() + 1,
         originalAmount: '1000000',
         remainingAmount: '1000000',
@@ -413,9 +413,9 @@ describe('Affected Maker Orders', () => {
 
     it('should return empty affectedMakerOrders for first order in empty book', () => {
       const lendOrder: LendLimitOrder = createLendLimitOrder({
-        walletAddress: walletAddress1,
-        loanToken,
-        maturities: [maturity],
+        accountId: accountId1,
+        assetId,
+        marketIds: [marketId],
         timestamp: Date.now(),
         originalAmount: '1000000',
         remainingAmount: '1000000',
@@ -431,9 +431,9 @@ describe('Affected Maker Orders', () => {
 
     it('should return empty affectedMakerOrders for market order with no liquidity', () => {
       const lendMarket: LendMarketOrder = createLendMarketOrder({
-        walletAddress: walletAddress1,
-        loanToken,
-        maturities: [maturity],
+        accountId: accountId1,
+        assetId,
+        marketIds: [marketId],
         timestamp: Date.now(),
         originalAmount: '1000000',
         remainingAmount: '1000000',
@@ -451,9 +451,9 @@ describe('Affected Maker Orders', () => {
     it('should correctly track partially and fully filled maker orders', () => {
       // Create two lend orders of different sizes
       const lendOrder1: LendLimitOrder = createLendLimitOrder({
-        walletAddress: walletAddress1,
-        loanToken,
-        maturities: [maturity],
+        accountId: accountId1,
+        assetId,
+        marketIds: [marketId],
         timestamp: Date.now(),
         originalAmount: '300000',
         remainingAmount: '300000',
@@ -462,9 +462,9 @@ describe('Affected Maker Orders', () => {
       });
 
       const lendOrder2: LendLimitOrder = createLendLimitOrder({
-        walletAddress: walletAddress1,
-        loanToken,
-        maturities: [maturity],
+        accountId: accountId1,
+        assetId,
+        marketIds: [marketId],
         timestamp: Date.now() + 1,
         originalAmount: '500000',
         remainingAmount: '500000',
@@ -477,9 +477,9 @@ describe('Affected Maker Orders', () => {
 
       // Create borrow order that fully fills first and partially fills second
       const borrowOrder: BorrowLimitOrder = createBorrowLimitOrder({
-        walletAddress: walletAddress2,
-        loanToken,
-        maturities: [maturity],
+        accountId: accountId2,
+        assetId,
+        marketIds: [marketId],
         timestamp: Date.now() + 2,
         originalAmount: '500000',
         remainingAmount: '500000',

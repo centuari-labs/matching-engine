@@ -24,10 +24,10 @@ import {
  */
 describe('BorrowerIsTaker Field', () => {
   let engine: MatchingEngine;
-  const loanToken = '0x1234567890123456789012345678901234567890';
-  const walletAddress1 = '0x1111111111111111111111111111111111111111';
-  const walletAddress2 = '0x2222222222222222222222222222222222222222';
-  const maturity = 1704067200;
+  const assetId = '550e8400-e29b-41d4-a716-446655440001';
+  const accountId1 = '550e8400-e29b-41d4-a716-446655440002';
+  const accountId2 = '550e8400-e29b-41d4-a716-446655440003';
+  const marketId = '550e8400-e29b-41d4-a716-446655440010';
 
   beforeEach(() => {
     engine = new MatchingEngine();
@@ -37,9 +37,9 @@ describe('BorrowerIsTaker Field', () => {
     it('should set borrowerIsTaker to false when lend market order matches borrow limit order', () => {
       // Borrow limit order is placed first (becomes maker)
       const borrowOrder: BorrowLimitOrder = createBorrowLimitOrder({
-        walletAddress: walletAddress2,
-        loanToken,
-        maturities: [maturity],
+        accountId: accountId2,
+        assetId,
+        marketIds: [marketId],
         timestamp: Date.now(),
         originalAmount: '1000000',
         remainingAmount: '1000000',
@@ -51,9 +51,9 @@ describe('BorrowerIsTaker Field', () => {
 
       // Lend market order comes in (becomes taker)
       const lendMarket: LendMarketOrder = createLendMarketOrder({
-        walletAddress: walletAddress1,
-        loanToken,
-        maturities: [maturity],
+        accountId: accountId1,
+        assetId,
+        marketIds: [marketId],
         timestamp: Date.now() + 1,
         originalAmount: '1000000',
         remainingAmount: '1000000',
@@ -71,9 +71,9 @@ describe('BorrowerIsTaker Field', () => {
     it('should set borrowerIsTaker to false for all matches when lend market order matches multiple borrow orders', () => {
       // Add multiple borrow orders (all become makers)
       const borrowOrder1: BorrowLimitOrder = createBorrowLimitOrder({
-        walletAddress: walletAddress2,
-        loanToken,
-        maturities: [maturity],
+        accountId: accountId2,
+        assetId,
+        marketIds: [marketId],
         timestamp: Date.now(),
         originalAmount: '500000',
         remainingAmount: '500000',
@@ -82,9 +82,9 @@ describe('BorrowerIsTaker Field', () => {
       });
 
       const borrowOrder2: BorrowLimitOrder = createBorrowLimitOrder({
-        walletAddress: walletAddress2,
-        loanToken,
-        maturities: [maturity],
+        accountId: accountId2,
+        assetId,
+        marketIds: [marketId],
         timestamp: Date.now() + 1,
         originalAmount: '500000',
         remainingAmount: '500000',
@@ -97,9 +97,9 @@ describe('BorrowerIsTaker Field', () => {
 
       // Lend market order matches both (taker)
       const lendMarket: LendMarketOrder = createLendMarketOrder({
-        walletAddress: walletAddress1,
-        loanToken,
-        maturities: [maturity],
+        accountId: accountId1,
+        assetId,
+        marketIds: [marketId],
         timestamp: Date.now() + 2,
         originalAmount: '1000000',
         remainingAmount: '1000000',
@@ -118,9 +118,9 @@ describe('BorrowerIsTaker Field', () => {
     it('should set borrowerIsTaker to false when lend limit order matches borrow limit order', () => {
       // Borrow limit order is placed first (becomes maker)
       const borrowOrder: BorrowLimitOrder = createBorrowLimitOrder({
-        walletAddress: walletAddress2,
-        loanToken,
-        maturities: [maturity],
+        accountId: accountId2,
+        assetId,
+        marketIds: [marketId],
         timestamp: Date.now(),
         originalAmount: '1000000',
         remainingAmount: '1000000',
@@ -132,9 +132,9 @@ describe('BorrowerIsTaker Field', () => {
 
       // Lend limit order comes in and matches (becomes taker)
       const lendOrder: LendLimitOrder = createLendLimitOrder({
-        walletAddress: walletAddress1,
-        loanToken,
-        maturities: [maturity],
+        accountId: accountId1,
+        assetId,
+        marketIds: [marketId],
         timestamp: Date.now() + 1,
         originalAmount: '1000000',
         remainingAmount: '1000000',
@@ -153,9 +153,9 @@ describe('BorrowerIsTaker Field', () => {
     it('should set borrowerIsTaker to false for all matches when lend limit order matches multiple borrow orders', () => {
       // Add multiple borrow orders (all become makers)
       const borrowOrder1: BorrowLimitOrder = createBorrowLimitOrder({
-        walletAddress: walletAddress2,
-        loanToken,
-        maturities: [maturity],
+        accountId: accountId2,
+        assetId,
+        marketIds: [marketId],
         timestamp: Date.now(),
         originalAmount: '500000',
         remainingAmount: '500000',
@@ -164,9 +164,9 @@ describe('BorrowerIsTaker Field', () => {
       });
 
       const borrowOrder2: BorrowLimitOrder = createBorrowLimitOrder({
-        walletAddress: walletAddress2,
-        loanToken,
-        maturities: [maturity],
+        accountId: accountId2,
+        assetId,
+        marketIds: [marketId],
         timestamp: Date.now() + 1,
         originalAmount: '500000',
         remainingAmount: '500000',
@@ -179,9 +179,9 @@ describe('BorrowerIsTaker Field', () => {
 
       // Lend limit order matches both (taker)
       const lendOrder: LendLimitOrder = createLendLimitOrder({
-        walletAddress: walletAddress1,
-        loanToken,
-        maturities: [maturity],
+        accountId: accountId1,
+        assetId,
+        marketIds: [marketId],
         timestamp: Date.now() + 2,
         originalAmount: '1000000',
         remainingAmount: '1000000',
@@ -201,9 +201,9 @@ describe('BorrowerIsTaker Field', () => {
     it('should set borrowerIsTaker to true when borrow market order matches lend limit order', () => {
       // Lend limit order is placed first (becomes maker)
       const lendOrder: LendLimitOrder = createLendLimitOrder({
-        walletAddress: walletAddress1,
-        loanToken,
-        maturities: [maturity],
+        accountId: accountId1,
+        assetId,
+        marketIds: [marketId],
         timestamp: Date.now(),
         originalAmount: '1000000',
         remainingAmount: '1000000',
@@ -215,9 +215,9 @@ describe('BorrowerIsTaker Field', () => {
 
       // Borrow market order comes in (becomes taker)
       const borrowMarket: BorrowMarketOrder = createBorrowMarketOrder({
-        walletAddress: walletAddress2,
-        loanToken,
-        maturities: [maturity],
+        accountId: accountId2,
+        assetId,
+        marketIds: [marketId],
         timestamp: Date.now() + 1,
         originalAmount: '1000000',
         remainingAmount: '1000000',
@@ -235,9 +235,9 @@ describe('BorrowerIsTaker Field', () => {
     it('should set borrowerIsTaker to true for all matches when borrow market order matches multiple lend orders', () => {
       // Add multiple lend orders (all become makers)
       const lendOrder1: LendLimitOrder = createLendLimitOrder({
-        walletAddress: walletAddress1,
-        loanToken,
-        maturities: [maturity],
+        accountId: accountId1,
+        assetId,
+        marketIds: [marketId],
         timestamp: Date.now(),
         originalAmount: '500000',
         remainingAmount: '500000',
@@ -246,9 +246,9 @@ describe('BorrowerIsTaker Field', () => {
       });
 
       const lendOrder2: LendLimitOrder = createLendLimitOrder({
-        walletAddress: walletAddress1,
-        loanToken,
-        maturities: [maturity],
+        accountId: accountId1,
+        assetId,
+        marketIds: [marketId],
         timestamp: Date.now() + 1,
         originalAmount: '500000',
         remainingAmount: '500000',
@@ -261,9 +261,9 @@ describe('BorrowerIsTaker Field', () => {
 
       // Borrow market order matches both (taker)
       const borrowMarket: BorrowMarketOrder = createBorrowMarketOrder({
-        walletAddress: walletAddress2,
-        loanToken,
-        maturities: [maturity],
+        accountId: accountId2,
+        assetId,
+        marketIds: [marketId],
         timestamp: Date.now() + 2,
         originalAmount: '1000000',
         remainingAmount: '1000000',
@@ -282,9 +282,9 @@ describe('BorrowerIsTaker Field', () => {
     it('should set borrowerIsTaker to true when borrow limit order matches lend limit order', () => {
       // Lend limit order is placed first (becomes maker)
       const lendOrder: LendLimitOrder = createLendLimitOrder({
-        walletAddress: walletAddress1,
-        loanToken,
-        maturities: [maturity],
+        accountId: accountId1,
+        assetId,
+        marketIds: [marketId],
         timestamp: Date.now(),
         originalAmount: '1000000',
         remainingAmount: '1000000',
@@ -296,9 +296,9 @@ describe('BorrowerIsTaker Field', () => {
 
       // Borrow limit order comes in and matches (becomes taker)
       const borrowOrder: BorrowLimitOrder = createBorrowLimitOrder({
-        walletAddress: walletAddress2,
-        loanToken,
-        maturities: [maturity],
+        accountId: accountId2,
+        assetId,
+        marketIds: [marketId],
         timestamp: Date.now() + 1,
         originalAmount: '1000000',
         remainingAmount: '1000000',
@@ -317,9 +317,9 @@ describe('BorrowerIsTaker Field', () => {
     it('should set borrowerIsTaker to true for all matches when borrow limit order matches multiple lend orders', () => {
       // Add multiple lend orders (all become makers)
       const lendOrder1: LendLimitOrder = createLendLimitOrder({
-        walletAddress: walletAddress1,
-        loanToken,
-        maturities: [maturity],
+        accountId: accountId1,
+        assetId,
+        marketIds: [marketId],
         timestamp: Date.now(),
         originalAmount: '500000',
         remainingAmount: '500000',
@@ -328,9 +328,9 @@ describe('BorrowerIsTaker Field', () => {
       });
 
       const lendOrder2: LendLimitOrder = createLendLimitOrder({
-        walletAddress: walletAddress1,
-        loanToken,
-        maturities: [maturity],
+        accountId: accountId1,
+        assetId,
+        marketIds: [marketId],
         timestamp: Date.now() + 1,
         originalAmount: '500000',
         remainingAmount: '500000',
@@ -343,9 +343,9 @@ describe('BorrowerIsTaker Field', () => {
 
       // Borrow limit order matches both (taker)
       const borrowOrder: BorrowLimitOrder = createBorrowLimitOrder({
-        walletAddress: walletAddress2,
-        loanToken,
-        maturities: [maturity],
+        accountId: accountId2,
+        assetId,
+        marketIds: [marketId],
         timestamp: Date.now() + 2,
         originalAmount: '1000000',
         remainingAmount: '1000000',
@@ -365,9 +365,9 @@ describe('BorrowerIsTaker Field', () => {
     it('should correctly set borrowerIsTaker when limit order instantly matches (acts as taker)', () => {
       // This test verifies that a limit order can be a taker if it matches immediately
       const lendOrder: LendLimitOrder = createLendLimitOrder({
-        walletAddress: walletAddress1,
-        loanToken,
-        maturities: [maturity],
+        accountId: accountId1,
+        assetId,
+        marketIds: [marketId],
         timestamp: Date.now(),
         originalAmount: '1000000',
         remainingAmount: '1000000',
@@ -379,9 +379,9 @@ describe('BorrowerIsTaker Field', () => {
 
       // Borrow limit order with rate >= lend rate matches instantly (taker)
       const borrowOrder: BorrowLimitOrder = createBorrowLimitOrder({
-        walletAddress: walletAddress2,
-        loanToken,
-        maturities: [maturity],
+        accountId: accountId2,
+        assetId,
+        marketIds: [marketId],
         timestamp: Date.now() + 1,
         originalAmount: '1000000',
         remainingAmount: '1000000',
@@ -399,9 +399,9 @@ describe('BorrowerIsTaker Field', () => {
     it('should correctly set borrowerIsTaker in partial fill scenarios', () => {
       // Lend order in book (maker)
       const lendOrder: LendLimitOrder = createLendLimitOrder({
-        walletAddress: walletAddress1,
-        loanToken,
-        maturities: [maturity],
+        accountId: accountId1,
+        assetId,
+        marketIds: [marketId],
         timestamp: Date.now(),
         originalAmount: '1000000',
         remainingAmount: '1000000',
@@ -413,9 +413,9 @@ describe('BorrowerIsTaker Field', () => {
 
       // First borrow order partially fills (taker)
       const borrowOrder1: BorrowLimitOrder = createBorrowLimitOrder({
-        walletAddress: walletAddress2,
-        loanToken,
-        maturities: [maturity],
+        accountId: accountId2,
+        assetId,
+        marketIds: [marketId],
         timestamp: Date.now() + 1,
         originalAmount: '400000',
         remainingAmount: '400000',
@@ -429,9 +429,9 @@ describe('BorrowerIsTaker Field', () => {
 
       // Second borrow order also matches remaining (taker)
       const borrowOrder2: BorrowLimitOrder = createBorrowLimitOrder({
-        walletAddress: walletAddress2,
-        loanToken,
-        maturities: [maturity],
+        accountId: accountId2,
+        assetId,
+        marketIds: [marketId],
         timestamp: Date.now() + 2,
         originalAmount: '600000',
         remainingAmount: '600000',
@@ -444,15 +444,15 @@ describe('BorrowerIsTaker Field', () => {
       expect(result2.matches[0].borrowerIsTaker).toBe(true);
     });
 
-    it('should correctly identify taker across multiple maturities', () => {
-      const maturity1 = 1704067200;
-      const maturity2 = 1706745600;
+    it('should correctly identify taker across multiple markets', () => {
+      const marketId1 = '550e8400-e29b-41d4-a716-446655440010';
+      const marketId2 = '550e8400-e29b-41d4-a716-446655440011';
 
-      // Add lend orders for both maturities (makers)
+      // Add lend orders for both markets (makers)
       const lendOrder1: LendLimitOrder = createLendLimitOrder({
-        walletAddress: walletAddress1,
-        loanToken,
-        maturities: [maturity1],
+        accountId: accountId1,
+        assetId,
+        marketIds: [marketId1],
         timestamp: Date.now(),
         originalAmount: '500000',
         remainingAmount: '500000',
@@ -461,9 +461,9 @@ describe('BorrowerIsTaker Field', () => {
       });
 
       const lendOrder2: LendLimitOrder = createLendLimitOrder({
-        walletAddress: walletAddress1,
-        loanToken,
-        maturities: [maturity2],
+        accountId: accountId1,
+        assetId,
+        marketIds: [marketId2],
         timestamp: Date.now() + 1,
         originalAmount: '500000',
         remainingAmount: '500000',
@@ -474,11 +474,11 @@ describe('BorrowerIsTaker Field', () => {
       engine.submitOrder(lendOrder1);
       engine.submitOrder(lendOrder2);
 
-      // Borrow market order for both maturities (taker)
+      // Borrow market order for both markets (taker)
       const borrowMarket: BorrowMarketOrder = createBorrowMarketOrder({
-        walletAddress: walletAddress2,
-        loanToken,
-        maturities: [maturity1, maturity2],
+        accountId: accountId2,
+        assetId,
+        marketIds: [marketId1, marketId2],
         timestamp: Date.now() + 2,
         originalAmount: '1000000',
         remainingAmount: '1000000',

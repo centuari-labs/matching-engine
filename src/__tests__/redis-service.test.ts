@@ -15,10 +15,10 @@ import { generateMatchId, generateOrderId } from '../utils/helpers';
 import Redis from 'ioredis';
 
 describe('RedisService', () => {
-  const loanToken = '0x1234567890123456789012345678901234567890';
-  const walletAddress1 = '0x1111111111111111111111111111111111111111';
-  const walletAddress2 = '0x2222222222222222222222222222222222222222';
-  const maturity = 1704067200;
+  const assetId = '550e8400-e29b-41d4-a716-446655440001';
+  const accountId1 = '550e8400-e29b-41d4-a716-446655440002';
+  const accountId2 = '550e8400-e29b-41d4-a716-446655440003';
+  const marketId = '550e8400-e29b-41d4-a716-446655440010';
 
   // Use test database (15) to avoid interfering with production data
   const TEST_DB = 15;
@@ -40,12 +40,12 @@ describe('RedisService', () => {
       matchId: generateMatchId(),
       lendOrderId: generateOrderId(),
       borrowOrderId: generateOrderId(),
-      lenderWallet: walletAddress1,
-      borrowerWallet: walletAddress2,
+      lenderAccountId: accountId1,
+      borrowerAccountId: accountId2,
       matchedAmount: '1000000',
       rate: 500,
-      loanToken,
-      maturity,
+      assetId,
+      marketId,
       timestamp: Date.now(),
       borrowerIsTaker: true,
       makerFeeAmount: '1000',
@@ -254,12 +254,12 @@ describe('RedisService', () => {
         expect(fieldMap.matchId).toBe(match.matchId);
         expect(fieldMap.lendOrderId).toBe(match.lendOrderId);
         expect(fieldMap.borrowOrderId).toBe(match.borrowOrderId);
-        expect(fieldMap.lenderWallet).toBe(match.lenderWallet);
-        expect(fieldMap.borrowerWallet).toBe(match.borrowerWallet);
+        expect(fieldMap.lenderAccountId).toBe(match.lenderAccountId);
+        expect(fieldMap.borrowerAccountId).toBe(match.borrowerAccountId);
         expect(fieldMap.matchedAmount).toBe(match.matchedAmount);
         expect(fieldMap.rate).toBe(match.rate.toString());
-        expect(fieldMap.loanToken).toBe(match.loanToken);
-        expect(fieldMap.maturity).toBe(match.maturity.toString());
+        expect(fieldMap.assetId).toBe(match.assetId);
+        expect(fieldMap.marketId).toBe(match.marketId);
         expect(fieldMap.timestamp).toBe(match.timestamp.toString());
         expect(fieldMap.borrowerIsTaker).toBe(match.borrowerIsTaker.toString());
       }

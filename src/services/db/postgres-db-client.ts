@@ -1,4 +1,4 @@
-import { Pool, type PoolConfig, type PoolClient } from 'pg';
+import { Pool, type PoolConfig } from 'pg';
 import type { DbClient, MatchEvent, OrderStatusEvent } from '../../types/db';
 import type { DbConfig } from '../../config/db-config';
 import { loadDbConfig } from '../../config/db-config';
@@ -96,81 +96,11 @@ export class PostgresDbClient implements DbClient {
     }
   }
 
-  /**
-   * Look up an asset ID by its on-chain token address within an existing transaction.
-   *
-   * @param client - Active transaction client
-   * @param tokenAddress - On-chain token address to resolve
-   * @returns The UUID of the matching asset row
-   * @throws Error if no matching asset is found
-   */
-  private async findAssetIdByToken(
-    client: PoolClient,
-    tokenAddress: string
-  ): Promise<string> {
-    const result = await client.query<{ id: string }>(
-      `
-        SELECT id
-        FROM assets
-        WHERE token_address = $1
-        LIMIT 1
-      `,
-      [tokenAddress]
-    );
-
-    const row = result.rows[0];
-    if (!row) {
-      throw new Error(`Asset not found for token_address=${tokenAddress}`);
-    }
-
-    return row.id;
-  }
-
-  /**
-   * Look up an account ID by its user wallet address within an existing transaction.
-   *
-   * @param client - Active transaction client
-   * @param wallet - User wallet address to resolve
-   * @returns The UUID of the matching account row
-   * @throws Error if no matching account is found
-   */
-  private async findAccountIdByWallet(
-    client: PoolClient,
-    wallet: string
-  ): Promise<string> {
-    const result = await client.query<{ id: string }>(
-      `
-        SELECT id
-        FROM accounts
-        WHERE user_wallet = $1
-        LIMIT 1
-      `,
-      [wallet]
-    );
-
-    const row = result.rows[0];
-    if (!row) {
-      throw new Error(`Account not found for user_wallet=${wallet}`);
-    }
-
-    return row.id;
-  }
-
   async insertMatch(event: MatchEvent): Promise<void> {
     const client = await this.pool.connect();
 
     try {
       await client.query('BEGIN');
-
-      const assetId = await this.findAssetIdByToken(client, event.loanToken);
-      const lenderAccountId = await this.findAccountIdByWallet(
-        client,
-        event.lenderWallet
-      );
-      const borrowerAccountId = await this.findAccountIdByWallet(
-        client,
-        event.borrowerWallet
-      );
 
       await client.query(
         `
@@ -212,11 +142,11 @@ export class PostgresDbClient implements DbClient {
         `,
         [
           event.matchId,
-          event.lendOrderId, //@todo : change into order market id
-          event.borrowOrderId,//@todo : change into order market id
-          assetId,
-          lenderAccountId,
-          borrowerAccountId,
+          event.lendOrderId,
+          event.borrowOrderId,
+          event.assetId,
+          event.lenderAccountId,
+          event.borrowerAccountId,
           event.matchedAmount,
           event.rate,
           event.borrowerIsTaker,

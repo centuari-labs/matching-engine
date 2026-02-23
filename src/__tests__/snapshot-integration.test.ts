@@ -12,8 +12,8 @@ import { SnapshotService } from '../services/snapshot-service';
 import {
   createLendLimitOrder,
   createBorrowLimitOrder,
-  DEFAULT_LOAN_TOKEN,
-  DEFAULT_MATURITY,
+  DEFAULT_ASSET_ID,
+  DEFAULT_MARKET_ID,
 } from './factories/order-factory';
 
 describe('Snapshot Integration', () => {
@@ -44,11 +44,11 @@ describe('Snapshot Integration', () => {
       const snapshotService = new SnapshotService(testSnapshotDir, null, false);
       const engine1 = new MatchingEngine(undefined, snapshotService);
 
-      const walletAddress1 = '0x1111111111111111111111111111111111111111';
+      const accountId1 = '550e8400-e29b-41d4-a716-446655440002';
       const lendOrder = createLendLimitOrder({
-        walletAddress: walletAddress1,
-        loanToken: DEFAULT_LOAN_TOKEN,
-        maturities: [DEFAULT_MATURITY],
+        accountId: accountId1,
+        assetId: DEFAULT_ASSET_ID,
+        marketIds: [DEFAULT_MARKET_ID],
         rate: 500,
       });
 
@@ -68,16 +68,16 @@ describe('Snapshot Integration', () => {
       const snapshotService = new SnapshotService(testSnapshotDir, null, false);
       const engine1 = new MatchingEngine(undefined, snapshotService);
 
-      const walletAddress1 = '0x1111111111111111111111111111111111111111';
+      const accountId1 = '550e8400-e29b-41d4-a716-446655440002';
       const lendOrder = createLendLimitOrder({
-        walletAddress: walletAddress1,
-        loanToken: DEFAULT_LOAN_TOKEN,
-        maturities: [DEFAULT_MATURITY],
+        accountId: accountId1,
+        assetId: DEFAULT_ASSET_ID,
+        marketIds: [DEFAULT_MARKET_ID],
         rate: 500,
       });
 
       engine1.submitOrder(lendOrder);
-      engine1.cancelOrder(lendOrder.orderId, walletAddress1);
+      engine1.cancelOrder(lendOrder.orderId, accountId1);
 
       // Wait for async snapshot
       await new Promise((resolve) => setTimeout(resolve, 100));
@@ -94,20 +94,20 @@ describe('Snapshot Integration', () => {
       const snapshotService = new SnapshotService(testSnapshotDir, null, false);
       const engine1 = new MatchingEngine(undefined, snapshotService);
 
-      const walletAddress1 = '0x1111111111111111111111111111111111111111';
-      const walletAddress2 = '0x2222222222222222222222222222222222222222';
+      const accountId1 = '550e8400-e29b-41d4-a716-446655440002';
+      const accountId2 = '550e8400-e29b-41d4-a716-446655440003';
 
       const lendOrder = createLendLimitOrder({
-        walletAddress: walletAddress1,
-        loanToken: DEFAULT_LOAN_TOKEN,
-        maturities: [DEFAULT_MATURITY],
+        accountId: accountId1,
+        assetId: DEFAULT_ASSET_ID,
+        marketIds: [DEFAULT_MARKET_ID],
         rate: 500,
       });
 
       const borrowOrder = createBorrowLimitOrder({
-        walletAddress: walletAddress2,
-        loanToken: DEFAULT_LOAN_TOKEN,
-        maturities: [DEFAULT_MATURITY],
+        accountId: accountId2,
+        assetId: DEFAULT_ASSET_ID,
+        marketIds: [DEFAULT_MARKET_ID],
         rate: 600,
       });
 
@@ -137,28 +137,28 @@ describe('Snapshot Integration', () => {
       const snapshotService = new SnapshotService(testSnapshotDir, null, false);
       const engine1 = new MatchingEngine(undefined, snapshotService);
 
-      const walletAddress1 = '0x1111111111111111111111111111111111111111';
-      const walletAddress2 = '0x2222222222222222222222222222222222222222';
+      const accountId1 = '550e8400-e29b-41d4-a716-446655440002';
+      const accountId2 = '550e8400-e29b-41d4-a716-446655440003';
 
       // Add multiple orders that won't match (borrow rate < lend rates)
       // This ensures all orders remain in the book after submission
       const lendOrder1 = createLendLimitOrder({
-        walletAddress: walletAddress1,
-        loanToken: DEFAULT_LOAN_TOKEN,
-        maturities: [DEFAULT_MATURITY],
+        accountId: accountId1,
+        assetId: DEFAULT_ASSET_ID,
+        marketIds: [DEFAULT_MARKET_ID],
         rate: 600, // Lender wants at least 600
       });
       const lendOrder2 = createLendLimitOrder({
-        walletAddress: walletAddress1,
-        loanToken: DEFAULT_LOAN_TOKEN,
-        maturities: [DEFAULT_MATURITY],
+        accountId: accountId1,
+        assetId: DEFAULT_ASSET_ID,
+        marketIds: [DEFAULT_MARKET_ID],
         rate: 700, // Lender wants at least 700
         timestamp: Date.now() + 1,
       });
       const borrowOrder = createBorrowLimitOrder({
-        walletAddress: walletAddress2,
-        loanToken: DEFAULT_LOAN_TOKEN,
-        maturities: [DEFAULT_MATURITY],
+        accountId: accountId2,
+        assetId: DEFAULT_ASSET_ID,
+        marketIds: [DEFAULT_MARKET_ID],
         rate: 500, // Borrower willing to pay at most 500
       });
 
@@ -192,7 +192,7 @@ describe('Snapshot Integration', () => {
       expect(engine2.hasOrder(borrowOrder.orderId)).toBe(true);
 
       // Verify order book structure (checks trees)
-      const orderBook = engine2.getOrderBook(DEFAULT_LOAN_TOKEN, DEFAULT_MATURITY, 10);
+      const orderBook = engine2.getOrderBook(DEFAULT_ASSET_ID, DEFAULT_MARKET_ID, 10);
       
       // Debug: Log what we got
       console.log('Lend orders:', orderBook.lendOrders.length);
@@ -214,22 +214,22 @@ describe('Snapshot Integration', () => {
       const snapshotService = new SnapshotService(testSnapshotDir, null, false);
       const engine1 = new MatchingEngine(undefined, snapshotService);
 
-      const walletAddress1 = '0x1111111111111111111111111111111111111111';
-      const walletAddress2 = '0x2222222222222222222222222222222222222222';
+      const accountId1 = '550e8400-e29b-41d4-a716-446655440002';
+      const accountId2 = '550e8400-e29b-41d4-a716-446655440003';
 
       const lendOrder = createLendLimitOrder({
-        walletAddress: walletAddress1,
-        loanToken: DEFAULT_LOAN_TOKEN,
-        maturities: [DEFAULT_MATURITY],
+        accountId: accountId1,
+        assetId: DEFAULT_ASSET_ID,
+        marketIds: [DEFAULT_MARKET_ID],
         rate: 500,
         originalAmount: '2000000',
         remainingAmount: '2000000',
       });
 
       const borrowOrder = createBorrowLimitOrder({
-        walletAddress: walletAddress2,
-        loanToken: DEFAULT_LOAN_TOKEN,
-        maturities: [DEFAULT_MATURITY],
+        accountId: accountId2,
+        assetId: DEFAULT_ASSET_ID,
+        marketIds: [DEFAULT_MARKET_ID],
         rate: 600,
         originalAmount: '1000000',
         remainingAmount: '1000000',
@@ -249,7 +249,7 @@ describe('Snapshot Integration', () => {
       expect(restoredLendOrder).not.toBeNull();
 
       // Verify remaining amount
-      const orderBook = engine2.getOrderBook(DEFAULT_LOAN_TOKEN, DEFAULT_MATURITY, 10);
+      const orderBook = engine2.getOrderBook(DEFAULT_ASSET_ID, DEFAULT_MARKET_ID, 10);
       const restoredOrder = orderBook.lendOrders.find((o) => o.orderId === lendOrder.orderId);
       expect(restoredOrder).toBeDefined();
       expect(parseInt(restoredOrder!.amount, 10)).toBeLessThan(2000000);
@@ -282,11 +282,11 @@ describe('Snapshot Integration', () => {
       const invalidService = new SnapshotService('/invalid/path', null, false);
       const engine = new MatchingEngine(undefined, invalidService);
 
-      const walletAddress1 = '0x1111111111111111111111111111111111111111';
+      const accountId1 = '550e8400-e29b-41d4-a716-446655440002';
       const lendOrder = createLendLimitOrder({
-        walletAddress: walletAddress1,
-        loanToken: DEFAULT_LOAN_TOKEN,
-        maturities: [DEFAULT_MATURITY],
+        accountId: accountId1,
+        assetId: DEFAULT_ASSET_ID,
+        marketIds: [DEFAULT_MARKET_ID],
         rate: 500,
       });
 
@@ -304,11 +304,11 @@ describe('Snapshot Integration', () => {
       const snapshotService = new SnapshotService(testSnapshotDir, null, false);
       const engine = new MatchingEngine(undefined, snapshotService);
 
-      const walletAddress1 = '0x1111111111111111111111111111111111111111';
+      const accountId1 = '550e8400-e29b-41d4-a716-446655440002';
       const lendOrder = createLendLimitOrder({
-        walletAddress: walletAddress1,
-        loanToken: DEFAULT_LOAN_TOKEN,
-        maturities: [DEFAULT_MATURITY],
+        accountId: accountId1,
+        assetId: DEFAULT_ASSET_ID,
+        marketIds: [DEFAULT_MARKET_ID],
         rate: 500,
       });
 

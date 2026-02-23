@@ -324,9 +324,9 @@ describe('NatsService Integration (requires NATS server)', () => {
       // Publish a test order
       const testOrder = {
         orderId: '123e4567-e89b-12d3-a456-426614174000',
-        loanToken: '0x1234567890123456789012345678901234567890',
-        walletAddress: '0x1111111111111111111111111111111111111111',
-        maturities: [Date.now() + 86400000],
+        assetId: '550e8400-e29b-41d4-a716-446655440001',
+        accountId: '550e8400-e29b-41d4-a716-446655440002',
+        marketIds: ['550e8400-e29b-41d4-a716-446655440010'],
         timestamp: Date.now(),
         side: OrderSide.Lend,
         type: OrderType.Limit,

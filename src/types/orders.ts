@@ -27,16 +27,6 @@ export enum OrderType {
 }
 
 /**
- * Ethereum address validation schema
- *
- * Validates Ethereum addresses in the standard format (0x followed by 40 hexadecimal characters).
- * This schema is used across the project for validating wallet addresses, token addresses, and collateral token addresses.
- */
-export const ethereumAddressSchema = z
-  .string()
-  .regex(/^0x[a-fA-F0-9]{40}$/, 'Invalid Ethereum address format');
-
-/**
  * Base order schema with common fields.
  *
  * All monetary values are represented as decimal strings containing only digits.
@@ -44,11 +34,11 @@ export const ethereumAddressSchema = z
  */
 const baseOrderSchema = z.object({
   orderId: z.string().uuid('Order ID must be a valid UUID'),
-  walletAddress: ethereumAddressSchema, //@todo : should use account id
-  loanToken: ethereumAddressSchema,//@todo : should use asset id
-  maturities: z //@todo : should use market id
-    .array(z.number().int().positive('Maturity must be a positive integer'))
-    .min(1, 'At least one maturity date is required'),
+  accountId: z.string().uuid('Account ID must be a valid UUID'),
+  assetId: z.string().uuid('Asset ID must be a valid UUID'),
+  marketIds: z
+    .array(z.string().uuid('Market ID must be a valid UUID'))
+    .min(1, 'At least one market ID is required'),
   timestamp: z.number().int().positive('Timestamp must be a positive integer'),
   side: z.nativeEnum(OrderSide),
   type: z.nativeEnum(OrderType),
@@ -189,9 +179,9 @@ export function isLimitOrder(order: Order): order is LendLimitOrder | BorrowLimi
  */
 export interface OrderMetadata {
   orderId: string;
-  walletAddress: string;
-  loanToken: string;
-  maturities: number[];
+  accountId: string;
+  assetId: string;
+  marketIds: string[];
   side: OrderSide;
   type: OrderType;
 }

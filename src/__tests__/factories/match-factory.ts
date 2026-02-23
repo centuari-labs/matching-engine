@@ -1,6 +1,6 @@
 import { generateMatchId, generateOrderId, calculateMakerFee, calculateTakerFee } from '../../utils/helpers';
 import { matchSchema, type Match } from '../../types/matches';
-import { DEFAULT_LOAN_TOKEN, DEFAULT_MATURITY } from './order-factory';
+import { DEFAULT_ASSET_ID, DEFAULT_MARKET_ID } from './order-factory';
 
 /**
  * Default matched amount used in tests.
@@ -20,12 +20,12 @@ export function createMatch(overrides: Partial<Match> = {}): Match {
     matchId: generateMatchId(),
     lendOrderId: generateOrderId(),
     borrowOrderId: generateOrderId(),
-    lenderWallet: '0x1111111111111111111111111111111111111111',
-    borrowerWallet: '0x2222222222222222222222222222222222222222',
+    lenderAccountId: '550e8400-e29b-41d4-a716-446655440002',
+    borrowerAccountId: '550e8400-e29b-41d4-a716-446655440003',
     matchedAmount,
     rate: 500,
-    loanToken: DEFAULT_LOAN_TOKEN,
-    maturity: DEFAULT_MATURITY,
+    assetId: DEFAULT_ASSET_ID,
+    marketId: DEFAULT_MARKET_ID,
     timestamp: Date.now(),
     borrowerIsTaker: true,
     makerFeeAmount: calculateMakerFee(matchedAmount),

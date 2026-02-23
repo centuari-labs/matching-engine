@@ -15,9 +15,9 @@ type RBTree = createRBTree.Tree<Order, null>;
  * OrderBook manages all orders using Red-Black Trees for efficient price-time priority matching
  */
 export class OrderBook {
-  // Main order books indexed by (loanToken, maturity)
-  private lendOrders: Map<string, Map<number, RBTree>>;
-  private borrowOrders: Map<string, Map<number, RBTree>>;
+  // Main order books indexed by (assetId, marketId)
+  private lendOrders: Map<string, Map<string, RBTree>>;
+  private borrowOrders: Map<string, Map<string, RBTree>>;
 
   // Order metadata for O(1) lookups by orderId
   private orderIndex: Map<string, OrderMetadata & { order: Order }>;
@@ -43,34 +43,34 @@ export class OrderBook {
     // Store order metadata for quick lookups
     this.orderIndex.set(order.orderId, {
       orderId: order.orderId,
-      walletAddress: order.walletAddress,
-      loanToken: order.loanToken,
-      maturities: order.maturities,
+      accountId: order.accountId,
+      assetId: order.assetId,
+      marketIds: order.marketIds,
       side: order.side,
       type: order.type,
       order,
     });
 
-    // Add to appropriate trees for each maturity
+    // Add to appropriate trees for each market
     const orderMap = order.side === OrderSide.Lend ? this.lendOrders : this.borrowOrders;
     const comparator = order.side === OrderSide.Lend ? this.lendComparator : this.borrowComparator;
 
-    for (const maturity of order.maturities) {
-      // Get or create token map
-      if (!orderMap.has(order.loanToken)) {
-        orderMap.set(order.loanToken, new Map());
+    for (const marketId of order.marketIds) {
+      // Get or create asset map
+      if (!orderMap.has(order.assetId)) {
+        orderMap.set(order.assetId, new Map());
       }
-      const tokenMap = orderMap.get(order.loanToken)!;
+      const assetMap = orderMap.get(order.assetId)!;
 
-      // Get or create tree for this maturity
-      let tree = tokenMap.get(maturity);
+      // Get or create tree for this market
+      let tree = assetMap.get(marketId);
       if (!tree) {
         tree = createRBTree(comparator);
-        tokenMap.set(maturity, tree);
+        assetMap.set(marketId, tree);
       }
 
       // Insert order into tree
-      tokenMap.set(maturity, tree.insert(order, null));
+      assetMap.set(marketId, tree.insert(order, null));
     }
   }
 
@@ -89,24 +89,24 @@ export class OrderBook {
     const orderMap =
       metadata.side === OrderSide.Lend ? this.lendOrders : this.borrowOrders;
 
-    // Remove from all maturity trees
-    const tokenMap = orderMap.get(metadata.loanToken);
-    if (tokenMap) {
-      for (const maturity of metadata.maturities) {
-        let tree = tokenMap.get(maturity);
+    // Remove from all market trees
+    const assetMap = orderMap.get(metadata.assetId);
+    if (assetMap) {
+      for (const marketId of metadata.marketIds) {
+        let tree = assetMap.get(marketId);
         if (tree) {
           // Remove the order from the tree
           tree = tree.remove(metadata.order);
           if (tree.length === 0) {
-            tokenMap.delete(maturity);
+            assetMap.delete(marketId);
           } else {
-            tokenMap.set(maturity, tree);
+            assetMap.set(marketId, tree);
           }
         }
       }
 
-      if (tokenMap.size === 0) {
-        orderMap.delete(metadata.loanToken);
+      if (assetMap.size === 0) {
+        orderMap.delete(metadata.assetId);
       }
     }
 
@@ -150,19 +150,19 @@ export class OrderBook {
    * Get orders from the order book that could match
    *
    * @param side - The side to get orders from (opposite of incoming order)
-   * @param loanToken - The loan token address
-   * @param maturity - The maturity date
+   * @param assetId - The asset ID
+   * @param marketId - The market ID
    * @returns Array of orders in price-time priority order
    */
-  getBestOrders(side: OrderSide, loanToken: string, maturity: number): Order[] {
+  getBestOrders(side: OrderSide, assetId: string, marketId: string): Order[] {
     const orderMap = side === OrderSide.Lend ? this.lendOrders : this.borrowOrders;
-    const tokenMap = orderMap.get(loanToken);
+    const assetMap = orderMap.get(assetId);
 
-    if (!tokenMap) {
+    if (!assetMap) {
       return [];
     }
 
-    const tree = tokenMap.get(maturity);
+    const tree = assetMap.get(marketId);
     if (!tree) {
       return [];
     }
@@ -202,16 +202,16 @@ export class OrderBook {
   }
 
   /**
-   * Get order book snapshot for a specific token and maturity
+   * Get order book snapshot for a specific asset and market
    *
-   * @param loanToken - The loan token address
-   * @param maturity - The maturity date
+   * @param assetId - The asset ID
+   * @param marketId - The market ID
    * @param depth - Maximum number of orders to return per side
    * @returns Order book snapshot
    */
-  getOrderBookSnapshot(loanToken: string, maturity: number, depth: number = 10): {
-    loanToken: string;
-    maturity: number;
+  getOrderBookSnapshot(assetId: string, marketId: string, depth: number = 10): {
+    assetId: string;
+    marketId: string;
     lendOrders: Array<{
       orderId: string;
       rate?: number;
@@ -225,7 +225,7 @@ export class OrderBook {
       timestamp: number;
     }>;
   } {
-    const lendOrders = this.getBestOrders(OrderSide.Lend, loanToken, maturity)
+    const lendOrders = this.getBestOrders(OrderSide.Lend, assetId, marketId)
       .slice(0, depth)
       .map((order) => ({
         orderId: order.orderId,
@@ -234,7 +234,7 @@ export class OrderBook {
         timestamp: order.timestamp,
       }));
 
-    const borrowOrders = this.getBestOrders(OrderSide.Borrow, loanToken, maturity)
+    const borrowOrders = this.getBestOrders(OrderSide.Borrow, assetId, marketId)
       .slice(0, depth)
       .map((order) => {
         return {
@@ -246,8 +246,8 @@ export class OrderBook {
       });
 
     return {
-      loanToken,
-      maturity,
+      assetId,
+      marketId,
       lendOrders,
       borrowOrders,
     };

@@ -138,21 +138,21 @@ export class MatchingEngine {
     let remainingAmount = order.remainingAmount;
 
     // Try to match with each maturity
-    for (const maturity of order.maturities) {
+    for (const marketId of order.marketIds) {
       if (isZero(remainingAmount)) break;
 
       // Get borrow orders for this maturity (sorted by rate descending - highest first)
       const borrowOrders = this.orderBook.getBestOrders(
         OrderSide.Borrow,
-        order.loanToken,
-        maturity
+        order.assetId,
+        marketId
       );
 
       for (const borrowOrder of borrowOrders) {
         if (isZero(remainingAmount)) break;
 
-        // Skip self-matching: lend and borrow orders from the same wallet cannot match
-        if (order.walletAddress.toLowerCase() === borrowOrder.walletAddress.toLowerCase()) {
+        // Skip self-matching: lend and borrow orders from the same account cannot match
+        if (order.accountId.toLowerCase() === borrowOrder.accountId.toLowerCase()) {
           continue;
         }
 
@@ -183,12 +183,12 @@ export class MatchingEngine {
         const match = this.executionEngine.recordMatch({
           lendOrderId: order.orderId,
           borrowOrderId: borrowOrder.orderId,
-          lenderWallet: order.walletAddress,
-          borrowerWallet: borrowOrder.walletAddress,
+          lenderAccountId: order.accountId,
+          borrowerAccountId: borrowOrder.accountId,
           matchedAmount: matchAmount,
           rate: borrowLimitOrder.rate,
-          loanToken: order.loanToken,
-          maturity,
+          assetId: order.assetId,
+          marketId,
           borrowerIsTaker: false,
           makerFeeAmount,
           takerFeeAmount,
@@ -249,21 +249,21 @@ export class MatchingEngine {
     let remainingAmount = order.remainingAmount;
 
     // Try to match with each maturity
-    for (const maturity of order.maturities) {
+    for (const marketId of order.marketIds) {
       if (isZero(remainingAmount)) break;
 
       // Get borrow orders for this maturity (sorted by rate descending - highest first)
       const borrowOrders = this.orderBook.getBestOrders(
         OrderSide.Borrow,
-        order.loanToken,
-        maturity
+        order.assetId,
+        marketId
       );
 
       for (const borrowOrder of borrowOrders) {
         if (isZero(remainingAmount)) break;
 
-        // Skip self-matching: lend and borrow orders from the same wallet cannot match
-        if (order.walletAddress.toLowerCase() === borrowOrder.walletAddress.toLowerCase()) {
+        // Skip self-matching: lend and borrow orders from the same account cannot match
+        if (order.accountId.toLowerCase() === borrowOrder.accountId.toLowerCase()) {
           continue;
         }
 
@@ -304,12 +304,12 @@ export class MatchingEngine {
         const match = this.executionEngine.recordMatch({
           lendOrderId: order.orderId,
           borrowOrderId: borrowOrder.orderId,
-          lenderWallet: order.walletAddress,
-          borrowerWallet: borrowOrder.walletAddress,
+          lenderAccountId: order.accountId,
+          borrowerAccountId: borrowOrder.accountId,
           matchedAmount: matchAmount,
           rate: executionRate,
-          loanToken: order.loanToken,
-          maturity,
+          assetId: order.assetId,
+          marketId,
           borrowerIsTaker: false,
           makerFeeAmount,
           takerFeeAmount,
@@ -379,21 +379,21 @@ export class MatchingEngine {
     let remainingAmount = order.remainingAmount;
 
     // Try to match with each maturity
-    for (const maturity of order.maturities) {
+    for (const marketId of order.marketIds) {
       if (isZero(remainingAmount)) break;
 
       // Get lend orders for this maturity (sorted by rate ascending - lowest first)
       const lendOrders = this.orderBook.getBestOrders(
         OrderSide.Lend,
-        order.loanToken,
-        maturity
+        order.assetId,
+        marketId
       );
 
       for (const lendOrder of lendOrders) {
         if (isZero(remainingAmount)) break;
 
-        // Skip self-matching: lend and borrow orders from the same wallet cannot match
-        if (order.walletAddress.toLowerCase() === lendOrder.walletAddress.toLowerCase()) {
+        // Skip self-matching: lend and borrow orders from the same account cannot match
+        if (order.accountId.toLowerCase() === lendOrder.accountId.toLowerCase()) {
           continue;
         }
 
@@ -424,12 +424,12 @@ export class MatchingEngine {
         const match = this.executionEngine.recordMatch({
           lendOrderId: lendOrder.orderId,
           borrowOrderId: order.orderId,
-          lenderWallet: lendOrder.walletAddress,
-          borrowerWallet: order.walletAddress,
+          lenderAccountId: lendOrder.accountId,
+          borrowerAccountId: order.accountId,
           matchedAmount: matchAmount,
           rate: lendLimitOrder.rate,
-          loanToken: order.loanToken,
-          maturity,
+          assetId: order.assetId,
+          marketId,
           borrowerIsTaker: true,
           makerFeeAmount,
           takerFeeAmount,
@@ -487,21 +487,21 @@ export class MatchingEngine {
     let remainingAmount = order.remainingAmount;
 
     // Try to match with each maturity
-    for (const maturity of order.maturities) {
+    for (const marketId of order.marketIds) {
       if (isZero(remainingAmount)) break;
 
       // Get lend orders for this maturity (sorted by rate ascending - lowest first)
       const lendOrders = this.orderBook.getBestOrders(
         OrderSide.Lend,
-        order.loanToken,
-        maturity
+        order.assetId,
+        marketId
       );
 
       for (const lendOrder of lendOrders) {
         if (isZero(remainingAmount)) break;
 
-        // Skip self-matching: lend and borrow orders from the same wallet cannot match
-        if (order.walletAddress.toLowerCase() === lendOrder.walletAddress.toLowerCase()) {
+        // Skip self-matching: lend and borrow orders from the same account cannot match
+        if (order.accountId.toLowerCase() === lendOrder.accountId.toLowerCase()) {
           continue;
         }
 
@@ -542,12 +542,12 @@ export class MatchingEngine {
         const match = this.executionEngine.recordMatch({
           lendOrderId: lendOrder.orderId,
           borrowOrderId: order.orderId,
-          lenderWallet: lendOrder.walletAddress,
-          borrowerWallet: order.walletAddress,
+          lenderAccountId: lendOrder.accountId,
+          borrowerAccountId: order.accountId,
           matchedAmount: matchAmount,
           rate: executionRate,
-          loanToken: order.loanToken,
-          maturity,
+          assetId: order.assetId,
+          marketId,
           borrowerIsTaker: true,
           makerFeeAmount,
           takerFeeAmount,
@@ -606,17 +606,17 @@ export class MatchingEngine {
    * Cancel an order
    *
    * @param orderId - The ID of the order to cancel
-   * @param walletAddress - The wallet address of the order owner
-   * @returns True if order was cancelled, false if not found, wallet address doesn't match, or order is not cancellable
+   * @param accountId - The account ID of the order owner
+   * @returns True if order was cancelled, false if not found, account ID doesn't match, or order is not cancellable
    */
-  cancelOrder(orderId: string, walletAddress: string): boolean {
+  cancelOrder(orderId: string, accountId: string): boolean {
     const order = this.orderBook.getOrder(orderId);
     if (!order) {
       return false;
     }
 
-    // Validate wallet address matches the order owner
-    if (order.walletAddress.toLowerCase() !== walletAddress.toLowerCase()) {
+    // Validate account ID matches the order owner
+    if (order.accountId !== accountId) {
       return false;
     }
 
@@ -667,13 +667,13 @@ export class MatchingEngine {
   /**
    * Get order book snapshot
    *
-   * @param loanToken - The loan token address
-   * @param maturity - The maturity date
+   * @param assetId - The asset ID
+   * @param marketId - The market ID
    * @param depth - Maximum number of orders to return per side
    * @returns Order book snapshot
    */
-  getOrderBook(loanToken: string, maturity: number, depth: number = 10): OrderBookSnapshot {
-    return this.orderBook.getOrderBookSnapshot(loanToken, maturity, depth);
+  getOrderBook(assetId: string, marketId: string, depth: number = 10): OrderBookSnapshot {
+    return this.orderBook.getOrderBookSnapshot(assetId, marketId, depth);
   }
 
   /**
@@ -689,13 +689,13 @@ export class MatchingEngine {
   /**
    * Get execution engine statistics
    *
-   * @param loanToken - The loan token address
-   * @param maturity - The maturity date
+   * @param assetId - The asset ID
+   * @param marketId - The market ID
    * @returns Statistics object
    */
   getStatistics(
-    loanToken: string,
-    maturity: number
+    assetId: string,
+    marketId: string
   ): {
     totalMatches: number;
     totalVolume: bigint;
@@ -703,7 +703,7 @@ export class MatchingEngine {
     minRate: number;
     maxRate: number;
   } | null {
-    return this.executionEngine.getStatistics(loanToken, maturity);
+    return this.executionEngine.getStatistics(assetId, marketId);
   }
 
   /**

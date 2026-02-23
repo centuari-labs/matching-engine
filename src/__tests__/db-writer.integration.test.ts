@@ -414,7 +414,7 @@ describe('DbWriterService Integration (requires Postgres, Redis, NATS)', () => {
           'Test Token',
           'TT',
           1,
-          match.loanToken,
+          match.assetId,
           true,
           0,
         ]
@@ -434,10 +434,10 @@ describe('DbWriterService Integration (requires Postgres, Redis, NATS)', () => {
         [
           lenderAccountId,
           'lender-test-user',
-          match.lenderWallet,
+          match.lenderAccountId,
           borrowerAccountId,
           'borrower-test-user',
-          match.borrowerWallet,
+          match.borrowerAccountId,
         ]
       );
 
@@ -492,18 +492,18 @@ describe('DbWriterService Integration (requires Postgres, Redis, NATS)', () => {
         match.lendOrderId,
         'borrowOrderId',
         match.borrowOrderId,
-        'lenderWallet',
-        match.lenderWallet,
-        'borrowerWallet',
-        match.borrowerWallet,
+        'lenderAccountId',
+        match.lenderAccountId,
+        'borrowerAccountId',
+        match.borrowerAccountId,
         'matchedAmount',
         match.matchedAmount,
         'rate',
         String(match.rate),
-        'loanToken',
-        match.loanToken,
-        'maturity',
-        String(match.maturity),
+        'assetId',
+        match.assetId,
+        'marketId',
+        match.marketId,
         'timestamp',
         String(match.timestamp),
         'borrowerIsTaker',
@@ -590,13 +590,13 @@ describe('DbWriterService Integration (requires Postgres, Redis, NATS)', () => {
 
     it('should fail when asset or accounts are missing for a match', async () => {
       const match = createMatch({
-        loanToken: '0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48',
-        lenderWallet: '0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48',
-        borrowerWallet: '0x477Dcb9AE26E73C42D1a0172c1c216f38316EfE1',
+        assetId: '550e8400-e29b-41d4-a716-446655440099',
+        lenderAccountId: '550e8400-e29b-41d4-a716-446655440098',
+        borrowerAccountId: '550e8400-e29b-41d4-a716-446655440097',
       });
 
       await expect(dbClient.insertMatch(match)).rejects.toThrow(
-        'Asset not found for token_address'
+        'Asset not found'
       );
     });
   });

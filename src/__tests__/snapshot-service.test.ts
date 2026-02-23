@@ -14,8 +14,8 @@ import { MatchingEngine } from '../core/matching-engine';
 import {
   createLendLimitOrder,
   createBorrowLimitOrder,
-  DEFAULT_LOAN_TOKEN,
-  DEFAULT_MATURITY,
+  DEFAULT_ASSET_ID,
+  DEFAULT_MARKET_ID,
 } from './factories/order-factory';
 import { generateOrderId } from '../utils/helpers';
 
@@ -62,22 +62,22 @@ describe('SnapshotService', () => {
     });
 
     it('should save orders with their current state', async () => {
-      const walletAddress1 = '0x1111111111111111111111111111111111111111';
-      const walletAddress2 = '0x2222222222222222222222222222222222222222';
+      const accountId1 = '550e8400-e29b-41d4-a716-446655440002';
+      const accountId2 = '550e8400-e29b-41d4-a716-446655440003';
 
       // Add orders to order book
       const lendOrder = createLendLimitOrder({
-        walletAddress: walletAddress1,
-        loanToken: DEFAULT_LOAN_TOKEN,
-        maturities: [DEFAULT_MATURITY],
+        accountId: accountId1,
+        assetId: DEFAULT_ASSET_ID,
+        marketIds: [DEFAULT_MARKET_ID],
         rate: 500,
       });
       orderBook.addOrder(lendOrder);
 
       const borrowOrder = createBorrowLimitOrder({
-        walletAddress: walletAddress2,
-        loanToken: DEFAULT_LOAN_TOKEN,
-        maturities: [DEFAULT_MATURITY],
+        accountId: accountId2,
+        assetId: DEFAULT_ASSET_ID,
+        marketIds: [DEFAULT_MARKET_ID],
         rate: 600,
       });
       orderBook.addOrder(borrowOrder);
@@ -92,12 +92,12 @@ describe('SnapshotService', () => {
     });
 
     it('should save orders with updated remaining amounts', async () => {
-      const walletAddress1 = '0x1111111111111111111111111111111111111111';
+      const accountId1 = '550e8400-e29b-41d4-a716-446655440002';
 
       const lendOrder = createLendLimitOrder({
-        walletAddress: walletAddress1,
-        loanToken: DEFAULT_LOAN_TOKEN,
-        maturities: [DEFAULT_MATURITY],
+        accountId: accountId1,
+        assetId: DEFAULT_ASSET_ID,
+        marketIds: [DEFAULT_MARKET_ID],
         rate: 500,
       });
       orderBook.addOrder(lendOrder);
@@ -121,12 +121,12 @@ describe('SnapshotService', () => {
       executionEngine.recordMatch({
         lendOrderId,
         borrowOrderId,
-        lenderWallet: '0x1111111111111111111111111111111111111111',
-        borrowerWallet: '0x2222222222222222222222222222222222222222',
+        lenderAccountId: '550e8400-e29b-41d4-a716-446655440002',
+        borrowerAccountId: '550e8400-e29b-41d4-a716-446655440003',
         matchedAmount: '1000000',
         rate: 500,
-        loanToken: DEFAULT_LOAN_TOKEN,
-        maturity: DEFAULT_MATURITY,
+        assetId: DEFAULT_ASSET_ID,
+        marketId: DEFAULT_MARKET_ID,
         borrowerIsTaker: true,
         makerFeeAmount: '1000',
         takerFeeAmount: '2000',
@@ -166,9 +166,9 @@ describe('SnapshotService', () => {
 
       // Add an order and save again
       const lendOrder = createLendLimitOrder({
-        walletAddress: '0x1111111111111111111111111111111111111111',
-        loanToken: DEFAULT_LOAN_TOKEN,
-        maturities: [DEFAULT_MATURITY],
+        accountId: '550e8400-e29b-41d4-a716-446655440002',
+        assetId: DEFAULT_ASSET_ID,
+        marketIds: [DEFAULT_MARKET_ID],
         rate: 500,
       });
       orderBook.addOrder(lendOrder);
@@ -200,9 +200,9 @@ describe('SnapshotService', () => {
 
     it('should save metadata file', async () => {
       const lendOrder = createLendLimitOrder({
-        walletAddress: '0x1111111111111111111111111111111111111111',
-        loanToken: DEFAULT_LOAN_TOKEN,
-        maturities: [DEFAULT_MATURITY],
+        accountId: '550e8400-e29b-41d4-a716-446655440002',
+        assetId: DEFAULT_ASSET_ID,
+        marketIds: [DEFAULT_MARKET_ID],
         rate: 500,
       });
       orderBook.addOrder(lendOrder);
@@ -225,21 +225,21 @@ describe('SnapshotService', () => {
     });
 
     it('should load snapshot with orders', async () => {
-      const walletAddress1 = '0x1111111111111111111111111111111111111111';
-      const walletAddress2 = '0x2222222222222222222222222222222222222222';
+      const accountId1 = '550e8400-e29b-41d4-a716-446655440002';
+      const accountId2 = '550e8400-e29b-41d4-a716-446655440003';
 
       const lendOrder = createLendLimitOrder({
-        walletAddress: walletAddress1,
-        loanToken: DEFAULT_LOAN_TOKEN,
-        maturities: [DEFAULT_MATURITY],
+        accountId: accountId1,
+        assetId: DEFAULT_ASSET_ID,
+        marketIds: [DEFAULT_MARKET_ID],
         rate: 500,
       });
       orderBook.addOrder(lendOrder);
 
       const borrowOrder = createBorrowLimitOrder({
-        walletAddress: walletAddress2,
-        loanToken: DEFAULT_LOAN_TOKEN,
-        maturities: [DEFAULT_MATURITY],
+        accountId: accountId2,
+        assetId: DEFAULT_ASSET_ID,
+        marketIds: [DEFAULT_MARKET_ID],
         rate: 600,
       });
       orderBook.addOrder(borrowOrder);
@@ -263,12 +263,12 @@ describe('SnapshotService', () => {
       executionEngine.recordMatch({
         lendOrderId,
         borrowOrderId,
-        lenderWallet: '0x1111111111111111111111111111111111111111',
-        borrowerWallet: '0x2222222222222222222222222222222222222222',
+        lenderAccountId: '550e8400-e29b-41d4-a716-446655440002',
+        borrowerAccountId: '550e8400-e29b-41d4-a716-446655440003',
         matchedAmount: '1000000',
         rate: 500,
-        loanToken: DEFAULT_LOAN_TOKEN,
-        maturity: DEFAULT_MATURITY,
+        assetId: DEFAULT_ASSET_ID,
+        marketId: DEFAULT_MARKET_ID,
         borrowerIsTaker: true,
         makerFeeAmount: '1000',
         takerFeeAmount: '2000',
@@ -320,21 +320,21 @@ describe('SnapshotService', () => {
 
   describe('OrderBook integration', () => {
     it('should restore order book from snapshot', async () => {
-      const walletAddress1 = '0x1111111111111111111111111111111111111111';
-      const walletAddress2 = '0x2222222222222222222222222222222222222222';
+      const accountId1 = '550e8400-e29b-41d4-a716-446655440002';
+      const accountId2 = '550e8400-e29b-41d4-a716-446655440003';
 
       const lendOrder = createLendLimitOrder({
-        walletAddress: walletAddress1,
-        loanToken: DEFAULT_LOAN_TOKEN,
-        maturities: [DEFAULT_MATURITY],
+        accountId: accountId1,
+        assetId: DEFAULT_ASSET_ID,
+        marketIds: [DEFAULT_MARKET_ID],
         rate: 500,
       });
       orderBook.addOrder(lendOrder);
 
       const borrowOrder = createBorrowLimitOrder({
-        walletAddress: walletAddress2,
-        loanToken: DEFAULT_LOAN_TOKEN,
-        maturities: [DEFAULT_MATURITY],
+        accountId: accountId2,
+        assetId: DEFAULT_ASSET_ID,
+        marketIds: [DEFAULT_MARKET_ID],
         rate: 600,
       });
       orderBook.addOrder(borrowOrder);
@@ -354,12 +354,12 @@ describe('SnapshotService', () => {
     });
 
     it('should not restore fully filled orders', async () => {
-      const walletAddress1 = '0x1111111111111111111111111111111111111111';
+      const accountId1 = '550e8400-e29b-41d4-a716-446655440002';
 
       const lendOrder = createLendLimitOrder({
-        walletAddress: walletAddress1,
-        loanToken: DEFAULT_LOAN_TOKEN,
-        maturities: [DEFAULT_MATURITY],
+        accountId: accountId1,
+        assetId: DEFAULT_ASSET_ID,
+        marketIds: [DEFAULT_MARKET_ID],
         rate: 500,
       });
       orderBook.addOrder(lendOrder);
@@ -388,12 +388,12 @@ describe('SnapshotService', () => {
       executionEngine.recordMatch({
         lendOrderId,
         borrowOrderId,
-        lenderWallet: '0x1111111111111111111111111111111111111111',
-        borrowerWallet: '0x2222222222222222222222222222222222222222',
+        lenderAccountId: '550e8400-e29b-41d4-a716-446655440002',
+        borrowerAccountId: '550e8400-e29b-41d4-a716-446655440003',
         matchedAmount: '1000000',
         rate: 500,
-        loanToken: DEFAULT_LOAN_TOKEN,
-        maturity: DEFAULT_MATURITY,
+        assetId: DEFAULT_ASSET_ID,
+        marketId: DEFAULT_MARKET_ID,
         borrowerIsTaker: true,
         makerFeeAmount: '1000',
         takerFeeAmount: '2000',
@@ -418,8 +418,8 @@ describe('SnapshotService', () => {
 
   describe('MatchingEngine integration', () => {
     it('should save and restore complete matching engine state', async () => {
-      const walletAddress1 = '0x1111111111111111111111111111111111111111';
-      const walletAddress2 = '0x2222222222222222222222222222222222222222';
+      const accountId1 = '550e8400-e29b-41d4-a716-446655440002';
+      const accountId2 = '550e8400-e29b-41d4-a716-446655440003';
 
       // Create engine with snapshot service
       const engine1 = new MatchingEngine(undefined, snapshotService);
@@ -427,17 +427,17 @@ describe('SnapshotService', () => {
       // Submit orders that won't match (lend rate > borrow rate)
       // This ensures both orders remain in the book after submission
       const lendOrder = createLendLimitOrder({
-        walletAddress: walletAddress1,
-        loanToken: DEFAULT_LOAN_TOKEN,
-        maturities: [DEFAULT_MATURITY],
+        accountId: accountId1,
+        assetId: DEFAULT_ASSET_ID,
+        marketIds: [DEFAULT_MARKET_ID],
         rate: 600, // Lender wants at least 600
       });
       engine1.submitOrder(lendOrder);
 
       const borrowOrder = createBorrowLimitOrder({
-        walletAddress: walletAddress2,
-        loanToken: DEFAULT_LOAN_TOKEN,
-        maturities: [DEFAULT_MATURITY],
+        accountId: accountId2,
+        assetId: DEFAULT_ASSET_ID,
+        marketIds: [DEFAULT_MARKET_ID],
         rate: 500, // Borrower willing to pay at most 500
       });
       engine1.submitOrder(borrowOrder);
@@ -465,7 +465,7 @@ describe('SnapshotService', () => {
       expect(engine2.hasOrder(borrowOrder.orderId)).toBe(true);
       
       // Verify orders are in the order book trees (not just index)
-      const orderBook = engine2.getOrderBook(DEFAULT_LOAN_TOKEN, DEFAULT_MATURITY, 10);
+      const orderBook = engine2.getOrderBook(DEFAULT_ASSET_ID, DEFAULT_MARKET_ID, 10);
       expect(orderBook.lendOrders.length).toBeGreaterThan(0);
       expect(orderBook.borrowOrders.length).toBeGreaterThan(0);
       

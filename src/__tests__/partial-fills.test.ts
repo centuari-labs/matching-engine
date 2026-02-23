@@ -7,10 +7,10 @@ import {
 
 describe('Partial Fills', () => {
   let engine: MatchingEngine;
-  const loanToken = '0x1234567890123456789012345678901234567890';
-  const walletAddress1 = '0x1111111111111111111111111111111111111111';
-  const walletAddress2 = '0x2222222222222222222222222222222222222222';
-  const maturity = 1704067200;
+  const assetId = '550e8400-e29b-41d4-a716-446655440001';
+  const accountId1 = '550e8400-e29b-41d4-a716-446655440002';
+  const accountId2 = '550e8400-e29b-41d4-a716-446655440003';
+  const marketId = '550e8400-e29b-41d4-a716-446655440010';
 
   beforeEach(() => {
     engine = new MatchingEngine();
@@ -19,9 +19,9 @@ describe('Partial Fills', () => {
   it('should partially fill a large order with smaller orders', () => {
     // Add three small lend orders
     const lendOrder1: LendLimitOrder = createLendLimitOrder({
-      walletAddress: walletAddress1,
-      loanToken,
-      maturities: [maturity],
+      accountId: accountId1,
+      assetId,
+      marketIds: [marketId],
       timestamp: Date.now(),
       originalAmount: '300000',
       remainingAmount: '300000',
@@ -30,9 +30,9 @@ describe('Partial Fills', () => {
     });
 
     const lendOrder2: LendLimitOrder = createLendLimitOrder({
-      walletAddress: walletAddress1,
-      loanToken,
-      maturities: [maturity],
+      accountId: accountId1,
+      assetId,
+      marketIds: [marketId],
       timestamp: Date.now() + 1,
       originalAmount: '200000',
       remainingAmount: '200000',
@@ -41,9 +41,9 @@ describe('Partial Fills', () => {
     });
 
     const lendOrder3: LendLimitOrder = createLendLimitOrder({
-      walletAddress: walletAddress1,
-      loanToken,
-      maturities: [maturity],
+      accountId: accountId1,
+      assetId,
+      marketIds: [marketId],
       timestamp: Date.now() + 2,
       originalAmount: '400000',
       remainingAmount: '400000',
@@ -57,9 +57,9 @@ describe('Partial Fills', () => {
 
     // Submit large borrow order
     const borrowOrder: BorrowLimitOrder = createBorrowLimitOrder({
-      walletAddress: walletAddress2,
-      loanToken,
-      maturities: [maturity],
+      accountId: accountId2,
+      assetId,
+      marketIds: [marketId],
       timestamp: Date.now() + 3,
       originalAmount: '1000000',
       remainingAmount: '1000000',
@@ -83,9 +83,9 @@ describe('Partial Fills', () => {
   it('should handle partial fill when maker order is larger', () => {
     // Large lend order
     const lendOrder: LendLimitOrder = createLendLimitOrder({
-      walletAddress: walletAddress1,
-      loanToken,
-      maturities: [maturity],
+      accountId: accountId1,
+      assetId,
+      marketIds: [marketId],
       timestamp: Date.now(),
       originalAmount: '5000000',
       remainingAmount: '5000000',
@@ -97,9 +97,9 @@ describe('Partial Fills', () => {
 
     // Small borrow order
     const borrowOrder: BorrowLimitOrder = createBorrowLimitOrder({
-      walletAddress: walletAddress2,
-      loanToken,
-      maturities: [maturity],
+      accountId: accountId2,
+      assetId,
+      marketIds: [marketId],
       timestamp: Date.now() + 1,
       originalAmount: '1000000',
       remainingAmount: '1000000',
@@ -115,7 +115,7 @@ describe('Partial Fills', () => {
     expect(result.remainingOrder).toBeNull();
 
     // Lend order should still be in the book with remaining amount
-    const snapshot = engine.getOrderBook(loanToken, maturity, 10);
+    const snapshot = engine.getOrderBook(assetId, marketId, 10);
     expect(snapshot.lendOrders).toHaveLength(1);
     expect(snapshot.lendOrders[0].amount).toBe('4000000');
   });
@@ -123,9 +123,9 @@ describe('Partial Fills', () => {
   it('should handle multiple partial fills on the same order', () => {
     // Submit a large lend order
     const lendOrder: LendLimitOrder = createLendLimitOrder({
-      walletAddress: walletAddress1,
-      loanToken,
-      maturities: [maturity],
+      accountId: accountId1,
+      assetId,
+      marketIds: [marketId],
       timestamp: Date.now(),
       originalAmount: '1000000',
       remainingAmount: '1000000',
@@ -137,9 +137,9 @@ describe('Partial Fills', () => {
 
     // First partial fill
     const borrowOrder1: BorrowLimitOrder = createBorrowLimitOrder({
-      walletAddress: walletAddress2,
-      loanToken,
-      maturities: [maturity],
+      accountId: accountId2,
+      assetId,
+      marketIds: [marketId],
       timestamp: Date.now() + 1,
       originalAmount: '300000',
       remainingAmount: '300000',
@@ -153,9 +153,9 @@ describe('Partial Fills', () => {
 
     // Second partial fill
     const borrowOrder2: BorrowLimitOrder = createBorrowLimitOrder({
-      walletAddress: walletAddress2,
-      loanToken,
-      maturities: [maturity],
+      accountId: accountId2,
+      assetId,
+      marketIds: [marketId],
       timestamp: Date.now() + 2,
       originalAmount: '400000',
       remainingAmount: '400000',
@@ -169,9 +169,9 @@ describe('Partial Fills', () => {
 
     // Third partial fill - complete the order
     const borrowOrder3: BorrowLimitOrder = createBorrowLimitOrder({
-      walletAddress: walletAddress2,
-      loanToken,
-      maturities: [maturity],
+      accountId: accountId2,
+      assetId,
+      marketIds: [marketId],
       timestamp: Date.now() + 3,
       originalAmount: '300000',
       remainingAmount: '300000',
@@ -184,7 +184,7 @@ describe('Partial Fills', () => {
     expect(result3.matches[0].lendOrderId).toBe(lendOrder.orderId);
 
     // Original lend order should now be fully filled and removed
-    const snapshot = engine.getOrderBook(loanToken, maturity, 10);
+    const snapshot = engine.getOrderBook(assetId, marketId, 10);
     expect(snapshot.lendOrders).toHaveLength(0);
 
     // Check match history
@@ -202,9 +202,9 @@ describe('Partial Fills', () => {
     const amount = '1234567890';
 
     const lendOrder: LendLimitOrder = createLendLimitOrder({
-      walletAddress: walletAddress1,
-      loanToken,
-      maturities: [maturity],
+      accountId: accountId1,
+      assetId,
+      marketIds: [marketId],
       timestamp: Date.now(),
       originalAmount: amount,
       remainingAmount: amount,
@@ -213,9 +213,9 @@ describe('Partial Fills', () => {
     });
 
     const borrowOrder: BorrowLimitOrder = createBorrowLimitOrder({
-      walletAddress: walletAddress2,
-      loanToken,
-      maturities: [maturity],
+      accountId: accountId2,
+      assetId,
+      marketIds: [marketId],
       timestamp: Date.now() + 1,
       originalAmount: amount,
       remainingAmount: amount,
@@ -231,7 +231,7 @@ describe('Partial Fills', () => {
     expect(result.remainingOrder).toBeNull();
 
     // Both orders should be removed from order book
-    const snapshot = engine.getOrderBook(loanToken, maturity, 10);
+    const snapshot = engine.getOrderBook(assetId, marketId, 10);
     expect(snapshot.lendOrders).toHaveLength(0);
     expect(snapshot.borrowOrders).toHaveLength(0);
   });
@@ -240,9 +240,9 @@ describe('Partial Fills', () => {
     const largeAmount = '999999999999999999999999';
 
     const lendOrder: LendLimitOrder = createLendLimitOrder({
-      walletAddress: walletAddress1,
-      loanToken,
-      maturities: [maturity],
+      accountId: accountId1,
+      assetId,
+      marketIds: [marketId],
       timestamp: Date.now(),
       originalAmount: largeAmount,
       remainingAmount: largeAmount,
@@ -251,9 +251,9 @@ describe('Partial Fills', () => {
     });
 
     const borrowOrder: BorrowLimitOrder = createBorrowLimitOrder({
-      walletAddress: walletAddress2,
-      loanToken,
-      maturities: [maturity],
+      accountId: accountId2,
+      assetId,
+      marketIds: [marketId],
       timestamp: Date.now() + 1,
       originalAmount: '1000',
       remainingAmount: '1000',
@@ -268,7 +268,7 @@ describe('Partial Fills', () => {
     expect(result.matches[0].matchedAmount).toBe('1000');
 
     // Lend order should still exist with large remaining amount
-    const snapshot = engine.getOrderBook(loanToken, maturity, 10);
+    const snapshot = engine.getOrderBook(assetId, marketId, 10);
     expect(snapshot.lendOrders).toHaveLength(1);
     expect(BigInt(snapshot.lendOrders[0].amount)).toBe(BigInt(largeAmount) - BigInt('1000'));
   });

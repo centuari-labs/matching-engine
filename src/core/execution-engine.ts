@@ -46,12 +46,12 @@ export class ExecutionEngine {
   recordMatch(params: {
     lendOrderId: string;
     borrowOrderId: string;
-    lenderWallet: string;
-    borrowerWallet: string;
+    lenderAccountId: string;
+    borrowerAccountId: string;
     matchedAmount: string;
     rate: number;
-    loanToken: string;
-    maturity: number;
+    assetId: string;
+    marketId: string;
     borrowerIsTaker: boolean;
     makerFeeAmount: string;
     takerFeeAmount: string;
@@ -62,12 +62,12 @@ export class ExecutionEngine {
       matchId: generateMatchId(),
       lendOrderId: params.lendOrderId,
       borrowOrderId: params.borrowOrderId,
-      lenderWallet: params.lenderWallet,
-      borrowerWallet: params.borrowerWallet,
+      lenderAccountId: params.lenderAccountId,
+      borrowerAccountId: params.borrowerAccountId,
       matchedAmount: params.matchedAmount,
       rate: params.rate,
-      loanToken: params.loanToken,
-      maturity: params.maturity,
+      assetId: params.assetId,
+      marketId: params.marketId,
       timestamp: Date.now(),
       borrowerIsTaker: params.borrowerIsTaker,
       makerFeeAmount: params.makerFeeAmount,
@@ -242,8 +242,8 @@ export class ExecutionEngine {
    * @returns Array of matching results
    */
   getMatchesByCriteria(filter: {
-    loanToken?: string;
-    maturity?: number;
+    assetId?: string;
+    marketId?: string;
     minRate?: number;
     maxRate?: number;
     fromTimestamp?: number;
@@ -251,12 +251,12 @@ export class ExecutionEngine {
   }): Match[] {
     let results = this.getAllMatches();
 
-    if (filter.loanToken) {
-      results = results.filter((m) => m.loanToken === filter.loanToken);
+    if (filter.assetId) {
+      results = results.filter((m) => m.assetId === filter.assetId);
     }
 
-    if (filter.maturity !== undefined) {
-      results = results.filter((m) => m.maturity === filter.maturity);
+    if (filter.marketId !== undefined) {
+      results = results.filter((m) => m.marketId === filter.marketId);
     }
 
     if (filter.minRate !== undefined) {
@@ -279,15 +279,15 @@ export class ExecutionEngine {
   }
 
   /**
-   * Get statistics for a specific loan token and maturity
+   * Get statistics for a specific asset and market
    *
-   * @param loanToken - The loan token address
-   * @param maturity - The maturity date
+   * @param assetId - The asset ID
+   * @param marketId - The market ID
    * @returns Statistics object
    */
   getStatistics(
-    loanToken: string,
-    maturity: number
+    assetId: string,
+    marketId: string
   ): {
     totalMatches: number;
     totalVolume: bigint;
@@ -295,7 +295,7 @@ export class ExecutionEngine {
     minRate: number;
     maxRate: number;
   } | null {
-    const matches = this.getMatchesByCriteria({ loanToken, maturity });
+    const matches = this.getMatchesByCriteria({ assetId, marketId });
 
     if (matches.length === 0) {
       return null;

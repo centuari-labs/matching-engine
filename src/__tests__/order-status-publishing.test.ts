@@ -44,10 +44,10 @@ describe('Order Status Publishing', () => {
   let mockNc: ReturnType<typeof createMockNatsConnection>;
   let ctx: HandlerContext;
 
-  const loanToken = '0x1234567890123456789012345678901234567890';
-  const walletAddress1 = '0x1111111111111111111111111111111111111111';
-  const walletAddress2 = '0x2222222222222222222222222222222222222222';
-  const maturity = 1704067200;
+  const assetId = '550e8400-e29b-41d4-a716-446655440001';
+  const accountId1 = '550e8400-e29b-41d4-a716-446655440002';
+  const accountId2 = '550e8400-e29b-41d4-a716-446655440003';
+  const marketId = '550e8400-e29b-41d4-a716-446655440010';
 
   beforeEach(() => {
     engine = new MatchingEngine();
@@ -62,9 +62,9 @@ describe('Order Status Publishing', () => {
     it('should publish FILLED status for taker when fully matched', () => {
       // First submit a borrow order to the book
       const borrowOrder: BorrowLimitOrder = createBorrowLimitOrder({
-        walletAddress: walletAddress2,
-        loanToken,
-        maturities: [maturity],
+        accountId: accountId2,
+        assetId,
+        marketIds: [marketId],
         timestamp: Date.now(),
         originalAmount: '1000000',
         remainingAmount: '1000000',
@@ -75,9 +75,9 @@ describe('Order Status Publishing', () => {
 
       // Now submit a lend order that will fully match
       const lendOrder: LendLimitOrder = createLendLimitOrder({
-        walletAddress: walletAddress1,
-        loanToken,
-        maturities: [maturity],
+        accountId: accountId1,
+        assetId,
+        marketIds: [marketId],
         timestamp: Date.now() + 1,
         originalAmount: '1000000',
         remainingAmount: '1000000',
@@ -109,9 +109,9 @@ describe('Order Status Publishing', () => {
     it('should publish PARTIALLY_FILLED status for taker when partially matched', () => {
       // First submit a smaller borrow order to the book
       const borrowOrder: BorrowLimitOrder = createBorrowLimitOrder({
-        walletAddress: walletAddress2,
-        loanToken,
-        maturities: [maturity],
+        accountId: accountId2,
+        assetId,
+        marketIds: [marketId],
         timestamp: Date.now(),
         originalAmount: '300000',
         remainingAmount: '300000',
@@ -122,9 +122,9 @@ describe('Order Status Publishing', () => {
 
       // Now submit a larger lend order that will partially match
       const lendOrder: LendLimitOrder = createLendLimitOrder({
-        walletAddress: walletAddress1,
-        loanToken,
-        maturities: [maturity],
+        accountId: accountId1,
+        assetId,
+        marketIds: [marketId],
         timestamp: Date.now() + 1,
         originalAmount: '1000000',
         remainingAmount: '1000000',
@@ -155,9 +155,9 @@ describe('Order Status Publishing', () => {
     it('should publish OPEN status for limit order when added to book without matches', () => {
       // Submit a lend order with no counterparty
       const lendOrder: LendLimitOrder = createLendLimitOrder({
-        walletAddress: walletAddress1,
-        loanToken,
-        maturities: [maturity],
+        accountId: accountId1,
+        assetId,
+        marketIds: [marketId],
         timestamp: Date.now(),
         originalAmount: '1000000',
         remainingAmount: '1000000',
@@ -185,9 +185,9 @@ describe('Order Status Publishing', () => {
     it('should publish FILLED status for maker when fully matched', () => {
       // First submit a lend order to the book
       const lendOrder: LendLimitOrder = createLendLimitOrder({
-        walletAddress: walletAddress1,
-        loanToken,
-        maturities: [maturity],
+        accountId: accountId1,
+        assetId,
+        marketIds: [marketId],
         timestamp: Date.now(),
         originalAmount: '1000000',
         remainingAmount: '1000000',
@@ -198,9 +198,9 @@ describe('Order Status Publishing', () => {
 
       // Now submit a borrow order that will fully match the lend order
       const borrowOrder: BorrowLimitOrder = createBorrowLimitOrder({
-        walletAddress: walletAddress2,
-        loanToken,
-        maturities: [maturity],
+        accountId: accountId2,
+        assetId,
+        marketIds: [marketId],
         timestamp: Date.now() + 1,
         originalAmount: '1000000',
         remainingAmount: '1000000',
@@ -231,9 +231,9 @@ describe('Order Status Publishing', () => {
     it('should publish PARTIALLY_FILLED status for maker when partially matched', () => {
       // First submit a large lend order to the book
       const lendOrder: LendLimitOrder = createLendLimitOrder({
-        walletAddress: walletAddress1,
-        loanToken,
-        maturities: [maturity],
+        accountId: accountId1,
+        assetId,
+        marketIds: [marketId],
         timestamp: Date.now(),
         originalAmount: '1000000',
         remainingAmount: '1000000',
@@ -244,9 +244,9 @@ describe('Order Status Publishing', () => {
 
       // Now submit a smaller borrow order
       const borrowOrder: BorrowLimitOrder = createBorrowLimitOrder({
-        walletAddress: walletAddress2,
-        loanToken,
-        maturities: [maturity],
+        accountId: accountId2,
+        assetId,
+        marketIds: [marketId],
         timestamp: Date.now() + 1,
         originalAmount: '400000',
         remainingAmount: '400000',
@@ -277,9 +277,9 @@ describe('Order Status Publishing', () => {
     it('should publish status for all affected maker orders', () => {
       // Submit multiple lend orders to the book
       const lendOrder1: LendLimitOrder = createLendLimitOrder({
-        walletAddress: walletAddress1,
-        loanToken,
-        maturities: [maturity],
+        accountId: accountId1,
+        assetId,
+        marketIds: [marketId],
         timestamp: Date.now(),
         originalAmount: '300000',
         remainingAmount: '300000',
@@ -288,9 +288,9 @@ describe('Order Status Publishing', () => {
       });
 
       const lendOrder2: LendLimitOrder = createLendLimitOrder({
-        walletAddress: walletAddress1,
-        loanToken,
-        maturities: [maturity],
+        accountId: accountId1,
+        assetId,
+        marketIds: [marketId],
         timestamp: Date.now() + 1,
         originalAmount: '400000',
         remainingAmount: '400000',
@@ -303,9 +303,9 @@ describe('Order Status Publishing', () => {
 
       // Submit a large borrow order that matches both
       const borrowOrder: BorrowLimitOrder = createBorrowLimitOrder({
-        walletAddress: walletAddress2,
-        loanToken,
-        maturities: [maturity],
+        accountId: accountId2,
+        assetId,
+        marketIds: [marketId],
         timestamp: Date.now() + 2,
         originalAmount: '700000',
         remainingAmount: '700000',
@@ -347,9 +347,9 @@ describe('Order Status Publishing', () => {
     it('should publish FILLED status for market order when fully matched', () => {
       // First submit a borrow order to the book
       const borrowOrder: BorrowLimitOrder = createBorrowLimitOrder({
-        walletAddress: walletAddress2,
-        loanToken,
-        maturities: [maturity],
+        accountId: accountId2,
+        assetId,
+        marketIds: [marketId],
         timestamp: Date.now(),
         originalAmount: '1000000',
         remainingAmount: '1000000',
@@ -360,9 +360,9 @@ describe('Order Status Publishing', () => {
 
       // Now submit a lend market order
       const lendMarketOrder: LendMarketOrder = createLendMarketOrder({
-        walletAddress: walletAddress1,
-        loanToken,
-        maturities: [maturity],
+        accountId: accountId1,
+        assetId,
+        marketIds: [marketId],
         timestamp: Date.now() + 1,
         originalAmount: '1000000',
         remainingAmount: '1000000',
@@ -390,9 +390,9 @@ describe('Order Status Publishing', () => {
     it('should publish status for makers matched by borrow market order', () => {
       // First submit a lend order to the book
       const lendOrder: LendLimitOrder = createLendLimitOrder({
-        walletAddress: walletAddress1,
-        loanToken,
-        maturities: [maturity],
+        accountId: accountId1,
+        assetId,
+        marketIds: [marketId],
         timestamp: Date.now(),
         originalAmount: '500000',
         remainingAmount: '500000',
@@ -403,9 +403,9 @@ describe('Order Status Publishing', () => {
 
       // Now submit a borrow market order
       const borrowMarketOrder: BorrowMarketOrder = createBorrowMarketOrder({
-        walletAddress: walletAddress2,
-        loanToken,
-        maturities: [maturity],
+        accountId: accountId2,
+        assetId,
+        marketIds: [marketId],
         timestamp: Date.now() + 1,
         originalAmount: '500000',
         remainingAmount: '500000',

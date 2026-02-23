@@ -76,27 +76,27 @@ function publishError(ctx: HandlerContext, error: ErrorMessage): void {
 }
 
 /**
- * Publish orderbook snapshot for affected maturities after an order event.
+ * Publish orderbook snapshot for affected markets after an order event.
  *
- * For each maturity, fetches the best order on each side (depth=1) and
+ * For each market, fetches the best order on each side (depth=1) and
  * publishes a snapshot to NATS so downstream consumers (e.g. WebSocket
  * gateway) can push real-time best-price updates to clients.
  */
 function publishOrderbookSnapshot(
   ctx: HandlerContext,
-  loanToken: string,
-  maturities: number[]
+  assetId: string,
+  marketIds: string[]
 ): void {
   try {
-    for (const maturity of maturities) {
-      const snapshot = ctx.engine.getOrderBook(loanToken, maturity, 1);
+    for (const marketId of marketIds) {
+      const snapshot = ctx.engine.getOrderBook(assetId, marketId, 1);
 
       const bestLend = snapshot.lendOrders[0];
       const bestBorrow = snapshot.borrowOrders[0];
 
       const payload = {
-        loanToken,
-        maturity,
+        assetId,
+        marketId,
         lend: bestLend
           ? { price: bestLend.rate ?? 0, apr: '-', amount: bestLend.amount }
           : null,
@@ -188,7 +188,7 @@ export function handleLendMarketOrder(ctx: HandlerContext, data: Uint8Array): vo
 
     // Publish order status updates for taker and affected maker orders
     publishOrderStatusUpdates(ctx, order.orderId, result);
-    publishOrderbookSnapshot(ctx, order.loanToken, order.maturities);
+    publishOrderbookSnapshot(ctx, order.assetId, order.marketIds);
 
     console.log(
       `Lend market order ${order.orderId} processed: ${result.matches.length} matches`
@@ -224,7 +224,7 @@ export function handleLendLimitOrder(ctx: HandlerContext, data: Uint8Array): voi
 
     // Publish order status updates for taker and affected maker orders
     publishOrderStatusUpdates(ctx, order.orderId, result);
-    publishOrderbookSnapshot(ctx, order.loanToken, order.maturities);
+    publishOrderbookSnapshot(ctx, order.assetId, order.marketIds);
 
     console.log(
       `Lend limit order ${order.orderId} processed: ${result.matches.length} matches`
@@ -260,7 +260,7 @@ export function handleBorrowMarketOrder(ctx: HandlerContext, data: Uint8Array): 
 
     // Publish order status updates for taker and affected maker orders
     publishOrderStatusUpdates(ctx, order.orderId, result);
-    publishOrderbookSnapshot(ctx, order.loanToken, order.maturities);
+    publishOrderbookSnapshot(ctx, order.assetId, order.marketIds);
 
     console.log(
       `Borrow market order ${order.orderId} processed: ${result.matches.length} matches`
@@ -296,7 +296,7 @@ export function handleBorrowLimitOrder(ctx: HandlerContext, data: Uint8Array): v
 
     // Publish order status updates for taker and affected maker orders
     publishOrderStatusUpdates(ctx, order.orderId, result);
-    publishOrderbookSnapshot(ctx, order.loanToken, order.maturities);
+    publishOrderbookSnapshot(ctx, order.assetId, order.marketIds);
 
     console.log(
       `Borrow limit order ${order.orderId} processed: ${result.matches.length} matches`
@@ -323,9 +323,9 @@ export function handleCancelOrder(ctx: HandlerContext, data: Uint8Array): void {
     // Parse and validate the cancellation request
     const request = parseMessage(data, cancelOrderMessageSchema);
 
-    console.log(`Processing cancel request for order: ${request.orderId} from wallet: ${request.walletAddress}`);
+    console.log(`Processing cancel request for order: ${request.orderId} from account: ${request.accountId}`);
 
-    // Read the order before cancellation to get loanToken/maturities for snapshot
+    // Read the order before cancellation to get assetId/marketIds for snapshot
     const order = ctx.engine.getOrder(request.orderId);
     if (!order) {
       console.warn(`Order ${request.orderId} not found for cancellation`);
@@ -341,7 +341,7 @@ export function handleCancelOrder(ctx: HandlerContext, data: Uint8Array): void {
     }
 
     // Cancel order in matching engine
-    const success = ctx.engine.cancelOrder(request.orderId, request.walletAddress);
+    const success = ctx.engine.cancelOrder(request.orderId, request.accountId);
 
     if (success) {
       console.log(`Order ${request.orderId} cancelled successfully`);
@@ -356,14 +356,14 @@ export function handleCancelOrder(ctx: HandlerContext, data: Uint8Array): void {
         })
       );
 
-      publishOrderbookSnapshot(ctx, order.loanToken, order.maturities);
+      publishOrderbookSnapshot(ctx, order.assetId, order.marketIds);
     } else {
-      console.warn(`Wallet address mismatch for order ${request.orderId}`);
+      console.warn(`Account ID mismatch for order ${request.orderId}`);
       publishError(
         ctx,
         createErrorMessage(
           ERROR_CODES.VALIDATION_ERROR,
-          `Wallet address does not match order owner`,
+          `Account ID does not match order owner`,
           request.orderId
         )
       );
