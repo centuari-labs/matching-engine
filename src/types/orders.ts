@@ -37,18 +37,35 @@ export const ethereumAddressSchema = z
   .regex(/^0x[a-fA-F0-9]{40}$/, 'Invalid Ethereum address format');
 
 /**
+ * Schema for a single market slot: a market UUID and its corresponding maturity timestamp.
+ *
+ * Orders specify which markets they participate in via an array of these slots.
+ * Each entry must have both a valid market ID and a positive integer maturity.
+ */
+export const marketSlotSchema = z.object({
+  marketId: z.string().uuid('Market ID must be a valid UUID'),
+  maturity: z.number().int().positive('Maturity must be a positive integer'),
+});
+
+/**
+ * TypeScript type for a market slot (marketId + maturity).
+ */
+export type MarketSlot = z.infer<typeof marketSlotSchema>;
+
+/**
  * Base order schema with common fields.
  *
  * All monetary values are represented as decimal strings containing only digits.
  * This avoids precision issues when dealing with very large integers.
+ * Markets are represented as an array of { marketId, maturity } slots; the array must be non-empty.
  */
 const baseOrderSchema = z.object({
   orderId: z.string().uuid('Order ID must be a valid UUID'),
-  walletAddress: ethereumAddressSchema,
-  loanToken: ethereumAddressSchema,
-  maturities: z
-    .array(z.number().int().positive('Maturity must be a positive integer'))
-    .min(1, 'At least one maturity date is required'),
+  walletAddress: ethereumAddressSchema, //@note : later change into account id
+  loanToken: ethereumAddressSchema, //@note : later change into asset id
+  markets: z
+    .array(marketSlotSchema)
+    .min(1, 'At least one market slot is required'),
   timestamp: z.number().int().positive('Timestamp must be a positive integer'),
   side: z.nativeEnum(OrderSide),
   type: z.nativeEnum(OrderType),
@@ -109,7 +126,7 @@ export const lendLimitOrderSchema = baseOrderSchema.extend({
     .number()
     .int('Rate must be an integer')
     .min(0, 'Rate must be non-negative')
-    .max(100000, 'Rate must not exceed 100000 basis points (1000%)'),
+    .max(10000, 'Rate must not exceed 10000 basis points (100%)'),
 });
 
 /**
@@ -132,7 +149,7 @@ export const borrowLimitOrderSchema = baseOrderSchema.extend({
     .number()
     .int('Rate must be an integer')
     .min(0, 'Rate must be non-negative')
-    .max(100000, 'Rate must not exceed 100000 basis points (1000%)')
+    .max(10000, 'Rate must not exceed 10000 basis points (100%)')
 });
 
 /**
@@ -185,13 +202,15 @@ export function isLimitOrder(order: Order): order is LendLimitOrder | BorrowLimi
 }
 
 /**
- * Order metadata for internal tracking
+ * Order metadata for internal tracking.
+ *
+ * Uses the same markets array as the order for consistent lookups and iteration.
  */
 export interface OrderMetadata {
   orderId: string;
   walletAddress: string;
   loanToken: string;
-  maturities: number[];
+  markets: MarketSlot[];
   side: OrderSide;
   type: OrderType;
 }

@@ -45,17 +45,18 @@ export class OrderBook {
       orderId: order.orderId,
       walletAddress: order.walletAddress,
       loanToken: order.loanToken,
-      maturities: order.maturities,
+      markets: order.markets,
       side: order.side,
       type: order.type,
       order,
     });
 
-    // Add to appropriate trees for each maturity
+    // Add to appropriate trees for each market (maturity)
     const orderMap = order.side === OrderSide.Lend ? this.lendOrders : this.borrowOrders;
     const comparator = order.side === OrderSide.Lend ? this.lendComparator : this.borrowComparator;
 
-    for (const maturity of order.maturities) {
+    for (const market of order.markets) {
+      const maturity = market.maturity;
       // Get or create token map
       if (!orderMap.has(order.loanToken)) {
         orderMap.set(order.loanToken, new Map());
@@ -89,10 +90,11 @@ export class OrderBook {
     const orderMap =
       metadata.side === OrderSide.Lend ? this.lendOrders : this.borrowOrders;
 
-    // Remove from all maturity trees
+    // Remove from all market (maturity) trees
     const tokenMap = orderMap.get(metadata.loanToken);
     if (tokenMap) {
-      for (const maturity of metadata.maturities) {
+      for (const market of metadata.markets) {
+        const maturity = market.maturity;
         let tree = tokenMap.get(maturity);
         if (tree) {
           // Remove the order from the tree

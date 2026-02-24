@@ -14,6 +14,7 @@ import {
   createBorrowLimitOrder,
   createLendMarketOrder,
   createBorrowMarketOrder,
+  marketsFromMaturities,
 } from './factories/order-factory';
 
 /**
@@ -64,7 +65,7 @@ describe('Order Status Publishing', () => {
       const borrowOrder: BorrowLimitOrder = createBorrowLimitOrder({
         walletAddress: walletAddress2,
         loanToken,
-        maturities: [maturity],
+        markets: marketsFromMaturities([maturity]),
         timestamp: Date.now(),
         originalAmount: '1000000',
         remainingAmount: '1000000',
@@ -77,7 +78,7 @@ describe('Order Status Publishing', () => {
       const lendOrder: LendLimitOrder = createLendLimitOrder({
         walletAddress: walletAddress1,
         loanToken,
-        maturities: [maturity],
+        markets: marketsFromMaturities([maturity]),
         timestamp: Date.now() + 1,
         originalAmount: '1000000',
         remainingAmount: '1000000',
@@ -111,7 +112,7 @@ describe('Order Status Publishing', () => {
       const borrowOrder: BorrowLimitOrder = createBorrowLimitOrder({
         walletAddress: walletAddress2,
         loanToken,
-        maturities: [maturity],
+        markets: marketsFromMaturities([maturity]),
         timestamp: Date.now(),
         originalAmount: '300000',
         remainingAmount: '300000',
@@ -124,7 +125,7 @@ describe('Order Status Publishing', () => {
       const lendOrder: LendLimitOrder = createLendLimitOrder({
         walletAddress: walletAddress1,
         loanToken,
-        maturities: [maturity],
+        markets: marketsFromMaturities([maturity]),
         timestamp: Date.now() + 1,
         originalAmount: '1000000',
         remainingAmount: '1000000',
@@ -157,7 +158,7 @@ describe('Order Status Publishing', () => {
       const lendOrder: LendLimitOrder = createLendLimitOrder({
         walletAddress: walletAddress1,
         loanToken,
-        maturities: [maturity],
+        markets: marketsFromMaturities([maturity]),
         timestamp: Date.now(),
         originalAmount: '1000000',
         remainingAmount: '1000000',
@@ -187,7 +188,7 @@ describe('Order Status Publishing', () => {
       const lendOrder: LendLimitOrder = createLendLimitOrder({
         walletAddress: walletAddress1,
         loanToken,
-        maturities: [maturity],
+        markets: marketsFromMaturities([maturity]),
         timestamp: Date.now(),
         originalAmount: '1000000',
         remainingAmount: '1000000',
@@ -200,7 +201,7 @@ describe('Order Status Publishing', () => {
       const borrowOrder: BorrowLimitOrder = createBorrowLimitOrder({
         walletAddress: walletAddress2,
         loanToken,
-        maturities: [maturity],
+        markets: marketsFromMaturities([maturity]),
         timestamp: Date.now() + 1,
         originalAmount: '1000000',
         remainingAmount: '1000000',
@@ -233,7 +234,7 @@ describe('Order Status Publishing', () => {
       const lendOrder: LendLimitOrder = createLendLimitOrder({
         walletAddress: walletAddress1,
         loanToken,
-        maturities: [maturity],
+        markets: marketsFromMaturities([maturity]),
         timestamp: Date.now(),
         originalAmount: '1000000',
         remainingAmount: '1000000',
@@ -246,7 +247,7 @@ describe('Order Status Publishing', () => {
       const borrowOrder: BorrowLimitOrder = createBorrowLimitOrder({
         walletAddress: walletAddress2,
         loanToken,
-        maturities: [maturity],
+        markets: marketsFromMaturities([maturity]),
         timestamp: Date.now() + 1,
         originalAmount: '400000',
         remainingAmount: '400000',
@@ -279,7 +280,7 @@ describe('Order Status Publishing', () => {
       const lendOrder1: LendLimitOrder = createLendLimitOrder({
         walletAddress: walletAddress1,
         loanToken,
-        maturities: [maturity],
+        markets: marketsFromMaturities([maturity]),
         timestamp: Date.now(),
         originalAmount: '300000',
         remainingAmount: '300000',
@@ -290,7 +291,7 @@ describe('Order Status Publishing', () => {
       const lendOrder2: LendLimitOrder = createLendLimitOrder({
         walletAddress: walletAddress1,
         loanToken,
-        maturities: [maturity],
+        markets: marketsFromMaturities([maturity]),
         timestamp: Date.now() + 1,
         originalAmount: '400000',
         remainingAmount: '400000',
@@ -305,7 +306,7 @@ describe('Order Status Publishing', () => {
       const borrowOrder: BorrowLimitOrder = createBorrowLimitOrder({
         walletAddress: walletAddress2,
         loanToken,
-        maturities: [maturity],
+        markets: marketsFromMaturities([maturity]),
         timestamp: Date.now() + 2,
         originalAmount: '700000',
         remainingAmount: '700000',
@@ -349,7 +350,7 @@ describe('Order Status Publishing', () => {
       const borrowOrder: BorrowLimitOrder = createBorrowLimitOrder({
         walletAddress: walletAddress2,
         loanToken,
-        maturities: [maturity],
+        markets: marketsFromMaturities([maturity]),
         timestamp: Date.now(),
         originalAmount: '1000000',
         remainingAmount: '1000000',
@@ -362,7 +363,7 @@ describe('Order Status Publishing', () => {
       const lendMarketOrder: LendMarketOrder = createLendMarketOrder({
         walletAddress: walletAddress1,
         loanToken,
-        maturities: [maturity],
+        markets: marketsFromMaturities([maturity]),
         timestamp: Date.now() + 1,
         originalAmount: '1000000',
         remainingAmount: '1000000',
@@ -392,7 +393,7 @@ describe('Order Status Publishing', () => {
       const lendOrder: LendLimitOrder = createLendLimitOrder({
         walletAddress: walletAddress1,
         loanToken,
-        maturities: [maturity],
+        markets: marketsFromMaturities([maturity]),
         timestamp: Date.now(),
         originalAmount: '500000',
         remainingAmount: '500000',
@@ -405,7 +406,7 @@ describe('Order Status Publishing', () => {
       const borrowMarketOrder: BorrowMarketOrder = createBorrowMarketOrder({
         walletAddress: walletAddress2,
         loanToken,
-        maturities: [maturity],
+        markets: marketsFromMaturities([maturity]),
         timestamp: Date.now() + 1,
         originalAmount: '500000',
         remainingAmount: '500000',

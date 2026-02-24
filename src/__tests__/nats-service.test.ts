@@ -9,6 +9,7 @@ import { MatchingEngine } from '../core/matching-engine';
 import { NatsService } from '../services/nats-service';
 import type { NatsConfig } from '../config/nats-config';
 import { OrderSide, OrderType, OrderStatus } from '../types/orders';
+import { marketsFromMaturities } from './factories/order-factory';
 
 // Mock NATS config for testing
 const mockConfig: NatsConfig = {
@@ -326,7 +327,7 @@ describe('NatsService Integration (requires NATS server)', () => {
         orderId: '123e4567-e89b-12d3-a456-426614174000',
         loanToken: '0x1234567890123456789012345678901234567890',
         walletAddress: '0x1111111111111111111111111111111111111111',
-        maturities: [Date.now() + 86400000],
+        markets: marketsFromMaturities([Date.now() + 86400000]),
         timestamp: Date.now(),
         side: OrderSide.Lend,
         type: OrderType.Limit,

@@ -7,7 +7,7 @@ A high-performance matching engine for Web3 lending and borrowing built with Typ
 This matching engine efficiently matches lend and borrow orders for decentralized lending protocols. It supports:
 
 - **Market and Limit Orders**: Both lend and borrow sides
-- **Multiple Maturities**: Orders can specify multiple maturity dates
+- **Multiple Markets**: Orders specify one or more markets via a `markets` array (each entry has a `marketId` UUID and `maturity` timestamp)
 - **Partial Fills**: Orders can be partially filled across multiple matches
 - **Price-Time Priority**: Best prices matched first, then earliest orders
 - **High Performance**: O(log n) order operations using Red-Black Trees
@@ -42,17 +42,19 @@ import { MatchingEngine, OrderSide, OrderType, OrderStatus } from '@centuari/mat
 // Initialize the matching engine
 const engine = new MatchingEngine();
 
-// Create a lend limit order
+// Create a lend limit order (markets: array of { marketId, maturity } per market)
 const lendOrder = {
   orderId: '550e8400-e29b-41d4-a716-446655440000',
   loanToken: '0x1234567890123456789012345678901234567890',
-  maturities: [1704067200], // Unix timestamp for maturity date
+  walletAddress: '0x1111111111111111111111111111111111111111',
+  markets: [{ marketId: '6ba7b810-9dad-11d1-80b4-00c04fd430c8', maturity: 1704067200 }],
   timestamp: Date.now(),
   side: OrderSide.Lend,
   type: OrderType.Limit,
   status: OrderStatus.Open,
-  originalAmount: '1000000', // Amount in token's smallest unit
+  originalAmount: '1000000',
   remainingAmount: '1000000',
+  settlementFeeAmount: '10000',
   rate: 500, // Interest rate in basis points (500 = 5%)
 };
 
@@ -76,30 +78,33 @@ const engine = new MatchingEngine();
 // Lender offers to lend at 5% (500 basis points)
 const lendOrder = {
   orderId: generateOrderId(),
+  walletAddress: '0x1111111111111111111111111111111111111111',
   loanToken: '0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48', // USDC
-  maturities: [1704067200],
+  markets: [{ marketId: '6ba7b810-9dad-11d1-80b4-00c04fd430c8', maturity: 1704067200 }],
   timestamp: Date.now(),
   side: OrderSide.Lend,
   type: OrderType.Limit,
   status: OrderStatus.Open,
-  originalAmount: '1000000000', // 1000 USDC (6 decimals)
+  originalAmount: '1000000000',
   remainingAmount: '1000000000',
+  settlementFeeAmount: '10000',
   rate: 500,
 };
 
 // Borrower willing to pay 6% (600 basis points)
 const borrowOrder = {
   orderId: generateOrderId(),
+  walletAddress: '0x2222222222222222222222222222222222222222',
   loanToken: '0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48',
-  maturities: [1704067200],
+  markets: [{ marketId: '6ba7b810-9dad-11d1-80b4-00c04fd430c8', maturity: 1704067200 }],
   timestamp: Date.now(),
   side: OrderSide.Borrow,
   type: OrderType.Limit,
   status: OrderStatus.Open,
-  originalAmount: '500000000', // 500 USDC
+  originalAmount: '500000000',
   remainingAmount: '500000000',
+  settlementFeeAmount: '10000',
   rate: 600,
-  collateralTokens: ['0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2'], // WETH
 };
 
 // Submit orders
@@ -133,30 +138,35 @@ import { OrderSide, OrderType, OrderStatus } from '@centuari/matching-engine';
 const engine = new MatchingEngine();
 
 // Add two lend limit orders at different rates
+const marketSlot = { marketId: '6ba7b810-9dad-11d1-80b4-00c04fd430c8', maturity: 1704067200 };
 const lendOrder1 = {
   orderId: generateOrderId(),
+  walletAddress: '0x1111111111111111111111111111111111111111',
   loanToken: '0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48',
-  maturities: [1704067200],
+  markets: [marketSlot],
   timestamp: Date.now(),
   side: OrderSide.Lend,
   type: OrderType.Limit,
   status: OrderStatus.Open,
   originalAmount: '500000000',
   remainingAmount: '500000000',
-  rate: 400, // 4%
+  settlementFeeAmount: '10000',
+  rate: 400,
 };
 
 const lendOrder2 = {
   orderId: generateOrderId(),
+  walletAddress: '0x1111111111111111111111111111111111111111',
   loanToken: '0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48',
-  maturities: [1704067200],
+  markets: [marketSlot],
   timestamp: Date.now() + 1,
   side: OrderSide.Lend,
   type: OrderType.Limit,
   status: OrderStatus.Open,
   originalAmount: '700000000',
   remainingAmount: '700000000',
-  rate: 600, // 6%
+  settlementFeeAmount: '10000',
+  rate: 600,
 };
 
 engine.submitOrder(lendOrder1);
@@ -165,15 +175,16 @@ engine.submitOrder(lendOrder2);
 // Submit borrow market order - will match at best rates
 const borrowMarketOrder = {
   orderId: generateOrderId(),
+  walletAddress: '0x2222222222222222222222222222222222222222',
   loanToken: '0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48',
-  maturities: [1704067200],
+  markets: [marketSlot],
   timestamp: Date.now() + 2,
   side: OrderSide.Borrow,
   type: OrderType.Market,
   status: OrderStatus.Open,
-  originalAmount: '1000000000', // 1000 USDC
+  originalAmount: '1000000000',
   remainingAmount: '1000000000',
-  collateralTokens: ['0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2'],
+  settlementFeeAmount: '10000',
 };
 
 const result = engine.submitOrder(borrowMarketOrder);
@@ -194,30 +205,34 @@ import { OrderSide, OrderType, OrderStatus } from '@centuari/matching-engine';
 
 const engine = new MatchingEngine();
 
-// Add lend orders at different maturities
+// Add lend orders at different maturities (each market: { marketId, maturity })
 const lendOrder1 = {
   orderId: generateOrderId(),
+  walletAddress: '0x1111111111111111111111111111111111111111',
   loanToken: '0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48',
-  maturities: [1704067200], // Jan 2024
+  markets: [{ marketId: '6ba7b810-9dad-11d1-80b4-00c04fd430c8', maturity: 1704067200 }], // Jan 2024
   timestamp: Date.now(),
   side: OrderSide.Lend,
   type: OrderType.Limit,
   status: OrderStatus.Open,
   originalAmount: '500000000',
   remainingAmount: '500000000',
+  settlementFeeAmount: '10000',
   rate: 500,
 };
 
 const lendOrder2 = {
   orderId: generateOrderId(),
+  walletAddress: '0x1111111111111111111111111111111111111111',
   loanToken: '0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48',
-  maturities: [1735689600], // Jan 2025
+  markets: [{ marketId: '7ca7b810-9dad-11d1-80b4-00c04fd430c9', maturity: 1735689600 }], // Jan 2025
   timestamp: Date.now(),
   side: OrderSide.Lend,
   type: OrderType.Limit,
   status: OrderStatus.Open,
   originalAmount: '600000000',
   remainingAmount: '600000000',
+  settlementFeeAmount: '10000',
   rate: 500,
 };
 
@@ -227,16 +242,20 @@ engine.submitOrder(lendOrder2);
 // Borrow order with multiple maturities
 const borrowOrder = {
   orderId: generateOrderId(),
+  walletAddress: '0x2222222222222222222222222222222222222222',
   loanToken: '0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48',
-  maturities: [1704067200, 1735689600], // Both maturities
+  markets: [
+    { marketId: '6ba7b810-9dad-11d1-80b4-00c04fd430c8', maturity: 1704067200 },
+    { marketId: '7ca7b810-9dad-11d1-80b4-00c04fd430c9', maturity: 1735689600 },
+  ],
   timestamp: Date.now(),
   side: OrderSide.Borrow,
   type: OrderType.Limit,
   status: OrderStatus.Open,
   originalAmount: '1000000000',
   remainingAmount: '1000000000',
+  settlementFeeAmount: '10000',
   rate: 600,
-  collateralTokens: ['0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2'],
 };
 
 const result = engine.submitOrder(borrowOrder);
@@ -256,13 +275,14 @@ const order = {
   orderId: generateOrderId(),
   walletAddress: '0x1111111111111111111111111111111111111111',
   loanToken: '0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48',
-  maturities: [1704067200],
+  markets: [{ marketId: '6ba7b810-9dad-11d1-80b4-00c04fd430c8', maturity: 1704067200 }],
   timestamp: Date.now(),
   side: OrderSide.Lend,
   type: OrderType.Limit,
   status: OrderStatus.Open,
   originalAmount: '1000000000',
   remainingAmount: '1000000000',
+  settlementFeeAmount: '10000',
   rate: 500,
 };
 
@@ -407,17 +427,26 @@ Get trading statistics for a specific token and maturity.
 
 #### Order Types
 
+Orders use a unified `markets` array instead of separate maturity lists. Each entry is a **market slot** with both a market UUID and maturity timestamp.
+
 ```typescript
+interface MarketSlot {
+  marketId: string; // UUID
+  maturity: number; // Unix timestamp
+}
+
 interface LendMarketOrder {
-  orderId: string; // UUID
-  loanToken: string; // Ethereum address
-  maturities: number[]; // Unix timestamps
+  orderId: string;
+  walletAddress: string;
+  loanToken: string;
+  markets: MarketSlot[]; // At least one; each has marketId + maturity
   timestamp: number;
   side: OrderSide.Lend;
   type: OrderType.Market;
   status: OrderStatus;
-  originalAmount: string; // BigInt as string
+  originalAmount: string;
   remainingAmount: string;
+  settlementFeeAmount: string;
 }
 
 interface LendLimitOrder extends LendMarketOrder {
@@ -427,20 +456,21 @@ interface LendLimitOrder extends LendMarketOrder {
 
 interface BorrowMarketOrder {
   orderId: string;
+  walletAddress: string;
   loanToken: string;
-  maturities: number[];
+  markets: MarketSlot[];
   timestamp: number;
   side: OrderSide.Borrow;
   type: OrderType.Market;
   status: OrderStatus;
   originalAmount: string;
   remainingAmount: string;
-  collateralTokens: string[]; // Ethereum addresses
+  settlementFeeAmount: string;
 }
 
 interface BorrowLimitOrder extends BorrowMarketOrder {
   type: OrderType.Limit;
-  rate: number; // Basis points
+  rate: number;
 }
 ```
 
@@ -532,7 +562,8 @@ using the shared factory helpers:
 
 - `src/__tests__/factories/order-factory.ts` – helpers for creating all order
   types (`createLendLimitOrder`, `createBorrowLimitOrder`, etc.) with sensible
-  defaults for amounts and fee fields.
+  defaults for amounts, fee fields, and `markets`. Use `marketsFromMaturities([...])`
+  in overrides when you only need to set maturities (deterministic marketIds are derived).
 - `src/__tests__/factories/match-factory.ts` – helper for creating `Match`
   instances with default fee fields derived from the matched amount.
 

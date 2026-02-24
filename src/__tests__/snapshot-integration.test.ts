@@ -14,6 +14,7 @@ import {
   createBorrowLimitOrder,
   DEFAULT_LOAN_TOKEN,
   DEFAULT_MATURITY,
+  marketsFromMaturities,
 } from './factories/order-factory';
 
 describe('Snapshot Integration', () => {
@@ -48,7 +49,7 @@ describe('Snapshot Integration', () => {
       const lendOrder = createLendLimitOrder({
         walletAddress: walletAddress1,
         loanToken: DEFAULT_LOAN_TOKEN,
-        maturities: [DEFAULT_MATURITY],
+        markets: marketsFromMaturities([DEFAULT_MATURITY]),
         rate: 500,
       });
 
@@ -72,7 +73,7 @@ describe('Snapshot Integration', () => {
       const lendOrder = createLendLimitOrder({
         walletAddress: walletAddress1,
         loanToken: DEFAULT_LOAN_TOKEN,
-        maturities: [DEFAULT_MATURITY],
+        markets: marketsFromMaturities([DEFAULT_MATURITY]),
         rate: 500,
       });
 
@@ -100,14 +101,14 @@ describe('Snapshot Integration', () => {
       const lendOrder = createLendLimitOrder({
         walletAddress: walletAddress1,
         loanToken: DEFAULT_LOAN_TOKEN,
-        maturities: [DEFAULT_MATURITY],
+        markets: marketsFromMaturities([DEFAULT_MATURITY]),
         rate: 500,
       });
 
       const borrowOrder = createBorrowLimitOrder({
         walletAddress: walletAddress2,
         loanToken: DEFAULT_LOAN_TOKEN,
-        maturities: [DEFAULT_MATURITY],
+        markets: marketsFromMaturities([DEFAULT_MATURITY]),
         rate: 600,
       });
 
@@ -145,20 +146,20 @@ describe('Snapshot Integration', () => {
       const lendOrder1 = createLendLimitOrder({
         walletAddress: walletAddress1,
         loanToken: DEFAULT_LOAN_TOKEN,
-        maturities: [DEFAULT_MATURITY],
+        markets: marketsFromMaturities([DEFAULT_MATURITY]),
         rate: 600, // Lender wants at least 600
       });
       const lendOrder2 = createLendLimitOrder({
         walletAddress: walletAddress1,
         loanToken: DEFAULT_LOAN_TOKEN,
-        maturities: [DEFAULT_MATURITY],
+        markets: marketsFromMaturities([DEFAULT_MATURITY]),
         rate: 700, // Lender wants at least 700
         timestamp: Date.now() + 1,
       });
       const borrowOrder = createBorrowLimitOrder({
         walletAddress: walletAddress2,
         loanToken: DEFAULT_LOAN_TOKEN,
-        maturities: [DEFAULT_MATURITY],
+        markets: marketsFromMaturities([DEFAULT_MATURITY]),
         rate: 500, // Borrower willing to pay at most 500
       });
 
@@ -220,7 +221,7 @@ describe('Snapshot Integration', () => {
       const lendOrder = createLendLimitOrder({
         walletAddress: walletAddress1,
         loanToken: DEFAULT_LOAN_TOKEN,
-        maturities: [DEFAULT_MATURITY],
+        markets: marketsFromMaturities([DEFAULT_MATURITY]),
         rate: 500,
         originalAmount: '2000000',
         remainingAmount: '2000000',
@@ -229,7 +230,7 @@ describe('Snapshot Integration', () => {
       const borrowOrder = createBorrowLimitOrder({
         walletAddress: walletAddress2,
         loanToken: DEFAULT_LOAN_TOKEN,
-        maturities: [DEFAULT_MATURITY],
+        markets: marketsFromMaturities([DEFAULT_MATURITY]),
         rate: 600,
         originalAmount: '1000000',
         remainingAmount: '1000000',
@@ -286,7 +287,7 @@ describe('Snapshot Integration', () => {
       const lendOrder = createLendLimitOrder({
         walletAddress: walletAddress1,
         loanToken: DEFAULT_LOAN_TOKEN,
-        maturities: [DEFAULT_MATURITY],
+        markets: marketsFromMaturities([DEFAULT_MATURITY]),
         rate: 500,
       });
 
@@ -308,7 +309,7 @@ describe('Snapshot Integration', () => {
       const lendOrder = createLendLimitOrder({
         walletAddress: walletAddress1,
         loanToken: DEFAULT_LOAN_TOKEN,
-        maturities: [DEFAULT_MATURITY],
+        markets: marketsFromMaturities([DEFAULT_MATURITY]),
         rate: 500,
       });
 

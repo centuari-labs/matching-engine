@@ -1,3 +1,4 @@
+import { v5 as uuidv5 } from 'uuid';
 import {
   OrderStatus,
   OrderType,
@@ -6,12 +7,34 @@ import {
   type BorrowLimitOrder,
   type LendMarketOrder,
   type BorrowMarketOrder,
+  type MarketSlot,
   lendLimitOrderSchema,
   borrowLimitOrderSchema,
   lendMarketOrderSchema,
   borrowMarketOrderSchema,
 } from '../../types/orders';
 import { generateOrderId } from '../../utils/helpers';
+
+/**
+ * UUID namespace for deriving deterministic market IDs from maturity timestamps in tests.
+ */
+const MARKET_MATURITY_NAMESPACE = '6ba7b810-9dad-11d1-80b4-00c04fd430c8';
+
+/**
+ * Build an array of market slots from maturity timestamps.
+ *
+ * Uses a deterministic UUID v5 per maturity so the same maturity always maps to the same marketId.
+ * Use this in tests when you only care about maturities and not specific market IDs.
+ *
+ * @param maturities - Array of maturity timestamps.
+ * @returns Array of { marketId, maturity } slots.
+ */
+export function marketsFromMaturities(maturities: number[]): MarketSlot[] {
+  return maturities.map((maturity) => ({
+    marketId: uuidv5(String(maturity), MARKET_MATURITY_NAMESPACE),
+    maturity,
+  }));
+}
 
 /**
  * Default loan token address used in tests.
@@ -43,7 +66,7 @@ function createBaseOrder() {
     orderId: generateOrderId(),
     walletAddress: '0x1111111111111111111111111111111111111111',
     loanToken: DEFAULT_LOAN_TOKEN,
-    maturities: [DEFAULT_MATURITY],
+    markets: marketsFromMaturities([DEFAULT_MATURITY]),
     timestamp: Date.now(),
     status: OrderStatus.Open,
     originalAmount: DEFAULT_ORDER_AMOUNT,
