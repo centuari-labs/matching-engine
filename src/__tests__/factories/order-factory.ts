@@ -42,6 +42,11 @@ export function marketsFromMaturities(maturities: number[]): MarketSlot[] {
 export const DEFAULT_LOAN_TOKEN = '0x1234567890123456789012345678901234567890';
 
 /**
+ * Default asset ID (UUID) used in tests.
+ */
+export const DEFAULT_ASSET_ID = '8411e8f0-6f5c-4061-a74c-ebc5040f4981';
+
+/**
  * Default maturity timestamp used in tests.
  */
 export const DEFAULT_MATURITY = 1704067200;
@@ -66,6 +71,7 @@ function createBaseOrder() {
     orderId: generateOrderId(),
     walletAddress: '0x1111111111111111111111111111111111111111',
     loanToken: DEFAULT_LOAN_TOKEN,
+    assetId: DEFAULT_ASSET_ID,
     markets: marketsFromMaturities([DEFAULT_MATURITY]),
     timestamp: Date.now(),
     status: OrderStatus.Open,

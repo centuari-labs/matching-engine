@@ -20,8 +20,8 @@ import {
   ERROR_CODES,
   type ErrorMessage,
 } from '../types/messages';
-import type { MatchResult } from '../types/matches';
-import { OrderStatus } from '../types/orders';
+import type { Match, MatchResult } from '../types/matches';
+import { OrderSide, OrderStatus } from '../types/orders';
 import { NATS_TOPICS } from '../config/nats-config';
 
 /**
@@ -128,6 +128,39 @@ function publishOrderStatusUpdates(
 }
 
 /**
+ * Publish individual recent-trade events to NATS for each match.
+ *
+ * The WebSocket gateway subscribes to `matches.created` and broadcasts
+ * each event to the `recent-trades:{assetId}` Socket.IO room.
+ *
+ * @param ctx - Handler context
+ * @param assetId - Asset UUID for the traded token
+ * @param takerSide - Side of the taker order (the order that was just submitted)
+ * @param matches - Array of matches produced by the matching engine
+ */
+function publishMatchCreatedEvents(
+  ctx: HandlerContext,
+  assetId: string,
+  takerSide: OrderSide,
+  matches: Match[]
+): void {
+  try {
+    for (const match of matches) {
+      const tradeEvent = {
+        assetId,
+        side: takerSide,
+        amount: match.matchedAmount,
+        rate: match.rate,
+        timestamp: match.timestamp,
+      };
+      ctx.nc.publish(NATS_TOPICS.MATCHES_CREATED, JSON.stringify(tradeEvent));
+    }
+  } catch (err) {
+    console.error('Failed to publish match created events:', err);
+  }
+}
+
+/**
  * Handle lend market order messages
  *
  * @param ctx - Handler context
@@ -147,6 +180,11 @@ export function handleLendMarketOrder(ctx: HandlerContext, data: Uint8Array): vo
 
     // Publish order status updates for taker and affected maker orders
     publishOrderStatusUpdates(ctx, order.orderId, result);
+
+    // Publish recent-trade events for each match
+    if (result.matches.length > 0) {
+      publishMatchCreatedEvents(ctx, order.assetId, order.side, result.matches);
+    }
 
     console.log(
       `Lend market order ${order.orderId} processed: ${result.matches.length} matches`
@@ -183,6 +221,11 @@ export function handleLendLimitOrder(ctx: HandlerContext, data: Uint8Array): voi
     // Publish order status updates for taker and affected maker orders
     publishOrderStatusUpdates(ctx, order.orderId, result);
 
+    // Publish recent-trade events for each match
+    if (result.matches.length > 0) {
+      publishMatchCreatedEvents(ctx, order.assetId, order.side, result.matches);
+    }
+
     console.log(
       `Lend limit order ${order.orderId} processed: ${result.matches.length} matches`
     );
@@ -218,6 +261,11 @@ export function handleBorrowMarketOrder(ctx: HandlerContext, data: Uint8Array): 
     // Publish order status updates for taker and affected maker orders
     publishOrderStatusUpdates(ctx, order.orderId, result);
 
+    // Publish recent-trade events for each match
+    if (result.matches.length > 0) {
+      publishMatchCreatedEvents(ctx, order.assetId, order.side, result.matches);
+    }
+
     console.log(
       `Borrow market order ${order.orderId} processed: ${result.matches.length} matches`
     );
@@ -252,6 +300,11 @@ export function handleBorrowLimitOrder(ctx: HandlerContext, data: Uint8Array): v
 
     // Publish order status updates for taker and affected maker orders
     publishOrderStatusUpdates(ctx, order.orderId, result);
+
+    // Publish recent-trade events for each match
+    if (result.matches.length > 0) {
+      publishMatchCreatedEvents(ctx, order.assetId, order.side, result.matches);
+    }
 
     console.log(
       `Borrow limit order ${order.orderId} processed: ${result.matches.length} matches`
