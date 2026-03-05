@@ -76,6 +76,25 @@ export class ExecutionEngine {
       borrowerSettlementFeeAmount: params.borrowerSettlementFeeAmount,
     };
 
+    // Log match creation for observability and debugging
+    // eslint-disable-next-line no-console
+    console.log('[MatchingEngine] Match created', {
+      matchId: match.matchId,
+      lendOrderId: match.lendOrderId,
+      borrowOrderId: match.borrowOrderId,
+      lenderWallet: match.lenderWallet,
+      borrowerWallet: match.borrowerWallet,
+      matchedAmount: match.matchedAmount,
+      rate: match.rate,
+      loanToken: match.loanToken,
+      maturity: match.maturity,
+      borrowerIsTaker: match.borrowerIsTaker,
+      makerFeeAmount: match.makerFeeAmount,
+      takerFeeAmount: match.takerFeeAmount,
+      lenderSettlementFeeAmount: match.lenderSettlementFeeAmount,
+      borrowerSettlementFeeAmount: match.borrowerSettlementFeeAmount,
+    });
+
     // Validate match against schema
     matchSchema.parse(match);
 
