@@ -66,7 +66,7 @@ export class PostgresDbClient implements DbClient {
                 : 0n)
             : null;
 
-      await client.query(
+      await client.query( //@todo : enhance to only update order status in DB after settlement to avoid quantity inaccuracy
         `
         UPDATE orders
         SET
