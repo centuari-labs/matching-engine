@@ -141,14 +141,19 @@ async function main(): Promise<void> {
     matchingEngine = new MatchingEngine(redisService ?? undefined, snapshotService ?? undefined);
     console.log('✓ Matching engine initialized\n');
 
-    // Restore state from snapshot if available
+    // Restore state from snapshot if available (unless reset requested)
     if (snapshotService) {
-      console.log('Attempting to restore state from snapshot...');
-      const restored = await matchingEngine.restoreFromSnapshot();
-      if (restored) {
-        console.log('✓ State restored from snapshot\n');
+      const snapshotResetOnStartup = process.env.SNAPSHOT_RESET_ON_STARTUP === 'true';
+      if (snapshotResetOnStartup) {
+        console.log('SNAPSHOT_RESET_ON_STARTUP=true: Starting with empty state (skipping restore)\n');
       } else {
-        console.log('  No snapshot found or restore failed, starting with empty state\n');
+        console.log('Attempting to restore state from snapshot...');
+        const restored = await matchingEngine.restoreFromSnapshot();
+        if (restored) {
+          console.log('✓ State restored from snapshot\n');
+        } else {
+          console.log('  No snapshot found or restore failed, starting with empty state\n');
+        }
       }
     }
 
