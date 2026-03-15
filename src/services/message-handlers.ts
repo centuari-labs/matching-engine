@@ -85,7 +85,8 @@ function publishError(ctx: HandlerContext, error: ErrorMessage): void {
 function publishOrderStatusUpdates(
   ctx: HandlerContext,
   orderId: string,
-  result: MatchResult
+  result: MatchResult,
+  originalOrder?: { originalAmount: string; settlementFeeAmount: string }
 ): void {
   try {
     // Publish taker order status
@@ -107,6 +108,19 @@ function publishOrderStatusUpdates(
         timestamp: Date.now(),
       };
       ctx.nc.publish(NATS_TOPICS.ORDERS_STATUS, JSON.stringify(takerStatusMessage));
+    } else if (originalOrder) {
+      // Market order with no matches — cancel it so DB Writer updates the row
+      const cancelMessage = {
+        orderId,
+        status: 'CANCELLED' as const,
+        remainingAmount: originalOrder.originalAmount,
+        quantity: originalOrder.originalAmount,
+        settlementFeeAmount: originalOrder.settlementFeeAmount,
+        filledQuantity: '0',
+        filledSettlementFeeAmount: '0',
+        timestamp: Date.now(),
+      };
+      ctx.nc.publish(NATS_TOPICS.ORDERS_STATUS, JSON.stringify(cancelMessage));
     }
 
     // Publish status updates for all affected maker orders
@@ -179,7 +193,10 @@ export function handleLendMarketOrder(ctx: HandlerContext, data: Uint8Array): vo
     const result = ctx.engine.submitOrder(order);
 
     // Publish order status updates for taker and affected maker orders
-    publishOrderStatusUpdates(ctx, order.orderId, result);
+    publishOrderStatusUpdates(ctx, order.orderId, result, {
+      originalAmount: order.originalAmount,
+      settlementFeeAmount: order.settlementFeeAmount,
+    });
 
     // Publish recent-trade events for each match
     if (result.matches.length > 0) {
@@ -219,7 +236,10 @@ export function handleLendLimitOrder(ctx: HandlerContext, data: Uint8Array): voi
     const result = ctx.engine.submitOrder(order);
 
     // Publish order status updates for taker and affected maker orders
-    publishOrderStatusUpdates(ctx, order.orderId, result);
+    publishOrderStatusUpdates(ctx, order.orderId, result, {
+      originalAmount: order.originalAmount,
+      settlementFeeAmount: order.settlementFeeAmount,
+    });
 
     // Publish recent-trade events for each match
     if (result.matches.length > 0) {
@@ -259,7 +279,10 @@ export function handleBorrowMarketOrder(ctx: HandlerContext, data: Uint8Array): 
     const result = ctx.engine.submitOrder(order);
 
     // Publish order status updates for taker and affected maker orders
-    publishOrderStatusUpdates(ctx, order.orderId, result);
+    publishOrderStatusUpdates(ctx, order.orderId, result, {
+      originalAmount: order.originalAmount,
+      settlementFeeAmount: order.settlementFeeAmount,
+    });
 
     // Publish recent-trade events for each match
     if (result.matches.length > 0) {
@@ -299,7 +322,10 @@ export function handleBorrowLimitOrder(ctx: HandlerContext, data: Uint8Array): v
     const result = ctx.engine.submitOrder(order);
 
     // Publish order status updates for taker and affected maker orders
-    publishOrderStatusUpdates(ctx, order.orderId, result);
+    publishOrderStatusUpdates(ctx, order.orderId, result, {
+      originalAmount: order.originalAmount,
+      settlementFeeAmount: order.settlementFeeAmount,
+    });
 
     // Publish recent-trade events for each match
     if (result.matches.length > 0) {
