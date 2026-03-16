@@ -66,7 +66,7 @@ export class PostgresDbClient implements DbClient {
                 : 0n)
             : null;
 
-      await client.query( //@todo : enhance to only update order status in DB after settlement to avoid quantity inaccuracy
+      await client.query( //@note : enhance to only update order status in DB after settlement to avoid quantity inaccuracy
         `
         UPDATE orders
         SET
@@ -81,11 +81,13 @@ export class PostgresDbClient implements DbClient {
         [
           event.orderId,
           event.status,
-          filledQuantity !== null ? filledQuantity.toString() : null,
-          filledSettlementFee !== null ? filledSettlementFee.toString() : null,
+          filledQuantity !== null ? filledQuantity.toString() : null, //@todo : failed to update the filled quantity in DB
+          filledSettlementFee !== null ? filledSettlementFee.toString() : null, //@todo : failed to update the filled settlement fee in DB
           event.timestamp,
         ]
       );
+
+      //@todo : update users portofolio balance by reducing with the quantity, settlement fee, and maker taker fee
 
       await client.query('COMMIT');
     } catch (error) {
