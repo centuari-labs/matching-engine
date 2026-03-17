@@ -24,6 +24,8 @@ describe('Message Helpers', () => {
       expect(message.orderId).toBe(affected.orderId);
       expect(message.status).toBe(OrderStatus.Filled);
       expect(message.remainingAmount).toBe('0');
+      expect(message.filledQuantity).toBe('1000000');
+      expect(message.filledSettlementFeeAmount).toBe('1000');
       expect(typeof message.timestamp).toBe('number');
       expect(message.timestamp).toBeGreaterThan(0);
     });
@@ -75,6 +77,8 @@ describe('Message Helpers', () => {
       const message = createOrderStatusMessage(affected);
 
       expect(message.status).toBe('PARTIALLY_FILLED');
+      expect(message.filledQuantity).toBe('300000');
+      expect(message.filledSettlementFeeAmount).toBe('300');
     });
 
     it('should preserve remainingAmount as string', () => {

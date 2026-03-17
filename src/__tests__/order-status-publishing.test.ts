@@ -105,6 +105,8 @@ describe('Order Status Publishing', () => {
       const parsedTakerStatus = JSON.parse(takerStatus!.data);
       expect(parsedTakerStatus.status).toBe(OrderStatus.Filled);
       expect(parsedTakerStatus.remainingAmount).toBe('0');
+      expect(parsedTakerStatus.filledQuantity).toBe('1000000');
+      expect(parsedTakerStatus.filledSettlementFeeAmount).toBe('10000');
     });
 
     it('should publish PARTIALLY_FILLED status for taker when partially matched', () => {
@@ -151,6 +153,8 @@ describe('Order Status Publishing', () => {
       const parsedTakerStatus = JSON.parse(takerStatus!.data);
       expect(parsedTakerStatus.status).toBe(OrderStatus.PartiallyFilled);
       expect(parsedTakerStatus.remainingAmount).toBe('700000');
+      expect(parsedTakerStatus.filledQuantity).toBe('300000');
+      expect(parsedTakerStatus.filledSettlementFeeAmount).toBeDefined();
     });
 
     it('should publish OPEN status for limit order when added to book without matches', () => {
@@ -179,6 +183,8 @@ describe('Order Status Publishing', () => {
       expect(parsedStatus.orderId).toBe(lendOrder.orderId);
       expect(parsedStatus.status).toBe(OrderStatus.Open);
       expect(parsedStatus.remainingAmount).toBe('1000000');
+      expect(parsedStatus.filledQuantity).toBe('0');
+      expect(parsedStatus.filledSettlementFeeAmount).toBe('0');
     });
   });
 

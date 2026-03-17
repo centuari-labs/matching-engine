@@ -352,9 +352,9 @@ describe('DbWriterService Integration (requires Postgres, Redis, NATS)', () => {
         return (
           row.status === statusMessage.status &&
           normalizeNumeric(row.filled_quantity) ===
-            normalizeNumeric(statusMessage.filledQuantity ?? null) &&
+            normalizeNumeric(statusMessage.filledQuantity) &&
           normalizeNumeric(row.filled_settlement_fee) ===
-            normalizeNumeric(statusMessage.filledSettlementFeeAmount ?? null)
+            normalizeNumeric(statusMessage.filledSettlementFeeAmount)
         );
       }, 15000);
     });

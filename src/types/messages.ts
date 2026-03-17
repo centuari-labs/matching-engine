@@ -69,11 +69,9 @@ export type MatchCreatedMessage = z.infer<typeof matchCreatedMessageSchema>;
 /**
  * Schema for order status update notifications
  *
- * This topic is used by downstream services (including DB Writer) to
- * persist order state in the database. To support this, the schema
- * includes additional optional fields that allow consumers to compute
- * filled quantities and fees without having to look up the original
- * order payload.
+ * Published by the matching engine and consumed by the DB Writer to
+ * persist order state in the database. Filled amounts are always
+ * computed at the source so consumers can use them directly.
  */
 export const orderStatusMessageSchema = z.object({
   /**
@@ -92,32 +90,14 @@ export const orderStatusMessageSchema = z.object({
   remainingAmount: z.string(),
 
   /**
-   * Total order quantity (original notional amount).
-   *
-   * Used by DB Writer to compute filled_quantity.
+   * Total filled quantity so far (originalAmount - remainingAmount)
    */
-  quantity: z.string().optional(),
+  filledQuantity: z.string(),
 
   /**
-   * Total filled quantity so far.
-   *
-   * If omitted, consumers can derive it from quantity - remainingAmount
-   * when quantity is present.
+   * Total filled settlement fee so far
    */
-  filledQuantity: z.string().optional(),
-
-  /**
-   * Total settlement fee amount for this order assuming it is fully filled.
-   */
-  settlementFeeAmount: z.string().optional(),
-
-  /**
-   * Total filled settlement fee so far.
-   *
-   * If omitted, consumers can derive it from settlementFeeAmount and any
-   * remaining settlement-fee pool they track.
-   */
-  filledSettlementFeeAmount: z.string().optional(),
+  filledSettlementFeeAmount: z.string(),
 
   /**
    * Timestamp of the status update
@@ -307,20 +287,18 @@ export function createOrderStatusMessage(source: OrderStatusSource): OrderStatus
   const filledQuantity =
     originalAmount !== undefined
       ? (BigInt(originalAmount) - BigInt(remainingAmount)).toString()
-      : undefined;
+      : '0';
 
   const filledSettlementFeeAmount =
     settlementFeeAmount !== undefined && remainingSettlementFeeAmount !== undefined
       ? (BigInt(settlementFeeAmount) - BigInt(remainingSettlementFeeAmount)).toString()
-      : undefined;
+      : '0';
 
   return {
     orderId,
     status: status as OrderStatusMessage['status'],
     remainingAmount,
-    quantity: originalAmount,
     filledQuantity,
-    settlementFeeAmount,
     filledSettlementFeeAmount,
     timestamp: Date.now(),
   };

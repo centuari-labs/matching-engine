@@ -42,52 +42,24 @@ export class PostgresDbClient implements DbClient {
     try {
       await client.query('BEGIN');
 
-      // Derive filled quantities/fees if not provided explicitly.
-      const quantity = event.quantity ? BigInt(event.quantity) : null;
-      const remainingAmount = BigInt(event.remainingAmount);
-      const settlementFeeAmount = event.settlementFeeAmount
-        ? BigInt(event.settlementFeeAmount)
-        : null;
-
-      const filledQuantity =
-        event.filledQuantity !== undefined
-          ? BigInt(event.filledQuantity)
-          : quantity !== null
-            ? quantity - remainingAmount
-            : null;
-
-      const filledSettlementFee =
-        event.filledSettlementFeeAmount !== undefined
-          ? BigInt(event.filledSettlementFeeAmount)
-          : settlementFeeAmount !== null
-            ? settlementFeeAmount -
-              (quantity !== null && quantity !== 0n
-                ? (settlementFeeAmount * remainingAmount) / quantity
-                : 0n)
-            : null;
-
-      await client.query( //@note : enhance to only update order status in DB after settlement to avoid quantity inaccuracy
+      await client.query(
         `
         UPDATE orders
         SET
           status = $2,
-          -- quantity & settlement_fee are assumed to be set at order creation time,
-          -- so we only update the "filled" fields here.
-          filled_quantity = COALESCE($3::numeric, filled_quantity),
-          filled_settlement_fee = COALESCE($4::numeric, filled_settlement_fee),
+          filled_quantity = $3::numeric,
+          filled_settlement_fee = $4::numeric,
           updated_at = to_timestamp($5 / 1000.0)
         WHERE id = $1
         `,
         [
           event.orderId,
           event.status,
-          filledQuantity !== null ? filledQuantity.toString() : null, //@todo : failed to update the filled quantity in DB
-          filledSettlementFee !== null ? filledSettlementFee.toString() : null, //@todo : failed to update the filled settlement fee in DB
+          event.filledQuantity,
+          event.filledSettlementFeeAmount,
           event.timestamp,
         ]
       );
-
-      //@todo : update users portofolio balance by reducing with the quantity, settlement fee, and maker taker fee
 
       await client.query('COMMIT');
     } catch (error) {

@@ -663,6 +663,29 @@ export class MatchingEngine {
   }
 
   /**
+   * Get order info needed for status message publishing.
+   *
+   * @param orderId - The order ID
+   * @returns Order info if found, null otherwise
+   */
+  getOrderInfo(orderId: string): {
+    originalAmount: string;
+    remainingAmount: string;
+    settlementFeeAmount: string;
+    remainingSettlementFeeAmount: string;
+  } | null {
+    const order = this.orderBook.getOrder(orderId);
+    if (!order) return null;
+    return {
+      originalAmount: order.originalAmount,
+      remainingAmount: order.remainingAmount,
+      settlementFeeAmount: order.settlementFeeAmount,
+      remainingSettlementFeeAmount:
+        (order as any).remainingSettlementFeeAmount ?? order.settlementFeeAmount,
+    };
+  }
+
+  /**
    * Get order book snapshot
    *
    * @param loanToken - The loan token address

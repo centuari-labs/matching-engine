@@ -86,40 +86,46 @@ function publishOrderStatusUpdates(
   ctx: HandlerContext,
   orderId: string,
   result: MatchResult,
-  originalOrder?: { originalAmount: string; settlementFeeAmount: string }
+  originalOrder?: {
+    originalAmount: string;
+    settlementFeeAmount: string;
+    remainingSettlementFeeAmount?: string;
+  }
 ): void {
   try {
     // Publish taker order status
-    if (result.remainingOrder) {
+    if (result.remainingOrder && originalOrder) {
       // Order is partially filled or still open
-      const takerStatusMessage = {
+      const takerStatusMessage = createOrderStatusMessage({
         orderId: result.remainingOrder.orderId,
         status: result.remainingOrder.status,
         remainingAmount: result.remainingOrder.remainingAmount,
-        timestamp: Date.now(),
-      };
+        originalAmount: originalOrder.originalAmount,
+        settlementFeeAmount: originalOrder.settlementFeeAmount,
+        remainingSettlementFeeAmount: originalOrder.remainingSettlementFeeAmount,
+      });
       ctx.nc.publish(NATS_TOPICS.ORDERS_STATUS, JSON.stringify(takerStatusMessage));
-    } else if (result.matches.length > 0) {
+    } else if (result.matches.length > 0 && originalOrder) {
       // Order was fully filled (no remaining order means it was completely matched)
-      const takerStatusMessage = {
+      const takerStatusMessage = createOrderStatusMessage({
         orderId,
         status: OrderStatus.Filled,
         remainingAmount: '0',
-        timestamp: Date.now(),
-      };
+        originalAmount: originalOrder.originalAmount,
+        settlementFeeAmount: originalOrder.settlementFeeAmount,
+        remainingSettlementFeeAmount: '0',
+      });
       ctx.nc.publish(NATS_TOPICS.ORDERS_STATUS, JSON.stringify(takerStatusMessage));
     } else if (originalOrder) {
       // Market order with no matches — cancel it so DB Writer updates the row
-      const cancelMessage = {
+      const cancelMessage = createOrderStatusMessage({
         orderId,
-        status: 'CANCELLED' as const,
+        status: 'CANCELLED',
         remainingAmount: originalOrder.originalAmount,
-        quantity: originalOrder.originalAmount,
+        originalAmount: originalOrder.originalAmount,
         settlementFeeAmount: originalOrder.settlementFeeAmount,
-        filledQuantity: '0',
-        filledSettlementFeeAmount: '0',
-        timestamp: Date.now(),
-      };
+        remainingSettlementFeeAmount: originalOrder.settlementFeeAmount,
+      });
       ctx.nc.publish(NATS_TOPICS.ORDERS_STATUS, JSON.stringify(cancelMessage));
     }
 
@@ -196,6 +202,7 @@ export function handleLendMarketOrder(ctx: HandlerContext, data: Uint8Array): vo
     publishOrderStatusUpdates(ctx, order.orderId, result, {
       originalAmount: order.originalAmount,
       settlementFeeAmount: order.settlementFeeAmount,
+      remainingSettlementFeeAmount: (order as any).remainingSettlementFeeAmount,
     });
 
     // Publish recent-trade events for each match
@@ -239,6 +246,7 @@ export function handleLendLimitOrder(ctx: HandlerContext, data: Uint8Array): voi
     publishOrderStatusUpdates(ctx, order.orderId, result, {
       originalAmount: order.originalAmount,
       settlementFeeAmount: order.settlementFeeAmount,
+      remainingSettlementFeeAmount: (order as any).remainingSettlementFeeAmount,
     });
 
     // Publish recent-trade events for each match
@@ -282,6 +290,7 @@ export function handleBorrowMarketOrder(ctx: HandlerContext, data: Uint8Array): 
     publishOrderStatusUpdates(ctx, order.orderId, result, {
       originalAmount: order.originalAmount,
       settlementFeeAmount: order.settlementFeeAmount,
+      remainingSettlementFeeAmount: (order as any).remainingSettlementFeeAmount,
     });
 
     // Publish recent-trade events for each match
@@ -325,6 +334,7 @@ export function handleBorrowLimitOrder(ctx: HandlerContext, data: Uint8Array): v
     publishOrderStatusUpdates(ctx, order.orderId, result, {
       originalAmount: order.originalAmount,
       settlementFeeAmount: order.settlementFeeAmount,
+      remainingSettlementFeeAmount: (order as any).remainingSettlementFeeAmount,
     });
 
     // Publish recent-trade events for each match
@@ -359,8 +369,9 @@ export function handleCancelOrder(ctx: HandlerContext, data: Uint8Array): void {
 
     console.log(`Processing cancel request for order: ${request.orderId} from wallet: ${request.walletAddress}`);
 
-    // Check if order exists first
-    if (!ctx.engine.hasOrder(request.orderId)) {
+    // Get order info before cancellation (needed for status message)
+    const orderInfo = ctx.engine.getOrderInfo(request.orderId);
+    if (!orderInfo) {
       console.warn(`Order ${request.orderId} not found for cancellation`);
       publishError(
         ctx,
@@ -378,16 +389,17 @@ export function handleCancelOrder(ctx: HandlerContext, data: Uint8Array): void {
 
     if (success) {
       console.log(`Order ${request.orderId} cancelled successfully`);
-      
-      // Publish status update
-      ctx.nc.publish(
-        NATS_TOPICS.ORDERS_STATUS,
-        JSON.stringify({
-          orderId: request.orderId,
-          status: 'CANCELLED',
-          timestamp: Date.now(),
-        })
-      );
+
+      // Publish status update with filled amounts
+      const statusMessage = createOrderStatusMessage({
+        orderId: request.orderId,
+        status: 'CANCELLED',
+        remainingAmount: orderInfo.remainingAmount,
+        originalAmount: orderInfo.originalAmount,
+        settlementFeeAmount: orderInfo.settlementFeeAmount,
+        remainingSettlementFeeAmount: orderInfo.remainingSettlementFeeAmount,
+      });
+      ctx.nc.publish(NATS_TOPICS.ORDERS_STATUS, JSON.stringify(statusMessage));
     } else {
       console.warn(`Wallet address mismatch for order ${request.orderId}`);
       publishError(
