@@ -207,6 +207,8 @@ export class RedisService implements SettlementPublisher {
     return [
       'matchId',
       match.matchId,
+      'marketId',
+      match.marketId,
       'lendOrderId',
       match.lendOrderId,
       'borrowOrderId',

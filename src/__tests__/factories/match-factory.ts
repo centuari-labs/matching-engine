@@ -18,6 +18,7 @@ export function createMatch(overrides: Partial<Match> = {}): Match {
 
   const base: Match = {
     matchId: generateMatchId(),
+    marketId: generateMatchId(), // reuse UUID generator for market ID
     lendOrderId: generateOrderId(),
     borrowOrderId: generateOrderId(),
     lenderWallet: '0x1111111111111111111111111111111111111111',

@@ -313,6 +313,7 @@ export class DbWriterService {
 
     return {
       matchId: obj.matchId,
+      marketId: obj.marketId,
       lendOrderId: obj.lendOrderId,
       borrowOrderId: obj.borrowOrderId,
       lenderWallet: obj.lenderWallet,

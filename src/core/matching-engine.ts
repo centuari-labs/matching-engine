@@ -182,6 +182,7 @@ export class MatchingEngine {
 
         // Create match at borrow order's rate
         const match = this.executionEngine.recordMatch({
+          marketId: market.marketId,
           lendOrderId: order.orderId,
           borrowOrderId: borrowOrder.orderId,
           lenderWallet: order.walletAddress,
@@ -304,6 +305,7 @@ export class MatchingEngine {
         );
 
         const match = this.executionEngine.recordMatch({
+          marketId: market.marketId,
           lendOrderId: order.orderId,
           borrowOrderId: borrowOrder.orderId,
           lenderWallet: order.walletAddress,
@@ -425,6 +427,7 @@ export class MatchingEngine {
 
         // Create match at lend order's rate
         const match = this.executionEngine.recordMatch({
+          marketId: market.marketId,
           lendOrderId: lendOrder.orderId,
           borrowOrderId: order.orderId,
           lenderWallet: lendOrder.walletAddress,
@@ -544,6 +547,7 @@ export class MatchingEngine {
         );
 
         const match = this.executionEngine.recordMatch({
+          marketId: market.marketId,
           lendOrderId: lendOrder.orderId,
           borrowOrderId: order.orderId,
           lenderWallet: lendOrder.walletAddress,

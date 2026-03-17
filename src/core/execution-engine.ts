@@ -44,6 +44,7 @@ export class ExecutionEngine {
    * @returns The created match
    */
   recordMatch(params: {
+    marketId: string;
     lendOrderId: string;
     borrowOrderId: string;
     lenderWallet: string;
@@ -60,6 +61,7 @@ export class ExecutionEngine {
   }): Match {
     const match: Match = {
       matchId: generateMatchId(),
+      marketId: params.marketId,
       lendOrderId: params.lendOrderId,
       borrowOrderId: params.borrowOrderId,
       lenderWallet: params.lenderWallet,
@@ -80,6 +82,7 @@ export class ExecutionEngine {
     // eslint-disable-next-line no-console
     console.log('[MatchingEngine] Match created', {
       matchId: match.matchId,
+      marketId: match.marketId,
       lendOrderId: match.lendOrderId,
       borrowOrderId: match.borrowOrderId,
       lenderWallet: match.lenderWallet,

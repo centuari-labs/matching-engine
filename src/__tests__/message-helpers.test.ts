@@ -116,6 +116,7 @@ describe('Message Helpers', () => {
       const orderId = '123e4567-e89b-12d3-a456-426614174000';
       const mockMatch = {
         matchId: '223e4567-e89b-12d3-a456-426614174001',
+        marketId: '423e4567-e89b-12d3-a456-426614174003',
         lendOrderId: orderId,
         borrowOrderId: '323e4567-e89b-12d3-a456-426614174002',
         lenderWallet: '0x1111111111111111111111111111111111111111',

@@ -38,6 +38,7 @@ describe('RedisService', () => {
   function createTestMatch(): SettlementMatch {
     return {
       matchId: generateMatchId(),
+      marketId: generateMatchId(),
       lendOrderId: generateOrderId(),
       borrowOrderId: generateOrderId(),
       lenderWallet: walletAddress1,
