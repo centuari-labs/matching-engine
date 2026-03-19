@@ -146,7 +146,7 @@ export class PostgresDbClient implements DbClient {
         event.borrowerWallet
       );
 
-      await client.query(
+      const insertResult = await client.query(
         `
         INSERT INTO matches (
           id,
@@ -185,6 +185,7 @@ export class PostgresDbClient implements DbClient {
           to_timestamp($15 / 1000.0)
         )
         ON CONFLICT (id) DO NOTHING
+        RETURNING id
         `,
         [
           event.matchId,
@@ -204,6 +205,24 @@ export class PostgresDbClient implements DbClient {
           event.timestamp,
         ]
       );
+
+      // Lock lender balance for pending settlement (skip duplicates)
+      if (insertResult.rowCount && insertResult.rowCount > 0) {
+        await client.query(
+          `
+          UPDATE portfolio
+          SET locked_amount = locked_amount + ($1::numeric + $2::numeric),
+              updated_at = NOW()
+          WHERE account_id = $3 AND asset_id = $4
+          `,
+          [
+            event.matchedAmount,
+            event.lenderSettlementFeeAmount,
+            lenderAccountId,
+            assetId,
+          ]
+        );
+      }
 
       await client.query('COMMIT');
     } catch (error) {
