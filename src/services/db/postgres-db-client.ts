@@ -1,5 +1,5 @@
 import { Pool, type PoolConfig, type PoolClient } from 'pg';
-import type { DbClient, MatchEvent, OrderStatusEvent } from '../../types/db';
+import type { DbClient, MatchEvent, OrderStatusEvent, CancelledRemainderEvent } from '../../types/db';
 import type { DbConfig } from '../../config/db-config';
 import { loadDbConfig } from '../../config/db-config';
 
@@ -221,6 +221,61 @@ export class PostgresDbClient implements DbClient {
             lenderAccountId,
             assetId,
           ]
+        );
+      }
+
+      await client.query('COMMIT');
+    } catch (error) {
+      await client.query('ROLLBACK');
+      throw error;
+    } finally {
+      client.release();
+    }
+  }
+
+  async insertCancelledOrder(event: CancelledRemainderEvent): Promise<void> {
+    const client = await this.pool.connect();
+
+    try {
+      await client.query('BEGIN');
+
+      const accountId = await this.findAccountIdByWallet(client, event.accountWallet);
+
+      await client.query(
+        `
+        INSERT INTO orders (
+          id, account_id, asset_id, side, type, rate, quantity,
+          filled_quantity, settlement_fee, filled_settlement_fee,
+          status, created_at, updated_at
+        )
+        VALUES (
+          $1, $2, $3, $4, $5, $6, $7,
+          0, $8, 0,
+          'CANCELLED', to_timestamp($9 / 1000.0), to_timestamp($9 / 1000.0)
+        )
+        ON CONFLICT (id) DO NOTHING
+        `,
+        [
+          event.orderId,
+          accountId,
+          event.assetId,
+          event.side,
+          event.type,
+          event.rate,
+          event.quantity,
+          event.settlementFee,
+          event.timestamp,
+        ]
+      );
+
+      for (const marketId of event.marketIds) {
+        await client.query(
+          `
+          INSERT INTO order_markets (order_id, market_id, created_at)
+          VALUES ($1, $2, to_timestamp($3 / 1000.0))
+          ON CONFLICT DO NOTHING
+          `,
+          [event.orderId, marketId, event.timestamp]
         );
       }
 

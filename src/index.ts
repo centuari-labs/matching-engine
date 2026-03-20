@@ -43,6 +43,7 @@ export { matchSchema } from './types/matches';
 
 export type {
   CancelOrderMessage,
+  CancelledRemainderMessage,
   MatchCreatedMessage,
   OrderStatusMessage,
   OrderBookSnapshotMessage,
@@ -52,6 +53,7 @@ export type {
 
 export {
   cancelOrderMessageSchema,
+  cancelledRemainderMessageSchema,
   matchCreatedMessageSchema,
   orderStatusMessageSchema,
   orderBookSnapshotMessageSchema,

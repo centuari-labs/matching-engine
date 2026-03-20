@@ -19,10 +19,12 @@ import {
   createOrderStatusMessage,
   ERROR_CODES,
   type ErrorMessage,
+  type CancelledRemainderMessage,
 } from '../types/messages';
 import type { Match, MatchResult } from '../types/matches';
-import { OrderSide, OrderStatus } from '../types/orders';
+import { OrderSide, OrderStatus, OrderType } from '../types/orders';
 import { NATS_TOPICS } from '../config/nats-config';
+import { addBigNumbers, subtractBigNumbers, isZero, generateOrderId } from '../utils/helpers';
 
 /**
  * Handler context containing dependencies
@@ -82,20 +84,35 @@ function publishError(ctx: HandlerContext, error: ErrorMessage): void {
  * @param orderId - The taker order ID
  * @param result - Match result containing affected orders
  */
+/**
+ * Full order info needed for publishing status updates and cancelled remainder.
+ */
+interface OrderInfo {
+  originalAmount: string;
+  settlementFeeAmount: string;
+  remainingSettlementFeeAmount?: string;
+  /** Required for cancelled remainder — wallet address of the order owner */
+  walletAddress?: string;
+  /** Required for cancelled remainder — asset UUID */
+  assetId?: string;
+  /** Required for cancelled remainder — order side */
+  side?: OrderSide;
+  /** Required for cancelled remainder — order type */
+  type?: string;
+  /** Required for cancelled remainder — market IDs */
+  marketIds?: string[];
+}
+
 function publishOrderStatusUpdates(
   ctx: HandlerContext,
   orderId: string,
   result: MatchResult,
-  originalOrder?: {
-    originalAmount: string;
-    settlementFeeAmount: string;
-    remainingSettlementFeeAmount?: string;
-  }
+  originalOrder?: OrderInfo
 ): void {
   try {
     // Publish taker order status
     if (result.remainingOrder && originalOrder) {
-      // Order is partially filled or still open
+      // Order is partially filled or still open (limit order still in book)
       const takerStatusMessage = createOrderStatusMessage({
         orderId: result.remainingOrder.orderId,
         status: result.remainingOrder.status,
@@ -106,16 +123,57 @@ function publishOrderStatusUpdates(
       });
       ctx.nc.publish(NATS_TOPICS.ORDERS_STATUS, JSON.stringify(takerStatusMessage));
     } else if (result.matches.length > 0 && originalOrder) {
-      // Order was fully filled (no remaining order means it was completely matched)
+      // No remaining order in book — compute actual fill from matches.
+      // For limit orders removed from book, totalMatched == originalAmount.
+      // For market orders (IOC, never in book), totalMatched may be less.
+      const totalMatched = result.matches.reduce(
+        (sum, m) => addBigNumbers(sum, m.matchedAmount),
+        '0'
+      );
+      const remaining = subtractBigNumbers(originalOrder.originalAmount, totalMatched);
+      const isFull = isZero(remaining);
+
       const takerStatusMessage = createOrderStatusMessage({
         orderId,
         status: OrderStatus.Filled,
-        remainingAmount: '0',
+        remainingAmount: isFull ? '0' : remaining,
         originalAmount: originalOrder.originalAmount,
         settlementFeeAmount: originalOrder.settlementFeeAmount,
-        remainingSettlementFeeAmount: '0',
+        remainingSettlementFeeAmount: isFull
+          ? '0'
+          : originalOrder.remainingSettlementFeeAmount ?? '0',
       });
       ctx.nc.publish(NATS_TOPICS.ORDERS_STATUS, JSON.stringify(takerStatusMessage));
+
+      // If partially filled market order, publish a cancelled remainder order
+      if (
+        !isFull &&
+        originalOrder.walletAddress &&
+        originalOrder.assetId &&
+        originalOrder.side &&
+        originalOrder.marketIds
+      ) {
+        const remainingSettlementFee =
+          originalOrder.remainingSettlementFeeAmount ?? '0';
+
+        const cancelledRemainder: CancelledRemainderMessage = {
+          orderId: generateOrderId(),
+          originalOrderId: orderId,
+          accountWallet: originalOrder.walletAddress,
+          assetId: originalOrder.assetId,
+          side: originalOrder.side,
+          type: OrderType.Market,
+          rate: 0,
+          quantity: remaining,
+          settlementFee: remainingSettlementFee,
+          marketIds: originalOrder.marketIds,
+          timestamp: Date.now(),
+        };
+        ctx.nc.publish(
+          NATS_TOPICS.ORDERS_CANCELLED_REMAINDER,
+          JSON.stringify(cancelledRemainder)
+        );
+      }
     } else if (originalOrder) {
       // Market order with no matches — cancel it so DB Writer updates the row
       const cancelMessage = createOrderStatusMessage({
@@ -203,6 +261,11 @@ export function handleLendMarketOrder(ctx: HandlerContext, data: Uint8Array): vo
       originalAmount: order.originalAmount,
       settlementFeeAmount: order.settlementFeeAmount,
       remainingSettlementFeeAmount: (order as any).remainingSettlementFeeAmount,
+      walletAddress: order.walletAddress,
+      assetId: order.assetId,
+      side: order.side,
+      type: order.type,
+      marketIds: order.markets.map((m) => m.marketId),
     });
 
     // Publish recent-trade events for each match
@@ -247,6 +310,11 @@ export function handleLendLimitOrder(ctx: HandlerContext, data: Uint8Array): voi
       originalAmount: order.originalAmount,
       settlementFeeAmount: order.settlementFeeAmount,
       remainingSettlementFeeAmount: (order as any).remainingSettlementFeeAmount,
+      walletAddress: order.walletAddress,
+      assetId: order.assetId,
+      side: order.side,
+      type: order.type,
+      marketIds: order.markets.map((m) => m.marketId),
     });
 
     // Publish recent-trade events for each match
@@ -291,6 +359,11 @@ export function handleBorrowMarketOrder(ctx: HandlerContext, data: Uint8Array): 
       originalAmount: order.originalAmount,
       settlementFeeAmount: order.settlementFeeAmount,
       remainingSettlementFeeAmount: (order as any).remainingSettlementFeeAmount,
+      walletAddress: order.walletAddress,
+      assetId: order.assetId,
+      side: order.side,
+      type: order.type,
+      marketIds: order.markets.map((m) => m.marketId),
     });
 
     // Publish recent-trade events for each match
@@ -335,6 +408,11 @@ export function handleBorrowLimitOrder(ctx: HandlerContext, data: Uint8Array): v
       originalAmount: order.originalAmount,
       settlementFeeAmount: order.settlementFeeAmount,
       remainingSettlementFeeAmount: (order as any).remainingSettlementFeeAmount,
+      walletAddress: order.walletAddress,
+      assetId: order.assetId,
+      side: order.side,
+      type: order.type,
+      marketIds: order.markets.map((m) => m.marketId),
     });
 
     // Publish recent-trade events for each match

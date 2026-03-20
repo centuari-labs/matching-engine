@@ -8,6 +8,7 @@ import {
 } from '../services/message-handlers';
 import type { LendLimitOrder, BorrowLimitOrder } from '../types/orders';
 import { LendMarketOrder, BorrowMarketOrder, OrderStatus } from '../types/orders';
+import type { CancelledRemainderMessage } from '../types/messages';
 import { NATS_TOPICS } from '../config/nats-config';
 import {
   createLendLimitOrder,
@@ -435,6 +436,198 @@ describe('Order Status Publishing', () => {
       expect(makerStatus).toBeDefined();
       const parsedMakerStatus = JSON.parse(makerStatus!.data);
       expect(parsedMakerStatus.status).toBe(OrderStatus.Filled);
+    });
+
+    it('should publish FILLED with correct filledQuantity for partially matched lend market order', () => {
+      // Place a small borrow order on the book
+      const borrowOrder: BorrowLimitOrder = createBorrowLimitOrder({
+        walletAddress: walletAddress2,
+        loanToken,
+        markets: marketsFromMaturities([maturity]),
+        timestamp: Date.now(),
+        originalAmount: '100000',
+        remainingAmount: '100000',
+        settlementFeeAmount: '1000',
+        rate: 600,
+      });
+      engine.submitOrder(borrowOrder);
+
+      // Submit a larger lend market order — only 100k of 1M will match
+      const lendMarketOrder: LendMarketOrder = createLendMarketOrder({
+        walletAddress: walletAddress1,
+        loanToken,
+        markets: marketsFromMaturities([maturity]),
+        timestamp: Date.now() + 1,
+        originalAmount: '1000000',
+        remainingAmount: '1000000',
+        settlementFeeAmount: '10000',
+      });
+
+      handleLendMarketOrder(
+        ctx,
+        createOrderBytes(JSON.parse(JSON.stringify(lendMarketOrder))),
+      );
+
+      // Check taker status
+      const statusMessages = mockNc.getMessagesForTopic(NATS_TOPICS.ORDERS_STATUS);
+      const takerStatus = statusMessages.find((m) => {
+        const parsed = JSON.parse(m.data);
+        return parsed.orderId === lendMarketOrder.orderId;
+      });
+
+      expect(takerStatus).toBeDefined();
+      const parsedTakerStatus = JSON.parse(takerStatus!.data);
+      expect(parsedTakerStatus.status).toBe(OrderStatus.Filled);
+      expect(parsedTakerStatus.filledQuantity).toBe('100000');
+      expect(parsedTakerStatus.remainingAmount).toBe('900000');
+    });
+
+    it('should publish cancelled remainder order for partially matched lend market order', () => {
+      // Place a small borrow order on the book
+      const borrowOrder: BorrowLimitOrder = createBorrowLimitOrder({
+        walletAddress: walletAddress2,
+        loanToken,
+        markets: marketsFromMaturities([maturity]),
+        timestamp: Date.now(),
+        originalAmount: '100000',
+        remainingAmount: '100000',
+        settlementFeeAmount: '1000',
+        rate: 600,
+      });
+      engine.submitOrder(borrowOrder);
+
+      // Submit a larger lend market order — only 100k of 1M will match
+      const lendMarketOrder: LendMarketOrder = createLendMarketOrder({
+        walletAddress: walletAddress1,
+        loanToken,
+        markets: marketsFromMaturities([maturity]),
+        timestamp: Date.now() + 1,
+        originalAmount: '1000000',
+        remainingAmount: '1000000',
+        settlementFeeAmount: '10000',
+      });
+
+      handleLendMarketOrder(
+        ctx,
+        createOrderBytes(JSON.parse(JSON.stringify(lendMarketOrder))),
+      );
+
+      // Check cancelled remainder message was published
+      const cancelledMessages = mockNc.getMessagesForTopic(
+        NATS_TOPICS.ORDERS_CANCELLED_REMAINDER,
+      );
+      expect(cancelledMessages).toHaveLength(1);
+
+      const cancelled: CancelledRemainderMessage = JSON.parse(cancelledMessages[0].data);
+      expect(cancelled.originalOrderId).toBe(lendMarketOrder.orderId);
+      expect(cancelled.quantity).toBe('900000');
+      expect(cancelled.accountWallet).toBe(walletAddress1);
+      expect(cancelled.side).toBe('LEND');
+      expect(cancelled.type).toBe('MARKET');
+    });
+
+    it('should NOT publish cancelled remainder for fully matched market order', () => {
+      // Place a borrow order of equal size
+      const borrowOrder: BorrowLimitOrder = createBorrowLimitOrder({
+        walletAddress: walletAddress2,
+        loanToken,
+        markets: marketsFromMaturities([maturity]),
+        timestamp: Date.now(),
+        originalAmount: '1000000',
+        remainingAmount: '1000000',
+        settlementFeeAmount: '10000',
+        rate: 600,
+      });
+      engine.submitOrder(borrowOrder);
+
+      // Submit a lend market order of equal size — will be fully matched
+      const lendMarketOrder: LendMarketOrder = createLendMarketOrder({
+        walletAddress: walletAddress1,
+        loanToken,
+        markets: marketsFromMaturities([maturity]),
+        timestamp: Date.now() + 1,
+        originalAmount: '1000000',
+        remainingAmount: '1000000',
+        settlementFeeAmount: '10000',
+      });
+
+      handleLendMarketOrder(
+        ctx,
+        createOrderBytes(JSON.parse(JSON.stringify(lendMarketOrder))),
+      );
+
+      // No cancelled remainder should be published
+      const cancelledMessages = mockNc.getMessagesForTopic(
+        NATS_TOPICS.ORDERS_CANCELLED_REMAINDER,
+      );
+      expect(cancelledMessages).toHaveLength(0);
+
+      // Status should be FILLED with full amount
+      const statusMessages = mockNc.getMessagesForTopic(NATS_TOPICS.ORDERS_STATUS);
+      const takerStatus = statusMessages.find((m) => {
+        const parsed = JSON.parse(m.data);
+        return parsed.orderId === lendMarketOrder.orderId;
+      });
+      expect(takerStatus).toBeDefined();
+      const parsedTakerStatus = JSON.parse(takerStatus!.data);
+      expect(parsedTakerStatus.status).toBe(OrderStatus.Filled);
+      expect(parsedTakerStatus.filledQuantity).toBe('1000000');
+      expect(parsedTakerStatus.remainingAmount).toBe('0');
+    });
+
+    it('should publish correct filledQuantity for partially matched borrow market order', () => {
+      // Place a small lend order on the book
+      const lendOrder: LendLimitOrder = createLendLimitOrder({
+        walletAddress: walletAddress1,
+        loanToken,
+        markets: marketsFromMaturities([maturity]),
+        timestamp: Date.now(),
+        originalAmount: '200000',
+        remainingAmount: '200000',
+        settlementFeeAmount: '2000',
+        rate: 500,
+      });
+      engine.submitOrder(lendOrder);
+
+      // Submit a larger borrow market order — only 200k of 1M will match
+      const borrowMarketOrder: BorrowMarketOrder = createBorrowMarketOrder({
+        walletAddress: walletAddress2,
+        loanToken,
+        markets: marketsFromMaturities([maturity]),
+        timestamp: Date.now() + 1,
+        originalAmount: '1000000',
+        remainingAmount: '1000000',
+        settlementFeeAmount: '10000',
+      });
+
+      handleBorrowMarketOrder(
+        ctx,
+        createOrderBytes(JSON.parse(JSON.stringify(borrowMarketOrder))),
+      );
+
+      // Check taker status
+      const statusMessages = mockNc.getMessagesForTopic(NATS_TOPICS.ORDERS_STATUS);
+      const takerStatus = statusMessages.find((m) => {
+        const parsed = JSON.parse(m.data);
+        return parsed.orderId === borrowMarketOrder.orderId;
+      });
+
+      expect(takerStatus).toBeDefined();
+      const parsedTakerStatus = JSON.parse(takerStatus!.data);
+      expect(parsedTakerStatus.status).toBe(OrderStatus.Filled);
+      expect(parsedTakerStatus.filledQuantity).toBe('200000');
+      expect(parsedTakerStatus.remainingAmount).toBe('800000');
+
+      // Check cancelled remainder
+      const cancelledMessages = mockNc.getMessagesForTopic(
+        NATS_TOPICS.ORDERS_CANCELLED_REMAINDER,
+      );
+      expect(cancelledMessages).toHaveLength(1);
+
+      const cancelled: CancelledRemainderMessage = JSON.parse(cancelledMessages[0].data);
+      expect(cancelled.originalOrderId).toBe(borrowMarketOrder.orderId);
+      expect(cancelled.quantity).toBe('800000');
+      expect(cancelled.side).toBe('BORROW');
     });
   });
 });

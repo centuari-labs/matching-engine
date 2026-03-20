@@ -7,7 +7,7 @@
 
 import { z } from 'zod';
 import type { MatchResult } from './matches';
-import { ethereumAddressSchema } from './orders';
+import { ethereumAddressSchema, OrderSide, OrderType } from './orders';
 
 /**
  * Schema for order cancellation requests
@@ -109,6 +109,43 @@ export const orderStatusMessageSchema = z.object({
  * Type for order status messages
  */
 export type OrderStatusMessage = z.infer<typeof orderStatusMessageSchema>;
+
+/**
+ * Schema for cancelled remainder orders.
+ *
+ * Published when a market order (IOC) is partially filled and the unmatched
+ * remainder needs to be persisted as a separate CANCELLED order row so users
+ * can see it in their transaction history.
+ */
+export const cancelledRemainderMessageSchema = z.object({
+  /** New UUID for the cancelled remainder order */
+  orderId: z.string().uuid(),
+  /** ID of the original order that was partially filled */
+  originalOrderId: z.string().uuid(),
+  /** Wallet address of the order owner */
+  accountWallet: ethereumAddressSchema,
+  /** Asset UUID */
+  assetId: z.string().uuid(),
+  /** Order side */
+  side: z.nativeEnum(OrderSide),
+  /** Order type */
+  type: z.nativeEnum(OrderType),
+  /** Rate (0 for market orders) */
+  rate: z.number(),
+  /** Unmatched quantity */
+  quantity: z.string().regex(/^\d+$/, 'Quantity must be a positive integer string'),
+  /** Remaining settlement fee for the unmatched portion */
+  settlementFee: z.string().regex(/^\d+$/, 'Settlement fee must be a positive integer string'),
+  /** Market IDs the order participated in */
+  marketIds: z.array(z.string().uuid()).min(1),
+  /** Timestamp */
+  timestamp: z.number().int().positive(),
+});
+
+/**
+ * Type for cancelled remainder messages
+ */
+export type CancelledRemainderMessage = z.infer<typeof cancelledRemainderMessageSchema>;
 
 /**
  * Schema for order book snapshot responses

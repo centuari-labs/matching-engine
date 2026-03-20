@@ -7,7 +7,9 @@ import {
 } from '../config/redis-config';
 import {
   orderStatusMessageSchema,
+  cancelledRemainderMessageSchema,
   type OrderStatusMessage,
+  type CancelledRemainderMessage,
 } from '../types/messages';
 import { matchSchema, type Match } from '../types/matches';
 import type { DbClient } from '../types/db';
@@ -57,6 +59,7 @@ export class DbWriterService {
   private readonly options: Required<DbWriterOptions>;
 
   private natsSubscription: Subscription | null = null;
+  private natsCancelledRemainderSub: Subscription | null = null;
   private redisRunning = false;
   private redisWorkerPromise: Promise<void> | null = null;
 
@@ -86,6 +89,7 @@ export class DbWriterService {
    */
   async start(): Promise<void> {
     this.startNatsSubscription();
+    this.startCancelledRemainderSubscription();
     await this.ensureRedisGroup();
     this.startRedisWorker();
   }
@@ -97,6 +101,11 @@ export class DbWriterService {
     if (this.natsSubscription) {
       await this.natsSubscription.drain();
       this.natsSubscription = null;
+    }
+
+    if (this.natsCancelledRemainderSub) {
+      await this.natsCancelledRemainderSub.drain();
+      this.natsCancelledRemainderSub = null;
     }
 
     this.redisRunning = false;
@@ -164,6 +173,62 @@ export class DbWriterService {
     }
 
     await this.dbClient.updateOrderStatus(message);
+  }
+
+  /**
+   * Subscribe to the ORDERS_CANCELLED_REMAINDER topic and insert cancelled
+   * remainder order rows into the DB.
+   */
+  private startCancelledRemainderSubscription(): void {
+    const sub = this.nc.subscribe(NATS_TOPICS.ORDERS_CANCELLED_REMAINDER);
+    this.natsCancelledRemainderSub = sub;
+
+    const maxConcurrency = this.options.maxConcurrency;
+    let inFlight = 0;
+
+    (async () => {
+      for await (const msg of sub) {
+        while (inFlight >= maxConcurrency) {
+          await new Promise((resolve) => setTimeout(resolve, 10));
+        }
+
+        inFlight += 1;
+
+        void this.handleCancelledRemainderMessage(msg.data)
+          .catch((error) => {
+            console.error('DB Writer: failed to handle cancelled remainder message', error);
+          })
+          .finally(() => {
+            inFlight -= 1;
+          });
+      }
+    })().catch((error) => {
+      console.error('DB Writer: cancelled remainder subscription loop failed', error);
+    });
+
+    console.log(`DbWriterService subscribed to ${NATS_TOPICS.ORDERS_CANCELLED_REMAINDER}`);
+  }
+
+  private async handleCancelledRemainderMessage(data: Uint8Array): Promise<void> {
+    const text = new TextDecoder().decode(data);
+    let parsed: unknown;
+
+    try {
+      parsed = JSON.parse(text);
+    } catch (error) {
+      console.error('DB Writer: failed to parse cancelled remainder JSON', error, text);
+      return;
+    }
+
+    let message: CancelledRemainderMessage;
+    try {
+      message = cancelledRemainderMessageSchema.parse(parsed);
+    } catch (error) {
+      console.error('DB Writer: invalid cancelled remainder message', error, parsed);
+      return;
+    }
+
+    await this.dbClient.insertCancelledOrder(message);
   }
 
   /**
