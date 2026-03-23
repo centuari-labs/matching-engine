@@ -816,5 +816,35 @@ export class MatchingEngine {
       return false;
     }
   }
+
+  /**
+   * Sync the in-memory order book with active orders from the database.
+   *
+   * Adds any orders that exist in the database but are missing from the
+   * in-memory order book. This is additive only — it does not remove orders
+   * that are in memory but not in the database.
+   *
+   * Should be called on startup after snapshot restore to ensure consistency.
+   *
+   * @param dbOrders - Active orders loaded from the database
+   * @returns Counts of added and skipped orders
+   */
+  syncFromDatabase(dbOrders: Order[]): { added: number; skipped: number } {
+    let added = 0;
+    let skipped = 0;
+
+    for (const order of dbOrders) {
+      if (this.orderBook.getOrder(order.orderId)) {
+        skipped++;
+        continue;
+      }
+      if (!isZero(order.remainingAmount)) {
+        this.orderBook.addOrder(order);
+        added++;
+      }
+    }
+
+    return { added, skipped };
+  }
 }
 

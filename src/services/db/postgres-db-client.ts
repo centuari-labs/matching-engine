@@ -2,6 +2,8 @@ import { Pool, type PoolConfig, type PoolClient } from 'pg';
 import type { DbClient, MatchEvent, OrderStatusEvent, CancelledRemainderEvent } from '../../types/db';
 import type { DbConfig } from '../../config/db-config';
 import { loadDbConfig } from '../../config/db-config';
+import type { Order } from '../../types/orders';
+import { OrderSide, OrderType, OrderStatus } from '../../types/orders';
 
 /**
  * Postgres implementation of the DbClient interface.
@@ -283,6 +285,92 @@ export class PostgresDbClient implements DbClient {
     } catch (error) {
       await client.query('ROLLBACK');
       throw error;
+    } finally {
+      client.release();
+    }
+  }
+
+  /**
+   * Load all active (OPEN or PARTIALLY_FILLED) LIMIT orders from the database.
+   *
+   * Used to sync the matching engine's in-memory order book with the database
+   * on startup, ensuring orders that exist in the DB but are missing from the
+   * snapshot are restored.
+   *
+   * @returns Array of orders in the matching engine's Order format
+   */
+  async getActiveOrders(): Promise<Order[]> {
+    const client = await this.pool.connect();
+
+    try {
+      const result = await client.query<{
+        order_id: string;
+        wallet_address: string;
+        loan_token: string;
+        asset_id: string;
+        side: string;
+        type: string;
+        rate: string;
+        status: string;
+        original_amount: string;
+        remaining_amount: string;
+        settlement_fee: string;
+        timestamp: string;
+        markets: Array<{ marketId: string; maturity: number }>;
+      }>(
+        `
+        SELECT
+          o.id AS order_id,
+          a.user_wallet AS wallet_address,
+          t.token_address AS loan_token,
+          o.asset_id,
+          o.side,
+          o.type,
+          o.rate,
+          o.status,
+          o.quantity AS original_amount,
+          (o.quantity::bigint - o.filled_quantity::bigint)::text AS remaining_amount,
+          o.settlement_fee,
+          EXTRACT(EPOCH FROM o.created_at)::bigint * 1000 AS timestamp,
+          json_agg(
+            json_build_object(
+              'marketId', om.market_id,
+              'maturity', EXTRACT(EPOCH FROM m.maturity)::int
+            )
+          ) AS markets
+        FROM orders o
+        JOIN accounts a ON a.id = o.account_id
+        JOIN assets t ON t.id = o.asset_id
+        JOIN order_markets om ON om.order_id = o.id
+        JOIN markets m ON m.id = om.market_id
+        WHERE o.status IN ('OPEN', 'PARTIALLY_FILLED')
+          AND o.type = 'LIMIT'
+        GROUP BY o.id, a.user_wallet, t.token_address, o.asset_id,
+                 o.side, o.type, o.rate, o.status, o.quantity,
+                 o.filled_quantity, o.settlement_fee, o.created_at
+        `
+      );
+
+      return result.rows.map((row): Order => {
+        const base = {
+          orderId: row.order_id,
+          walletAddress: row.wallet_address,
+          loanToken: row.loan_token,
+          assetId: row.asset_id,
+          markets: row.markets,
+          timestamp: parseInt(row.timestamp, 10),
+          side: row.side as OrderSide,
+          type: row.type as OrderType,
+          status: row.status as OrderStatus,
+          originalAmount: row.original_amount,
+          remainingAmount: row.remaining_amount,
+          settlementFeeAmount: row.settlement_fee,
+          remainingSettlementFeeAmount: row.settlement_fee,
+          rate: parseInt(row.rate, 10),
+        };
+
+        return base as Order;
+      });
     } finally {
       client.release();
     }

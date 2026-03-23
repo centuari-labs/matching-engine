@@ -9,6 +9,7 @@ import { MatchingEngine } from '../core/matching-engine';
 import { NatsService } from './nats-service';
 import { RedisService } from './redis-service';
 import { SnapshotService } from './snapshot-service';
+import { PostgresDbClient } from './db/postgres-db-client';
 import * as dotenv from 'dotenv';
 
 // Load environment variables from .env file
@@ -155,6 +156,28 @@ async function main(): Promise<void> {
           console.log('  No snapshot found or restore failed, starting with empty state\n');
         }
       }
+    }
+
+    // Sync order book with database to ensure all active orders are in memory
+    const dbSyncEnabled = process.env.DB_SYNC_ON_STARTUP !== 'false';
+    if (dbSyncEnabled && process.env.DB_URL) {
+      console.log('Syncing order book with database...');
+      const dbClient = new PostgresDbClient();
+      try {
+        const activeOrders = await dbClient.getActiveOrders();
+        const syncResult = matchingEngine.syncFromDatabase(activeOrders);
+        console.log(
+          `✓ DB sync complete: ${syncResult.added} orders added, ${syncResult.skipped} already in memory`
+        );
+      } catch (error) {
+        console.warn(
+          '⚠ DB sync failed, continuing with snapshot-only state:',
+          error instanceof Error ? error.message : 'Unknown error'
+        );
+      } finally {
+        await dbClient.close();
+      }
+      console.log();
     }
 
     // Initialize NATS service
