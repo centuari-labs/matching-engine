@@ -180,7 +180,7 @@ export class PostgresDbClient implements DbClient {
           $11,
           $12,
           $13,
-          to_timestamp($14 / 1000.0),
+          to_timestamp($14),
           to_timestamp($15 / 1000.0),
           to_timestamp($15 / 1000.0)
         )
