@@ -100,6 +100,11 @@ export const orderStatusMessageSchema = z.object({
   filledSettlementFeeAmount: z.string(),
 
   /**
+   * Reason why the order was cancelled (only present when status is CANCELLED)
+   */
+  cancelReason: z.enum(['USER_CANCELLED', 'IOC']).optional(),
+
+  /**
    * Timestamp of the status update
    */
   timestamp: z.number().int().positive(),
@@ -138,6 +143,8 @@ export const cancelledRemainderMessageSchema = z.object({
   settlementFee: z.string().regex(/^\d+$/, 'Settlement fee must be a positive integer string'),
   /** Market IDs the order participated in */
   marketIds: z.array(z.string().uuid()).min(1),
+  /** Reason for cancellation */
+  cancelReason: z.enum(['USER_CANCELLED', 'IOC']).optional(),
   /** Timestamp */
   timestamp: z.number().int().positive(),
 });
@@ -303,6 +310,8 @@ export interface OrderStatusSource {
   settlementFeeAmount: string;
   /** Remaining settlement fee pool (may be lazily initialized) */
   remainingSettlementFeeAmount?: string;
+  /** Reason for cancellation (only when status is CANCELLED) */
+  cancelReason?: 'USER_CANCELLED' | 'IOC';
 }
 
 /**
@@ -319,6 +328,7 @@ export function createOrderStatusMessage(source: OrderStatusSource): OrderStatus
     originalAmount,
     settlementFeeAmount,
     remainingSettlementFeeAmount,
+    cancelReason,
   } = source;
 
   const filledQuantity =
@@ -337,6 +347,7 @@ export function createOrderStatusMessage(source: OrderStatusSource): OrderStatus
     remainingAmount,
     filledQuantity,
     filledSettlementFeeAmount,
+    ...(cancelReason ? { cancelReason } : {}),
     timestamp: Date.now(),
   };
 }

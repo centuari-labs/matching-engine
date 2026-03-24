@@ -167,6 +167,7 @@ function publishOrderStatusUpdates(
           quantity: remaining,
           settlementFee: remainingSettlementFee,
           marketIds: originalOrder.marketIds,
+          cancelReason: 'IOC',
           timestamp: Date.now(),
         };
         ctx.nc.publish(
@@ -183,6 +184,7 @@ function publishOrderStatusUpdates(
         originalAmount: originalOrder.originalAmount,
         settlementFeeAmount: originalOrder.settlementFeeAmount,
         remainingSettlementFeeAmount: originalOrder.settlementFeeAmount,
+        cancelReason: 'IOC',
       });
       ctx.nc.publish(NATS_TOPICS.ORDERS_STATUS, JSON.stringify(cancelMessage));
     }
@@ -476,6 +478,7 @@ export function handleCancelOrder(ctx: HandlerContext, data: Uint8Array): void {
         originalAmount: orderInfo.originalAmount,
         settlementFeeAmount: orderInfo.settlementFeeAmount,
         remainingSettlementFeeAmount: orderInfo.remainingSettlementFeeAmount,
+        cancelReason: 'USER_CANCELLED',
       });
       ctx.nc.publish(NATS_TOPICS.ORDERS_STATUS, JSON.stringify(statusMessage));
     } else {
