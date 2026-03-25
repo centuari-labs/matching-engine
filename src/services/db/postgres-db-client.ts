@@ -1,5 +1,5 @@
 import { Pool, type PoolConfig, type PoolClient } from 'pg';
-import type { DbClient, MatchEvent, OrderStatusEvent, CancelledRemainderEvent } from '../../types/db';
+import type { DbClient, MatchEvent, OrderStatusEvent, CancelledRemainderEvent, OrderUpdatedEvent } from '../../types/db';
 import type { DbConfig } from '../../config/db-config';
 import { loadDbConfig } from '../../config/db-config';
 import type { Order } from '../../types/orders';
@@ -371,6 +371,38 @@ export class PostgresDbClient implements DbClient {
 
         return base as Order;
       });
+    } finally {
+      client.release();
+    }
+  }
+
+  async updateOrderParameters(event: OrderUpdatedEvent): Promise<void> {
+    const client = await this.pool.connect();
+
+    try {
+      await client.query('BEGIN');
+
+      await client.query(
+        `
+        UPDATE orders
+        SET
+          rate = $2,
+          quantity = $3::numeric,
+          updated_at = to_timestamp($4 / 1000.0)
+        WHERE id = $1
+        `,
+        [
+          event.orderId,
+          event.rate,
+          event.originalAmount,
+          event.timestamp,
+        ]
+      );
+
+      await client.query('COMMIT');
+    } catch (error) {
+      await client.query('ROLLBACK');
+      throw error;
     } finally {
       client.release();
     }

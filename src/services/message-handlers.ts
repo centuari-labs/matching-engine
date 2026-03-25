@@ -15,14 +15,16 @@ import {
 } from '../types/orders';
 import {
   cancelOrderMessageSchema,
+  updateOrderMessageSchema,
   createErrorMessage,
   createOrderStatusMessage,
   ERROR_CODES,
   type ErrorMessage,
   type CancelledRemainderMessage,
+  type ErrorCode,
 } from '../types/messages';
 import type { Match, MatchResult } from '../types/matches';
-import { OrderSide, OrderStatus, OrderType } from '../types/orders';
+import { OrderSide, OrderStatus, OrderType, type Order } from '../types/orders';
 import { NATS_TOPICS } from '../config/nats-config';
 import { addBigNumbers, subtractBigNumbers, isZero, generateOrderId } from '../utils/helpers';
 
@@ -500,3 +502,118 @@ export function handleCancelOrder(ctx: HandlerContext, data: Uint8Array): void {
   }
 }
 
+export function handleUpdateOrder(ctx: HandlerContext, data: Uint8Array): void {
+  try {
+    // Parse and validate the update request
+    const request = parseMessage(data, updateOrderMessageSchema);
+
+    console.log(`Processing update request for order: ${request.orderId} from wallet: ${request.walletAddress}`);
+
+    // Get order info before update (needed for status message)
+    const orderInfo = ctx.engine.getOrderInfo(request.orderId);
+    if (!orderInfo) {
+      console.warn(`Order ${request.orderId} not found for update`);
+      publishError(
+        ctx,
+        createErrorMessage(
+          ERROR_CODES.ORDER_NOT_FOUND,
+          `Order ${request.orderId} not found`,
+          request.orderId
+        )
+      );
+      return;
+    }
+
+    // Update order in matching engine (removes old order from book)
+    const oldOrder = ctx.engine.updateOrder(request.orderId, request.walletAddress);
+
+    if (typeof oldOrder === 'object') {
+      console.log(`Order ${request.orderId} deactivated for update`);
+
+      // Calculate new amounts
+      let newOriginalAmount = oldOrder.originalAmount;
+      let newRemainingAmount = oldOrder.remainingAmount;
+      
+      if (request.amount) {
+        const filledAmount = subtractBigNumbers(oldOrder.originalAmount, oldOrder.remainingAmount);
+        newOriginalAmount = request.amount;
+        newRemainingAmount = subtractBigNumbers(request.amount, filledAmount);
+        
+        // Ensure remaining amount is not negative
+        if (BigInt(newRemainingAmount) < 0n) {
+           throw new Error('New total amount cannot be less than already filled amount');
+        }
+      }
+
+      const newRate = request.rate ?? (oldOrder as any).rate;
+
+      // Construct updated order (keeping same ID)
+      // We cast to any then back to Order to avoid union type conflicts since we know it's a limit order
+      const updatedOrder = {
+        ...oldOrder,
+        originalAmount: newOriginalAmount,
+        remainingAmount: newRemainingAmount,
+        rate: newRate,
+        timestamp: request.timestamp,
+      } as Order;
+
+      // Re-submit to the matching engine
+      const updateResult = ctx.engine.submitOrder(updatedOrder);
+
+      // Publish to orders.updated topic for parameter synchronization
+      const updateEvent = {
+        orderId: request.orderId,
+        originalAmount: newOriginalAmount,
+        remainingAmount: newRemainingAmount,
+        rate: newRate,
+        settlementFeeAmount: updatedOrder.settlementFeeAmount,
+        remainingSettlementFeeAmount: updatedOrder.remainingSettlementFeeAmount,
+        timestamp: request.timestamp,
+      };
+      
+      ctx.nc.publish(NATS_TOPICS.ORDERS_UPDATED, JSON.stringify(updateEvent));
+      
+      // Also publish the status update to confirm it's still alive (OPEN/PARTIALLY_FILLED)
+      const statusMessage = createOrderStatusMessage({
+        orderId: request.orderId,
+        status: updateResult.remainingOrder ? updateResult.remainingOrder.status : OrderStatus.Filled,
+        remainingAmount: updateResult.remainingOrder ? updateResult.remainingOrder.remainingAmount : '0',
+        originalAmount: newOriginalAmount,
+        settlementFeeAmount: updatedOrder.settlementFeeAmount,
+        remainingSettlementFeeAmount: updatedOrder.remainingSettlementFeeAmount,
+      });
+      ctx.nc.publish(NATS_TOPICS.ORDERS_STATUS, JSON.stringify(statusMessage));
+
+      console.log(`Order ${request.orderId} updated in-place and re-published`);
+    } else {
+      let errorCode: ErrorCode = ERROR_CODES.VALIDATION_ERROR;
+      let errorMessage = 'Wallet address does not match order owner';
+
+      if (oldOrder === 'NOT_FOUND') {
+        errorCode = ERROR_CODES.ORDER_NOT_FOUND;
+        errorMessage = `Order ${request.orderId} not found`;
+      } else if (oldOrder === 'INVALID_STATUS') {
+        errorCode = ERROR_CODES.INVALID_ORDER_STATUS;
+        errorMessage = `Order ${request.orderId} is in a status that cannot be updated`;
+      }
+
+      console.warn(`${errorMessage} for order ${request.orderId}`);
+      publishError(
+        ctx,
+        createErrorMessage(
+          errorCode as any,
+          errorMessage,
+          request.orderId
+        )
+      );
+    }
+  } catch (error) {
+    console.error('Error handling update order:', error);
+    const errorMsg =
+      error instanceof Error ? error.message : 'Unknown error';
+    publishError(
+      ctx,
+      createErrorMessage(ERROR_CODES.INVALID_ORDER, errorMsg)
+    );
+  }
+}

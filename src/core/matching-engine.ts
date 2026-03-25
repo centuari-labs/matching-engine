@@ -1,13 +1,13 @@
 import { OrderBook } from './order-book';
 import { ExecutionEngine } from './execution-engine';
 import type {
-  Order,
   LendMarketOrder,
   LendLimitOrder,
   BorrowMarketOrder,
   BorrowLimitOrder,
 } from '../types/orders';
-import { OrderSide, OrderStatus, OrderType, isLimitOrder } from '../types/orders';
+import { OrderSide, OrderStatus, OrderType, isLimitOrder, type Order } from '../types/orders';
+
 import type { Match, MatchResult, OrderBookSnapshot, AffectedOrder } from '../types/matches';
 import type { SettlementPublisher } from '../types/settlement';
 import type { SnapshotService } from '../services/snapshot-service';
@@ -640,6 +640,31 @@ export class MatchingEngine {
     this.saveSnapshotAsync();
 
     return true;
+  }
+
+  updateOrder(orderId: string, walletAddress: string): Order | 'NOT_FOUND' | 'WALLET_MISMATCH' | 'INVALID_STATUS' {
+    const order = this.orderBook.getOrder(orderId);
+    if (!order) {
+      return 'NOT_FOUND';
+    }
+
+    // Validate wallet address matches the order owner
+    if (order.walletAddress.toLowerCase() !== walletAddress.toLowerCase()) {
+      return 'WALLET_MISMATCH';
+    }
+
+    // Only allow update of open or partially filled orders
+    if (order.status !== OrderStatus.Open && order.status !== OrderStatus.PartiallyFilled) {
+      return 'INVALID_STATUS';
+    }
+
+    // Remove from order book
+    this.orderBook.removeOrder(orderId);
+
+    // Save snapshot after order deactivation (non-blocking)
+    this.saveSnapshotAsync();
+
+    return order;
   }
 
   /**

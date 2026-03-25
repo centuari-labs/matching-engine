@@ -119,6 +119,7 @@ export const NATS_TOPICS = {
   ORDERS_STATUS: 'orders.status',
   ORDERS_CANCELLED_REMAINDER: 'orders.cancelled_remainder',
   MATCHES_CREATED: 'matches.created',
+  ORDERS_UPDATED: 'orders.updated',
   ERRORS: 'errors',
 } as const;
 

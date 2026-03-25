@@ -8,8 +8,10 @@ import {
 import {
   orderStatusMessageSchema,
   cancelledRemainderMessageSchema,
+  orderUpdatedMessageSchema,
   type OrderStatusMessage,
   type CancelledRemainderMessage,
+  type OrderUpdatedMessage,
 } from '../types/messages';
 import { matchSchema, type Match } from '../types/matches';
 import type { DbClient } from '../types/db';
@@ -151,6 +153,26 @@ export class DbWriterService {
     });
 
     console.log(`DbWriterService subscribed to ${NATS_TOPICS.ORDERS_STATUS}`);
+
+    const updatedSub = this.nc.subscribe(NATS_TOPICS.ORDERS_UPDATED);
+    (async () => {
+      for await (const msg of updatedSub) {
+        while (inFlight >= maxConcurrency) {
+          await new Promise((resolve) => setTimeout(resolve, 10));
+        }
+        inFlight += 1;
+        void this.handleOrderUpdatedMessage(msg.data)
+          .catch((error) => {
+            console.error('DB Writer: failed to handle order updated message', error);
+          })
+          .finally(() => {
+            inFlight -= 1;
+          });
+      }
+    })().catch((error) => {
+      console.error('DB Writer: NATS updated subscription loop failed', error);
+    });
+    console.log(`DbWriterService subscribed to ${NATS_TOPICS.ORDERS_UPDATED}`);
   }
 
   private async handleOrderStatusMessage(data: Uint8Array): Promise<void> {
@@ -173,6 +195,28 @@ export class DbWriterService {
     }
 
     await this.dbClient.updateOrderStatus(message);
+  }
+
+  private async handleOrderUpdatedMessage(data: Uint8Array): Promise<void> {
+    const text = new TextDecoder().decode(data);
+    let parsed: unknown;
+
+    try {
+      parsed = JSON.parse(text);
+    } catch (error) {
+      console.error('DB Writer: failed to parse order update JSON', error, text);
+      return;
+    }
+
+    let message: OrderUpdatedMessage;
+    try {
+      message = orderUpdatedMessageSchema.parse(parsed);
+    } catch (error) {
+      console.error('DB Writer: invalid order update message', error, parsed);
+      return;
+    }
+
+    await this.dbClient.updateOrderParameters(message);
   }
 
   /**

@@ -29,6 +29,34 @@ export const cancelOrderMessageSchema = z.object({
   timestamp: z.number().int().positive(),
 });
 
+export const updateOrderMessageSchema = z.object({
+  orderId: z.string().uuid(),
+  walletAddress: ethereumAddressSchema,
+  amount: z.string().optional(),
+  rate: z.number().int().positive().optional(),
+  timestamp: z.number().int().positive()
+})
+
+/**
+ * Type for order cancellation messages
+ */
+export type UpdateOrderMessage = z.infer<typeof updateOrderMessageSchema>;
+
+/**
+ * Zod schema for the OrderUpdatedMessage published to `orders.updated` topic.
+ */
+export const orderUpdatedMessageSchema = z.object({
+  orderId: z.string().uuid(),
+  originalAmount: z.string(),
+  remainingAmount: z.string(),
+  rate: z.number().int().positive(),
+  settlementFeeAmount: z.string(),
+  remainingSettlementFeeAmount: z.string(),
+  timestamp: z.number().int().positive(),
+});
+
+export type OrderUpdatedMessage = z.infer<typeof orderUpdatedMessageSchema>;
+
 /**
  * Type for order cancellation messages
  */
@@ -231,6 +259,7 @@ export const ERROR_CODES = {
   INTERNAL_ERROR: 'INTERNAL_ERROR',
   NATS_CONNECTION_ERROR: 'NATS_CONNECTION_ERROR',
   MESSAGE_PARSE_ERROR: 'MESSAGE_PARSE_ERROR',
+  INVALID_ORDER_STATUS: 'INVALID_ORDER_STATUS',
 } as const;
 
 /**
