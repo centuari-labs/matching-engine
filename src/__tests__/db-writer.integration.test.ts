@@ -1,4 +1,4 @@
-/** 
+/**
  * DB Writer Integration Tests
  *
  * These tests exercise the DbWriterService against real Postgres, Redis and NATS
@@ -14,6 +14,8 @@
  *
  * WARNING: These tests will write to the configured database. Point DB config at
  * a dedicated test database schema before running.
+ *
+ * These tests are skipped when DB_URL is not set.
  */
 
 import { Pool, type PoolConfig } from 'pg';
@@ -37,6 +39,10 @@ import { createMatch } from './factories/match-factory';
 import { createOrderStatusMessage } from '../types/messages';
 import { OrderStatus } from '../types/orders';
 import { generateOrderId } from '../utils/helpers';
+
+// Skip entire suite when DB_URL is not configured (no real DB available).
+const DB_URL = process.env.DB_URL;
+const describeIfDb = DB_URL ? describe : describe.skip;
 
 // Integration tests in this file depend on real Postgres, Redis, and NATS,
 // which can take longer than Jest's default 5s timeout. Increase it to avoid
@@ -106,7 +112,7 @@ function normalizeNumeric(value: string | null | undefined): string | null {
   return value.replace(/\.0+$/, '');
 }
 
-describe('DbWriterService Integration (requires Postgres, Redis, NATS)', () => {
+describeIfDb('DbWriterService Integration (requires Postgres, Redis, NATS)', () => {
   let dbPool: Pool;
   let natsConnection: NatsConnection;
   let redisClient: Redis;
@@ -218,9 +224,7 @@ describe('DbWriterService Integration (requires Postgres, Redis, NATS)', () => {
     // Clean up only rows created by these tests.
     if (matchIdsToCleanup.length > 0) {
       try {
-        await dbPool.query('DELETE FROM matches WHERE id = ANY($1)', [
-          matchIdsToCleanup,
-        ]);
+        await dbPool.query('DELETE FROM matches WHERE id = ANY($1)', [matchIdsToCleanup]);
       } catch {
         // Ignore if table does not exist in the configured schema.
       }
@@ -229,9 +233,7 @@ describe('DbWriterService Integration (requires Postgres, Redis, NATS)', () => {
 
     if (accountIdsToCleanup.length > 0) {
       try {
-        await dbPool.query('DELETE FROM accounts WHERE id = ANY($1)', [
-          accountIdsToCleanup,
-        ]);
+        await dbPool.query('DELETE FROM accounts WHERE id = ANY($1)', [accountIdsToCleanup]);
       } catch {
         // Ignore if table does not exist in the configured schema.
       }
@@ -240,9 +242,7 @@ describe('DbWriterService Integration (requires Postgres, Redis, NATS)', () => {
 
     if (assetIdsToCleanup.length > 0) {
       try {
-        await dbPool.query('DELETE FROM assets WHERE id = ANY($1)', [
-          assetIdsToCleanup,
-        ]);
+        await dbPool.query('DELETE FROM assets WHERE id = ANY($1)', [assetIdsToCleanup]);
       } catch {
         // Ignore if table does not exist in the configured schema.
       }
@@ -251,9 +251,7 @@ describe('DbWriterService Integration (requires Postgres, Redis, NATS)', () => {
 
     if (orderIdsToCleanup.length > 0) {
       try {
-        await dbPool.query('DELETE FROM orders WHERE id = ANY($1)', [
-          orderIdsToCleanup,
-        ]);
+        await dbPool.query('DELETE FROM orders WHERE id = ANY($1)', [orderIdsToCleanup]);
       } catch {
         // Ignore if table does not exist in the configured schema.
       }
@@ -321,10 +319,7 @@ describe('DbWriterService Integration (requires Postgres, Redis, NATS)', () => {
       const statusMessage = createOrderStatusMessage(updatedOrder);
 
       // Publish status message to NATS.
-      natsConnection.publish(
-        NATS_TOPICS.ORDERS_STATUS,
-        Buffer.from(JSON.stringify(statusMessage))
-      );
+      natsConnection.publish(NATS_TOPICS.ORDERS_STATUS, Buffer.from(JSON.stringify(statusMessage)));
 
       // Wait until the order row is updated.
       await waitForCondition(async () => {
@@ -363,10 +358,7 @@ describe('DbWriterService Integration (requires Postgres, Redis, NATS)', () => {
       const consoleSpy = jest.spyOn(console, 'error').mockImplementation();
 
       // Publish an invalid (non-JSON) payload.
-      natsConnection.publish(
-        NATS_TOPICS.ORDERS_STATUS,
-        Buffer.from('not-json')
-      );
+      natsConnection.publish(NATS_TOPICS.ORDERS_STATUS, Buffer.from('not-json'));
 
       // Give the subscription loop time to process.
       await new Promise((resolve) => setTimeout(resolve, 500));
@@ -374,9 +366,7 @@ describe('DbWriterService Integration (requires Postgres, Redis, NATS)', () => {
       expect(consoleSpy).toHaveBeenCalled();
       const hadParseError = consoleSpy.mock.calls.some((call) =>
         call.some(
-          (arg) =>
-            typeof arg === 'string' &&
-            arg.includes('failed to parse order status JSON')
+          (arg) => typeof arg === 'string' && arg.includes('failed to parse order status JSON')
         )
       );
 
@@ -409,15 +399,7 @@ describe('DbWriterService Integration (requires Postgres, Redis, NATS)', () => {
           )
           VALUES ($1, $2, $3, $4, $5, $6, $7, NOW(), NOW())
         `,
-        [
-          assetId,
-          'Test Token',
-          'TT',
-          1,
-          match.loanToken,
-          true,
-          0,
-        ]
+        [assetId, 'Test Token', 'TT', 1, match.loanToken, true, 0]
       );
 
       await dbPool.query(
@@ -557,9 +539,7 @@ describe('DbWriterService Integration (requires Postgres, Redis, NATS)', () => {
       expect(row.maker_fee).toBe(match.makerFeeAmount);
       expect(row.taker_fee).toBe(match.takerFeeAmount);
       expect(row.lender_settlement_fee).toBe(match.lenderSettlementFeeAmount);
-      expect(row.borrower_settlement_fee).toBe(
-        match.borrowerSettlementFeeAmount
-      );
+      expect(row.borrower_settlement_fee).toBe(match.borrowerSettlementFeeAmount);
     });
 
     it('should acknowledge and skip invalid match entries', async () => {
@@ -601,4 +581,3 @@ describe('DbWriterService Integration (requires Postgres, Redis, NATS)', () => {
     });
   });
 });
-

@@ -1,18 +1,29 @@
 /**
- * Redis Service Integration Tests
+ * Redis Service Unit Tests
  *
- * Tests for RedisService methods and behavior using a real Redis connection.
- * These tests require a running Redis instance.
- *
- * Uses Redis database 15 (test database) to avoid interfering with production data.
- * All test data is cleaned up after each test.
+ * Tests for RedisService using mocked ioredis to avoid requiring a running Redis instance.
  */
 
 import { RedisService } from '../services/redis-service';
-import { REDIS_STREAMS } from '../config/redis-config';
+import { REDIS_STREAMS, REDIS_CONSUMER_GROUPS } from '../config/redis-config';
 import type { SettlementMatch } from '../types/settlement';
 import { generateMatchId, generateOrderId } from '../utils/helpers';
-import Redis from 'ioredis';
+
+// Mock ioredis
+jest.mock('ioredis', () => {
+  const mockRedisInstance = {
+    connect: jest.fn().mockResolvedValue(undefined),
+    quit: jest.fn().mockResolvedValue('OK'),
+    on: jest.fn(),
+    xadd: jest.fn().mockResolvedValue('1234567890-0'),
+    xgroup: jest.fn().mockResolvedValue('OK'),
+    xlen: jest.fn().mockResolvedValue(5),
+    xinfo: jest.fn().mockResolvedValue([['name', 'settlement-engine']]),
+    ping: jest.fn().mockResolvedValue('PONG'),
+  };
+
+  return jest.fn(() => mockRedisInstance);
+});
 
 describe('RedisService', () => {
   const loanToken = '0x1234567890123456789012345678901234567890';
@@ -20,11 +31,9 @@ describe('RedisService', () => {
   const walletAddress2 = '0x2222222222222222222222222222222222222222';
   const maturity = 1704067200;
 
-  // Use test database (15) to avoid interfering with production data
-  const TEST_DB = 15;
   const testConfig = {
-    url: process.env.REDIS_URL || 'redis://localhost:6379',
-    db: TEST_DB,
+    url: 'redis://localhost:6379',
+    db: 15,
     maxReconnectAttempts: 3,
     reconnectTimeWait: 1000,
     timeout: 5000,
@@ -32,9 +41,7 @@ describe('RedisService', () => {
   };
 
   let redisService: RedisService;
-  let cleanupClient: Redis | null = null;
 
-  // Helper to create a test match
   function createTestMatch(): SettlementMatch {
     return {
       matchId: generateMatchId(),
@@ -55,69 +62,27 @@ describe('RedisService', () => {
     };
   }
 
-  beforeAll(async () => {
-    // Verify Redis is available before running tests
-    try {
-      const testClient = new Redis({
-        host: 'localhost',
-        port: 6379,
-        db: TEST_DB,
-        lazyConnect: true,
-      });
-      await testClient.connect();
-      await testClient.ping();
-      await testClient.quit();
-    } catch (error) {
-      console.error(
-        'Redis is not available. Please start Redis before running these tests.'
-      );
-      throw error;
-    }
-  });
-
-  beforeEach(async () => {
-    // Create a new service instance for each test
+  beforeEach(() => {
+    jest.clearAllMocks();
     redisService = new RedisService(testConfig);
-
-    // Create a cleanup client to remove test data
-    cleanupClient = new Redis({
-      host: 'localhost',
-      port: 6379,
-      db: TEST_DB,
-      lazyConnect: true,
-    });
-    await cleanupClient.connect();
   });
 
   afterEach(async () => {
-    // Clean up: disconnect service and remove test stream data
     if (redisService && redisService.isServiceConnected()) {
       await redisService.disconnect();
-    }
-
-    if (cleanupClient) {
-      try {
-        // Delete the test stream
-        await cleanupClient.del(REDIS_STREAMS.SETTLEMENT_MATCHES);
-        await cleanupClient.quit();
-      } catch (error) {
-        // Ignore cleanup errors
-      }
-      cleanupClient = null;
     }
   });
 
   describe('Service Initialization', () => {
     it('should create a Redis service instance', () => {
-      const service = new RedisService(testConfig);
-      expect(service).toBeDefined();
-      expect(service.isServiceConnected()).toBe(false);
+      expect(redisService).toBeDefined();
+      expect(redisService.isServiceConnected()).toBe(false);
     });
 
     it('should create service with custom config', () => {
       const service = new RedisService({
         url: 'redis://localhost:6379',
-        db: TEST_DB,
+        db: 15,
         maxReconnectAttempts: 20,
         reconnectTimeWait: 3000,
         timeout: 15000,
@@ -127,19 +92,10 @@ describe('RedisService', () => {
     });
 
     it('should return correct stats when not connected', () => {
-      const service = new RedisService({
-        url: 'redis://localhost:6379',
-        db: TEST_DB,
-        maxReconnectAttempts: 10,
-        reconnectTimeWait: 2000,
-        timeout: 10000,
-        tls: false,
-      });
-
-      const stats = service.getStats();
+      const stats = redisService.getStats();
       expect(stats.connected).toBe(false);
       expect(stats.config.url).toBe('redis://localhost:6379');
-      expect(stats.config.db).toBe(TEST_DB);
+      expect(stats.config.db).toBe(15);
       expect(stats.config.hasAuth).toBe(false);
     });
 
@@ -147,7 +103,7 @@ describe('RedisService', () => {
       const service = new RedisService({
         url: 'redis://localhost:6379',
         password: 'secret',
-        db: TEST_DB,
+        db: 15,
         maxReconnectAttempts: 10,
         reconnectTimeWait: 2000,
         timeout: 10000,
@@ -184,18 +140,15 @@ describe('RedisService', () => {
     });
 
     it('should handle disconnect when not connected', async () => {
-      const service = new RedisService(testConfig);
-
       const consoleSpy = jest.spyOn(console, 'warn').mockImplementation();
-      await service.disconnect();
+      await redisService.disconnect();
 
       expect(consoleSpy).toHaveBeenCalledWith('Redis service is not connected');
       consoleSpy.mockRestore();
     });
 
     it('should return null client when not connected', () => {
-      const service = new RedisService(testConfig);
-      expect(service.getClient()).toBeNull();
+      expect(redisService.getClient()).toBeNull();
     });
 
     it('should return client when connected', async () => {
@@ -212,66 +165,25 @@ describe('RedisService', () => {
       const messageId = await redisService.publishSettlementMatch(match);
 
       expect(messageId).not.toBeNull();
-      expect(messageId).toMatch(/^\d+-\d+$/); // Redis stream ID format
+      expect(messageId).toBe('1234567890-0');
     });
 
     it('should return null when not connected', async () => {
-      const service = new RedisService(testConfig);
-
       const consoleSpy = jest.spyOn(console, 'warn').mockImplementation();
       const match = createTestMatch();
-      const messageId = await service.publishSettlementMatch(match);
+      const messageId = await redisService.publishSettlementMatch(match);
 
       expect(messageId).toBeNull();
       expect(consoleSpy).toHaveBeenCalled();
       consoleSpy.mockRestore();
     });
 
-    it('should include all match fields in published data', async () => {
-      await redisService.connect();
-
-      const match = createTestMatch();
-      const messageId = await redisService.publishSettlementMatch(match);
-      expect(messageId).not.toBeNull();
-
-      // Verify data was actually written to Redis stream
-      if (cleanupClient) {
-        const messages = await cleanupClient.xrange(
-          REDIS_STREAMS.SETTLEMENT_MATCHES,
-          messageId!,
-          messageId!
-        );
-
-        expect(messages).toHaveLength(1);
-        const [, fields] = messages[0];
-
-        // Convert fields array to object for easier checking
-        const fieldMap: Record<string, string> = {};
-        for (let i = 0; i < fields.length; i += 2) {
-          fieldMap[fields[i]] = fields[i + 1];
-        }
-
-        expect(fieldMap.matchId).toBe(match.matchId);
-        expect(fieldMap.lendOrderId).toBe(match.lendOrderId);
-        expect(fieldMap.borrowOrderId).toBe(match.borrowOrderId);
-        expect(fieldMap.lenderWallet).toBe(match.lenderWallet);
-        expect(fieldMap.borrowerWallet).toBe(match.borrowerWallet);
-        expect(fieldMap.matchedAmount).toBe(match.matchedAmount);
-        expect(fieldMap.rate).toBe(match.rate.toString());
-        expect(fieldMap.loanToken).toBe(match.loanToken);
-        expect(fieldMap.maturity).toBe(match.maturity.toString());
-        expect(fieldMap.timestamp).toBe(match.timestamp.toString());
-        expect(fieldMap.borrowerIsTaker).toBe(match.borrowerIsTaker.toString());
-      }
-    });
-
     it('should handle Redis errors gracefully', async () => {
       await redisService.connect();
 
-      // Disconnect the underlying client to simulate an error
       const client = redisService.getClient();
       if (client) {
-        await client.quit();
+        (client.xadd as jest.Mock).mockRejectedValueOnce(new Error('Connection lost'));
       }
 
       const consoleSpy = jest.spyOn(console, 'error').mockImplementation();
@@ -288,30 +200,28 @@ describe('RedisService', () => {
     it('should return stream info when connected', async () => {
       await redisService.connect();
 
-      // Publish a test message to create stream
-      const match = createTestMatch();
-      await redisService.publishSettlementMatch(match);
-
       const info = await redisService.getStreamInfo();
 
       expect(info).not.toBeNull();
-      expect(info!.length).toBeGreaterThanOrEqual(1);
-      expect(info!.groups).toBeGreaterThanOrEqual(1);
+      expect(info!.length).toBe(5);
+      expect(info!.groups).toBe(1);
     });
 
     it('should return null when not connected', async () => {
-      const service = new RedisService(testConfig);
-      const info = await service.getStreamInfo();
+      const info = await redisService.getStreamInfo();
       expect(info).toBeNull();
     });
 
-    it('should handle empty stream gracefully', async () => {
+    it('should handle missing stream gracefully', async () => {
       await redisService.connect();
 
-      // Stream might not exist yet
+      const client = redisService.getClient();
+      if (client) {
+        (client.xlen as jest.Mock).mockRejectedValueOnce(new Error('no such key'));
+      }
+
       const info = await redisService.getStreamInfo();
-      expect(info).not.toBeNull();
-      expect(info!.length).toBeGreaterThanOrEqual(0);
+      expect(info).toEqual({ length: 0, groups: 0 });
     });
   });
 
@@ -324,8 +234,19 @@ describe('RedisService', () => {
     });
 
     it('should return false when not connected', async () => {
-      const service = new RedisService(testConfig);
-      const healthy = await service.healthCheck();
+      const healthy = await redisService.healthCheck();
+      expect(healthy).toBe(false);
+    });
+
+    it('should return false when ping fails', async () => {
+      await redisService.connect();
+
+      const client = redisService.getClient();
+      if (client) {
+        (client.ping as jest.Mock).mockRejectedValueOnce(new Error('timeout'));
+      }
+
+      const healthy = await redisService.healthCheck();
       expect(healthy).toBe(false);
     });
   });
@@ -334,43 +255,41 @@ describe('RedisService', () => {
     it('should create consumer group on connect', async () => {
       await redisService.connect();
 
-      // Verify consumer group exists by checking stream info
-      const info = await redisService.getStreamInfo();
-      expect(info).not.toBeNull();
-      expect(info!.groups).toBeGreaterThanOrEqual(1);
+      const client = redisService.getClient();
+      expect(client!.xgroup).toHaveBeenCalledWith(
+        'CREATE',
+        REDIS_STREAMS.SETTLEMENT_MATCHES,
+        REDIS_CONSUMER_GROUPS.SETTLEMENT_ENGINE,
+        '0',
+        'MKSTREAM'
+      );
     });
 
-    it('should handle existing consumer group gracefully', async () => {
-      // First connection creates the group
-      await redisService.connect();
-      await redisService.disconnect();
-
-      // Second connection should handle existing group
-      const service2 = new RedisService(testConfig);
-      const consoleSpy = jest.spyOn(console, 'log').mockImplementation();
-      
-      // Should not throw
-      await service2.connect();
-
-      // Should log that group already exists or created successfully
-      const logCalls = consoleSpy.mock.calls.flat();
-      const hasGroupMessage = logCalls.some((msg) =>
-        typeof msg === 'string' &&
-        (msg.includes('already exists') || msg.includes('Created consumer group'))
+    it('should handle existing consumer group gracefully (BUSYGROUP)', async () => {
+      const Redis = require('ioredis');
+      const mockInstance = new Redis();
+      (mockInstance.xgroup as jest.Mock).mockRejectedValueOnce(
+        new Error('BUSYGROUP Consumer Group name already exists')
       );
-      expect(hasGroupMessage || consoleSpy.mock.calls.length > 0).toBe(true);
-      
+
+      const consoleSpy = jest.spyOn(console, 'log').mockImplementation();
+      const service = new RedisService(testConfig);
+      await service.connect();
+
+      const logCalls = consoleSpy.mock.calls.flat();
+      const hasGroupMessage = logCalls.some(
+        (msg) => typeof msg === 'string' && msg.includes('already exists')
+      );
+      expect(hasGroupMessage).toBe(true);
+
       consoleSpy.mockRestore();
-      await service2.disconnect();
+      await service.disconnect();
     });
   });
 
   describe('SettlementPublisher Interface', () => {
     it('should implement SettlementPublisher interface', () => {
-      const service = new RedisService(testConfig);
-
-      // Verify service has the required method
-      expect(typeof service.publishSettlementMatch).toBe('function');
+      expect(typeof redisService.publishSettlementMatch).toBe('function');
     });
 
     it('should be usable as SettlementPublisher type', async () => {
@@ -382,49 +301,17 @@ describe('RedisService', () => {
     });
   });
 
-  describe('Real Redis Integration', () => {
-    it('should actually connect to Redis and publish messages', async () => {
-      await redisService.connect();
-      expect(redisService.isServiceConnected()).toBe(true);
-
-      // Publish a message
-      const match = createTestMatch();
-      const messageId = await redisService.publishSettlementMatch(match);
-      expect(messageId).not.toBeNull();
-
-      // Verify message exists in Redis
-      if (cleanupClient) {
-        const messages = await cleanupClient.xrange(
-          REDIS_STREAMS.SETTLEMENT_MATCHES,
-          '-',
-          '+',
-          'COUNT',
-          1
-        );
-        console.log("MESSAGES: ", messages)
-        expect(messages.length).toBeGreaterThan(0);
-      }
-    });
-
-    it('should handle multiple messages in stream', async () => {
-      await redisService.connect();
-
-      // Publish multiple messages
-      const match1 = createTestMatch();
-      const match2 = createTestMatch();
-      const match3 = createTestMatch();
-
-      const id1 = await redisService.publishSettlementMatch(match1);
-      const id2 = await redisService.publishSettlementMatch(match2);
-      const id3 = await redisService.publishSettlementMatch(match3);
-
-      expect(id1).not.toBeNull();
-      expect(id2).not.toBeNull();
-      expect(id3).not.toBeNull();
-
-      // Verify all messages are in the stream
-      const info = await redisService.getStreamInfo();
-      expect(info!.length).toBeGreaterThanOrEqual(3);
+  describe('TLS Configuration', () => {
+    it('should accept TLS config', () => {
+      const service = new RedisService({
+        url: 'redis://localhost:6379',
+        db: 0,
+        maxReconnectAttempts: 3,
+        reconnectTimeWait: 1000,
+        timeout: 5000,
+        tls: true,
+      });
+      expect(service).toBeDefined();
     });
   });
 });

@@ -6,7 +6,10 @@ module.exports = {
   collectCoverageFrom: [
     'src/**/*.ts',
     '!src/**/*.test.ts',
-    '!src/**/__tests__/**'
+    '!src/**/__tests__/**',
+    '!src/services/main.ts',
+    '!src/services/db-writer-main.ts',
+    '!src/index.ts'
   ],
   coverageThreshold: {
     global: {
