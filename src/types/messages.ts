@@ -26,15 +26,21 @@ export const cancelOrderMessageSchema = z.object({
   /**
    * Timestamp of the cancellation request
    */
-  timestamp: z.number().int().positive(),
+  timestamp: z.number().int().positive().default(() => Date.now()),
 });
+
+const amountOrQuantitySchema = z.union([z.string(), z.number().transform(n => n.toString())]).optional();
 
 export const updateOrderMessageSchema = z.object({
   orderId: z.string().uuid(),
   walletAddress: ethereumAddressSchema,
-  amount: z.string().optional(),
+  amount: amountOrQuantitySchema,
+  quantity: amountOrQuantitySchema,
+  originalAmount: amountOrQuantitySchema,
   rate: z.number().int().positive().optional(),
-  timestamp: z.number().int().positive()
+  settlementFee: amountOrQuantitySchema,
+  settlementFeeAmount: amountOrQuantitySchema,
+  timestamp: z.number().int().positive().default(() => Date.now())
 })
 
 /**

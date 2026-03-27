@@ -507,7 +507,7 @@ export function handleUpdateOrder(ctx: HandlerContext, data: Uint8Array): void {
     // Parse and validate the update request
     const request = parseMessage(data, updateOrderMessageSchema);
 
-    console.log(`Processing update request for order: ${request.orderId} from wallet: ${request.walletAddress}`);
+    console.log(`Processing update request for order: ${request.orderId}`);
 
     // Get order info before update (needed for status message)
     const orderInfo = ctx.engine.getOrderInfo(request.orderId);
@@ -530,30 +530,54 @@ export function handleUpdateOrder(ctx: HandlerContext, data: Uint8Array): void {
     if (typeof oldOrder === 'object') {
       console.log(`Order ${request.orderId} deactivated for update`);
 
+      const targetQuantity = request.originalAmount || request.quantity || request.amount;
+      const targetSettlementFee = request.settlementFeeAmount || request.settlementFee;
+
       // Calculate new amounts
       let newOriginalAmount = oldOrder.originalAmount;
       let newRemainingAmount = oldOrder.remainingAmount;
-      
-      if (request.amount) {
+      let newSettlementFeeAmount = oldOrder.settlementFeeAmount;
+      let newRemainingSettlementFeeAmount = oldOrder.remainingSettlementFeeAmount ?? oldOrder.settlementFeeAmount;
+
+      if (targetQuantity) {
         const filledAmount = subtractBigNumbers(oldOrder.originalAmount, oldOrder.remainingAmount);
-        newOriginalAmount = request.amount;
-        newRemainingAmount = subtractBigNumbers(request.amount, filledAmount);
-        
+        newOriginalAmount = targetQuantity;
+        newRemainingAmount = subtractBigNumbers(targetQuantity, filledAmount);
+
         // Ensure remaining amount is not negative
         if (BigInt(newRemainingAmount) < 0n) {
-           throw new Error('New total amount cannot be less than already filled amount');
+          throw new Error('New total quantity cannot be less than already filled amount');
         }
+
+        // Recalculate settlement fees pro-rata if amount changed but not explicitly provided
+        if (!targetSettlementFee) {
+          const oldTotal = BigInt(oldOrder.originalAmount);
+          const newTotal = BigInt(newOriginalAmount);
+          newSettlementFeeAmount = ((BigInt(oldOrder.settlementFeeAmount) * newTotal) / oldTotal).toString();
+
+          const remaining = BigInt(newRemainingAmount);
+          newRemainingSettlementFeeAmount = ((BigInt(newSettlementFeeAmount) * remaining) / newTotal).toString();
+        }
+      }
+
+      if (targetSettlementFee) {
+        newSettlementFeeAmount = targetSettlementFee;
+        // Recalculate remaining fee pro-rata based on new total fee
+        const total = BigInt(newOriginalAmount);
+        const remaining = BigInt(newRemainingAmount);
+        newRemainingSettlementFeeAmount = ((BigInt(newSettlementFeeAmount) * remaining) / total).toString();
       }
 
       const newRate = request.rate ?? (oldOrder as any).rate;
 
       // Construct updated order (keeping same ID)
-      // We cast to any then back to Order to avoid union type conflicts since we know it's a limit order
       const updatedOrder = {
         ...oldOrder,
         originalAmount: newOriginalAmount,
         remainingAmount: newRemainingAmount,
         rate: newRate,
+        settlementFeeAmount: newSettlementFeeAmount,
+        remainingSettlementFeeAmount: newRemainingSettlementFeeAmount,
         timestamp: request.timestamp,
       } as Order;
 
@@ -566,25 +590,34 @@ export function handleUpdateOrder(ctx: HandlerContext, data: Uint8Array): void {
         originalAmount: newOriginalAmount,
         remainingAmount: newRemainingAmount,
         rate: newRate,
-        settlementFeeAmount: updatedOrder.settlementFeeAmount,
-        remainingSettlementFeeAmount: updatedOrder.remainingSettlementFeeAmount,
+        settlementFeeAmount: newSettlementFeeAmount,
+        remainingSettlementFeeAmount: newRemainingSettlementFeeAmount,
         timestamp: request.timestamp,
       };
-      
-      ctx.nc.publish(NATS_TOPICS.ORDERS_UPDATED, JSON.stringify(updateEvent));
-      
-      // Also publish the status update to confirm it's still alive (OPEN/PARTIALLY_FILLED)
-      const statusMessage = createOrderStatusMessage({
-        orderId: request.orderId,
-        status: updateResult.remainingOrder ? updateResult.remainingOrder.status : OrderStatus.Filled,
-        remainingAmount: updateResult.remainingOrder ? updateResult.remainingOrder.remainingAmount : '0',
-        originalAmount: newOriginalAmount,
-        settlementFeeAmount: updatedOrder.settlementFeeAmount,
-        remainingSettlementFeeAmount: updatedOrder.remainingSettlementFeeAmount,
-      });
-      ctx.nc.publish(NATS_TOPICS.ORDERS_STATUS, JSON.stringify(statusMessage));
 
-      console.log(`Order ${request.orderId} updated in-place and re-published`);
+      ctx.nc.publish(NATS_TOPICS.ORDERS_UPDATED, JSON.stringify(updateEvent));
+
+      const oldRate = (oldOrder as any).rate;
+      const oldOriginalAmount = oldOrder.originalAmount;
+
+      console.log(`Order ${request.orderId} updated: [Rate: ${oldRate} -> ${newRate}], [Quantity: ${oldOriginalAmount} -> ${newOriginalAmount}]`);
+
+      publishOrderStatusUpdates(ctx, request.orderId, updateResult, {
+        originalAmount: newOriginalAmount,
+        settlementFeeAmount: newSettlementFeeAmount,
+        remainingSettlementFeeAmount: newRemainingSettlementFeeAmount,
+        walletAddress: updatedOrder.walletAddress,
+        assetId: updatedOrder.assetId,
+        side: updatedOrder.side,
+        type: updatedOrder.type,
+        marketIds: updatedOrder.markets.map((m) => m.marketId),
+      });
+
+      if (updateResult.matches.length > 0) {
+        publishMatchCreatedEvents(ctx, updatedOrder.assetId, updatedOrder.side, updateResult.matches);
+      }
+
+      console.log(`Order ${request.orderId} re-published: ${updateResult.matches.length} matches found after update`);
     } else {
       let errorCode: ErrorCode = ERROR_CODES.VALIDATION_ERROR;
       let errorMessage = 'Wallet address does not match order owner';

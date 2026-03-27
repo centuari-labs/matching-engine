@@ -14,6 +14,7 @@ import {
   handleBorrowMarketOrder,
   handleBorrowLimitOrder,
   handleCancelOrder,
+  handleUpdateOrder,
   type HandlerContext,
 } from './message-handlers';
 
@@ -151,6 +152,12 @@ export class NatsService {
     this.subscriptions.push(cancelSub);
     this.processSubscription(cancelSub, (data) => handleCancelOrder(ctx, data));
     console.log(`✓ Subscribed to ${NATS_TOPICS.ORDERS_CANCEL}`);
+
+    // Subscribe to update orders
+    const updateSub = this.nc.subscribe(NATS_TOPICS.ORDERS_UPDATE);
+    this.subscriptions.push(updateSub);
+    this.processSubscription(updateSub, (data) => handleUpdateOrder(ctx, data));
+    console.log(`✓ Subscribed to ${NATS_TOPICS.ORDERS_UPDATE}`);
   }
 
   /**
