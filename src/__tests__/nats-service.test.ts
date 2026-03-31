@@ -9,7 +9,7 @@ import { MatchingEngine } from '../core/matching-engine';
 import { NatsService } from '../services/nats-service';
 import type { NatsConfig } from '../config/nats-config';
 import { OrderSide, OrderType, OrderStatus } from '../types/orders';
-import { marketsFromMaturities } from './factories/order-factory';
+import { marketsFromMaturities, DEFAULT_ASSET_ID } from './factories/order-factory';
 
 // Mock NATS config for testing
 const mockConfig: NatsConfig = {
@@ -334,6 +334,7 @@ describe('NatsService Integration (requires NATS server)', () => {
         originalAmount: '1000000',
         remainingAmount: '1000000',
         settlementFeeAmount: '10000',
+        assetId: DEFAULT_ASSET_ID,
         status: OrderStatus.Open,
         rate: 500,
       };

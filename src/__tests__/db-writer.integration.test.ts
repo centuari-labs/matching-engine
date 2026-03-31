@@ -488,6 +488,8 @@ describe('DbWriterService Integration (requires Postgres, Redis, NATS)', () => {
       const fields: string[] = [
         'matchId',
         match.matchId,
+        'marketId',
+        match.marketId,
         'lendOrderId',
         match.lendOrderId,
         'borrowOrderId',
