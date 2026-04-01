@@ -799,4 +799,65 @@ describe('Maker/Taker Fee Calculations', () => {
       }
     });
   });
+
+  describe('Fee Boundary Edge Cases', () => {
+    it('should return "0" for calculateMakerFee with 0 BPS regardless of amount', () => {
+      expect(calculateMakerFee('1000000', 0)).toBe('0');
+      expect(calculateMakerFee('999999999999999999', 0)).toBe('0');
+      expect(calculateMakerFee('1', 0)).toBe('0');
+    });
+
+    it('should return "0" for calculateTakerFee with 0 BPS regardless of amount', () => {
+      expect(calculateTakerFee('1000000', 0)).toBe('0');
+      expect(calculateTakerFee('999999999999999999', 0)).toBe('0');
+      expect(calculateTakerFee('1', 0)).toBe('0');
+    });
+
+    it('should return full amount for calculateMakerFee with max BPS (10000)', () => {
+      expect(calculateMakerFee('1000000', 10000)).toBe('1000000');
+      expect(calculateMakerFee('1', 10000)).toBe('1');
+      expect(calculateMakerFee('123456789', 10000)).toBe('123456789');
+    });
+
+    it('should return full amount for calculateTakerFee with max BPS (10000)', () => {
+      expect(calculateTakerFee('1000000', 10000)).toBe('1000000');
+      expect(calculateTakerFee('1', 10000)).toBe('1');
+      expect(calculateTakerFee('123456789', 10000)).toBe('123456789');
+    });
+
+    it('should return exactly "1" for amount "10000" with 1 BPS (threshold)', () => {
+      expect(calculateMakerFee('10000', 1)).toBe('1');
+      expect(calculateTakerFee('10000', 1)).toBe('1');
+    });
+
+    it('should return "0" for amount "9999" with 1 BPS (below threshold)', () => {
+      expect(calculateMakerFee('9999', 1)).toBe('0');
+      expect(calculateTakerFee('9999', 1)).toBe('0');
+    });
+
+    it('should use config-loaded default BPS when no explicit BPS param is passed', () => {
+      // Default config: makerFeeBps = 10, takerFeeBps = 20
+      const makerFee = calculateMakerFee('1000000');
+      const takerFee = calculateTakerFee('1000000');
+      // Should produce non-zero fees using defaults
+      expect(BigInt(makerFee)).toBeGreaterThan(0n);
+      expect(BigInt(takerFee)).toBeGreaterThan(0n);
+      // Taker fee should be >= maker fee (default taker BPS >= maker BPS)
+      expect(BigInt(takerFee)).toBeGreaterThanOrEqual(BigInt(makerFee));
+    });
+
+    it('should handle very large amounts near 2^128 without overflow', () => {
+      const hugeAmount = '340282366920938463463374607431768211455'; // 2^128 - 1
+      const makerFee = calculateMakerFee(hugeAmount, 10);
+      const takerFee = calculateTakerFee(hugeAmount, 20);
+      // Verify no crash and result is a valid positive number string
+      expect(makerFee).toMatch(/^\d+$/);
+      expect(takerFee).toMatch(/^\d+$/);
+      expect(BigInt(makerFee)).toBeGreaterThan(0n);
+      expect(BigInt(takerFee)).toBeGreaterThan(0n);
+      // Verify math: floor(hugeAmount * 10 / 10000)
+      const expected = (BigInt(hugeAmount) * 10n / 10000n).toString();
+      expect(makerFee).toBe(expected);
+    });
+  });
 });

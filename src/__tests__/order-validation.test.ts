@@ -197,5 +197,120 @@ describe('Order Validation', () => {
       expect(() => borrowLimitOrderSchema.parse(order)).toThrow();
     });
   });
+
+  describe('Schema Boundary Tests', () => {
+    it('should accept rate = 0 for lend limit order (min boundary)', () => {
+      expect(() => createLendLimitOrder({ rate: 0 })).not.toThrow();
+    });
+
+    it('should accept rate = 10000 for borrow limit order (max boundary)', () => {
+      expect(() => createBorrowLimitOrder({ rate: 10000 })).not.toThrow();
+    });
+
+    it('should accept amount = "0" as valid per regex', () => {
+      // Documents that "0" is a valid amount string per the schema
+      // (guarded at runtime by business logic, not schema)
+      const result = lendLimitOrderSchema.safeParse({
+        orderId: '550e8400-e29b-41d4-a716-446655440000',
+        walletAddress: validWalletAddress,
+        loanToken: validLoanToken,
+        assetId: '550e8400-e29b-41d4-a716-446655440001',
+        markets: marketsFromMaturities([1704067200]),
+        timestamp: Date.now(),
+        side: OrderSide.Lend,
+        type: OrderType.Limit,
+        status: OrderStatus.Open,
+        originalAmount: '0',
+        remainingAmount: '0',
+        settlementFeeAmount: '0',
+        rate: 500,
+      });
+      expect(result.success).toBe(true);
+    });
+
+    it('should reject maturity = 0 (positive() check)', () => {
+      const result = lendLimitOrderSchema.safeParse({
+        orderId: '550e8400-e29b-41d4-a716-446655440000',
+        walletAddress: validWalletAddress,
+        loanToken: validLoanToken,
+        assetId: '550e8400-e29b-41d4-a716-446655440001',
+        markets: [{ marketId: '550e8400-e29b-41d4-a716-446655440002', maturity: 0 }],
+        timestamp: Date.now(),
+        side: OrderSide.Lend,
+        type: OrderType.Limit,
+        status: OrderStatus.Open,
+        originalAmount: '1000000',
+        remainingAmount: '1000000',
+        settlementFeeAmount: '10000',
+        rate: 500,
+      });
+      expect(result.success).toBe(false);
+    });
+
+    it('should accept Ethereum address with all uppercase hex', () => {
+      expect(() =>
+        createLendLimitOrder({
+          walletAddress: '0xABCDEF0123456789ABCDEF0123456789ABCDEF01',
+        })
+      ).not.toThrow();
+    });
+
+    it('should reject Ethereum address missing "0x" prefix', () => {
+      const result = lendLimitOrderSchema.safeParse({
+        orderId: '550e8400-e29b-41d4-a716-446655440000',
+        walletAddress: '1234567890123456789012345678901234567890',
+        loanToken: validLoanToken,
+        assetId: '550e8400-e29b-41d4-a716-446655440001',
+        markets: marketsFromMaturities([1704067200]),
+        timestamp: Date.now(),
+        side: OrderSide.Lend,
+        type: OrderType.Limit,
+        status: OrderStatus.Open,
+        originalAmount: '1000000',
+        remainingAmount: '1000000',
+        settlementFeeAmount: '10000',
+        rate: 500,
+      });
+      expect(result.success).toBe(false);
+    });
+
+    it('should reject Ethereum address with invalid hex chars', () => {
+      const result = lendLimitOrderSchema.safeParse({
+        orderId: '550e8400-e29b-41d4-a716-446655440000',
+        walletAddress: '0xGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGG',
+        loanToken: validLoanToken,
+        assetId: '550e8400-e29b-41d4-a716-446655440001',
+        markets: marketsFromMaturities([1704067200]),
+        timestamp: Date.now(),
+        side: OrderSide.Lend,
+        type: OrderType.Limit,
+        status: OrderStatus.Open,
+        originalAmount: '1000000',
+        remainingAmount: '1000000',
+        settlementFeeAmount: '10000',
+        rate: 500,
+      });
+      expect(result.success).toBe(false);
+    });
+
+    it('should reject empty markets array', () => {
+      const result = lendLimitOrderSchema.safeParse({
+        orderId: '550e8400-e29b-41d4-a716-446655440000',
+        walletAddress: validWalletAddress,
+        loanToken: validLoanToken,
+        assetId: '550e8400-e29b-41d4-a716-446655440001',
+        markets: [],
+        timestamp: Date.now(),
+        side: OrderSide.Lend,
+        type: OrderType.Limit,
+        status: OrderStatus.Open,
+        originalAmount: '1000000',
+        remainingAmount: '1000000',
+        settlementFeeAmount: '10000',
+        rate: 500,
+      });
+      expect(result.success).toBe(false);
+    });
+  });
 });
 
