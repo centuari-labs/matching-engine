@@ -65,13 +65,13 @@ export class MatchingEngine {
     // backwards compatibility in tests or any internal callers that only set
     // settlementFeeAmount).
     const currentRemaining =
-      (order as any).remainingSettlementFeeAmount ?? order.settlementFeeAmount;
+      order.remainingSettlementFeeAmount ?? order.settlementFeeAmount;
 
     const proRata = calculateProRataSettlementFee(totalFee, matchedAmount, originalAmount);
     const actualFee = minBigNumber(proRata, currentRemaining);
 
     const remainingAfter = subtractBigNumbers(currentRemaining, actualFee);
-    (order as any).remainingSettlementFeeAmount = remainingAfter;
+    order.remainingSettlementFeeAmount = remainingAfter;
 
     return actualFee;
   }
@@ -216,7 +216,7 @@ export class MatchingEngine {
             remainingAmount: borrowRemainingAmount,
             originalAmount: borrowOrder.originalAmount,
             settlementFeeAmount: borrowOrder.settlementFeeAmount,
-            remainingSettlementFeeAmount: (borrowOrder as any).remainingSettlementFeeAmount,
+            remainingSettlementFeeAmount: borrowOrder.remainingSettlementFeeAmount,
           });
         } else {
           this.orderBook.updateOrderAmount(borrowOrder.orderId, borrowRemainingAmount);
@@ -226,7 +226,7 @@ export class MatchingEngine {
             remainingAmount: borrowRemainingAmount,
             originalAmount: borrowOrder.originalAmount,
             settlementFeeAmount: borrowOrder.settlementFeeAmount,
-            remainingSettlementFeeAmount: (borrowOrder as any).remainingSettlementFeeAmount,
+            remainingSettlementFeeAmount: borrowOrder.remainingSettlementFeeAmount,
           });
         }
       }
@@ -339,7 +339,7 @@ export class MatchingEngine {
             remainingAmount: borrowRemainingAmount,
             originalAmount: borrowOrder.originalAmount,
             settlementFeeAmount: borrowOrder.settlementFeeAmount,
-            remainingSettlementFeeAmount: (borrowOrder as any).remainingSettlementFeeAmount,
+            remainingSettlementFeeAmount: borrowOrder.remainingSettlementFeeAmount,
           });
         } else {
           this.orderBook.updateOrderAmount(borrowOrder.orderId, borrowRemainingAmount);
@@ -349,7 +349,7 @@ export class MatchingEngine {
             remainingAmount: borrowRemainingAmount,
             originalAmount: borrowOrder.originalAmount,
             settlementFeeAmount: borrowOrder.settlementFeeAmount,
-            remainingSettlementFeeAmount: (borrowOrder as any).remainingSettlementFeeAmount,
+            remainingSettlementFeeAmount: borrowOrder.remainingSettlementFeeAmount,
           });
         }
       }
@@ -458,7 +458,7 @@ export class MatchingEngine {
             remainingAmount: lendRemainingAmount,
             originalAmount: lendOrder.originalAmount,
             settlementFeeAmount: lendOrder.settlementFeeAmount,
-            remainingSettlementFeeAmount: (lendOrder as any).remainingSettlementFeeAmount,
+            remainingSettlementFeeAmount: lendOrder.remainingSettlementFeeAmount,
           });
         } else {
           this.orderBook.updateOrderAmount(lendOrder.orderId, lendRemainingAmount);
@@ -468,7 +468,7 @@ export class MatchingEngine {
             remainingAmount: lendRemainingAmount,
             originalAmount: lendOrder.originalAmount,
             settlementFeeAmount: lendOrder.settlementFeeAmount,
-            remainingSettlementFeeAmount: (lendOrder as any).remainingSettlementFeeAmount,
+            remainingSettlementFeeAmount: lendOrder.remainingSettlementFeeAmount,
           });
         }
       }
@@ -578,7 +578,7 @@ export class MatchingEngine {
             remainingAmount: lendRemainingAmount,
             originalAmount: lendOrder.originalAmount,
             settlementFeeAmount: lendOrder.settlementFeeAmount,
-            remainingSettlementFeeAmount: (lendOrder as any).remainingSettlementFeeAmount,
+            remainingSettlementFeeAmount: lendOrder.remainingSettlementFeeAmount,
           });
         } else {
           this.orderBook.updateOrderAmount(lendOrder.orderId, lendRemainingAmount);
@@ -588,7 +588,7 @@ export class MatchingEngine {
             remainingAmount: lendRemainingAmount,
             originalAmount: lendOrder.originalAmount,
             settlementFeeAmount: lendOrder.settlementFeeAmount,
-            remainingSettlementFeeAmount: (lendOrder as any).remainingSettlementFeeAmount,
+            remainingSettlementFeeAmount: lendOrder.remainingSettlementFeeAmount,
           });
         }
       }
@@ -681,7 +681,7 @@ export class MatchingEngine {
       remainingAmount: order.remainingAmount,
       settlementFeeAmount: order.settlementFeeAmount,
       remainingSettlementFeeAmount:
-        (order as any).remainingSettlementFeeAmount ?? order.settlementFeeAmount,
+        order.remainingSettlementFeeAmount ?? order.settlementFeeAmount,
     };
   }
 
