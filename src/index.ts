@@ -64,6 +64,11 @@ export {
   createOrderStatusMessage,
 } from './types/messages';
 
+// Buffer types
+export type { BufferStats, BufferEventHandler } from './types/buffer';
+export { loadBufferConfig } from './config/buffer-config';
+export type { BufferConfig } from './config/buffer-config';
+
 // Utility exports
 export {
   generateOrderId,

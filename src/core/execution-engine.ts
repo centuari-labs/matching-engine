@@ -1,6 +1,7 @@
 import type { Match } from '../types/matches';
 import { matchSchema } from '../types/matches';
 import type { SettlementPublisher } from '../types/settlement';
+import type { BufferStats, BufferEventHandler } from '../types/buffer';
 import { generateMatchId } from '../utils/helpers';
 
 /**
@@ -21,16 +22,44 @@ export class ExecutionEngine {
   /** Optional publisher for settlement matches */
   private settlementPublisher?: SettlementPublisher;
 
+  /** Optional handler for buffer lifecycle events (retry, threshold, disk spill) */
+  private bufferEventHandler?: BufferEventHandler;
+
+  /** Warning thresholds for buffer size monitoring (sorted ascending) */
+  private warningThresholds: number[];
+
+  /** Disk spill threshold */
+  private diskSpillThreshold: number;
+
+  /** Tracks which matchIds are currently in an active retry cycle */
+  private retryingMatchIds: Set<string>;
+
+  /** Tracks the last warning threshold that was reported to avoid duplicate alerts */
+  private lastReportedThreshold: number | null;
+
   /**
    * Create a new ExecutionEngine instance
    *
    * @param settlementPublisher - Optional publisher for settlement matches
+   * @param bufferEventHandler - Optional handler for buffer events (retry, thresholds, disk spill)
+   * @param warningThresholds - Buffer size thresholds that trigger warnings
+   * @param diskSpillThreshold - Buffer size that triggers disk spill
    */
-  constructor(settlementPublisher?: SettlementPublisher) {
+  constructor(
+    settlementPublisher?: SettlementPublisher,
+    bufferEventHandler?: BufferEventHandler,
+    warningThresholds: number[] = [],
+    diskSpillThreshold: number = 0
+  ) {
     this.matches = new Map();
     this.matchesByLendOrder = new Map();
     this.matchesByBorrowOrder = new Map();
     this.settlementPublisher = settlementPublisher;
+    this.bufferEventHandler = bufferEventHandler;
+    this.warningThresholds = [...warningThresholds].sort((a, b) => a - b);
+    this.diskSpillThreshold = diskSpillThreshold;
+    this.retryingMatchIds = new Set();
+    this.lastReportedThreshold = null;
   }
 
   /**
@@ -116,6 +145,9 @@ export class ExecutionEngine {
     }
     this.matchesByBorrowOrder.get(params.borrowOrderId)!.push(match.matchId);
 
+    // Check buffer thresholds after storing
+    this.checkThresholds();
+
     // Publish to settlement publisher (async, non-blocking)
     if (this.settlementPublisher) {
       this.publishAndCleanup(match);
@@ -139,19 +171,23 @@ export class ExecutionEngine {
         if (messageId) {
           // Success: remove from memory (Redis is source of truth)
           this.removeMatch(match.matchId);
+          this.retryingMatchIds.delete(match.matchId);
+          this.bufferEventHandler?.onPublishSucceeded(match.matchId);
         } else {
-          // Failed: keep in memory as fallback
+          // Failed: keep in memory, notify handler for retry
           console.warn(
             `Settlement publish returned null for match ${match.matchId}, keeping in memory`
           );
+          this.bufferEventHandler?.onPublishFailed(match);
         }
       })
       .catch((error) => {
-        // Error: keep in memory as fallback
+        // Error: keep in memory, notify handler for retry
         console.error(
           `Failed to publish settlement match ${match.matchId}, keeping in memory:`,
           error
         );
+        this.bufferEventHandler?.onPublishFailed(match);
       });
   }
 
@@ -193,6 +229,136 @@ export class ExecutionEngine {
       if (borrowMatchIds.length === 0) {
         this.matchesByBorrowOrder.delete(match.borrowOrderId);
       }
+    }
+  }
+
+  /**
+   * Retry publishing a match that previously failed
+   *
+   * Called by the retry service when it's time to re-attempt publishing.
+   * No-ops if the match has already been published and removed.
+   *
+   * @param matchId - ID of the match to retry
+   */
+  retryPublish(matchId: string): void {
+    const match = this.matches.get(matchId);
+    if (!match || !this.settlementPublisher) return;
+    this.publishAndCleanup(match);
+  }
+
+  /**
+   * Mark a match as currently being retried
+   *
+   * @param matchId - ID of the match
+   */
+  markRetrying(matchId: string): void {
+    if (this.matches.has(matchId)) {
+      this.retryingMatchIds.add(matchId);
+    }
+  }
+
+  /**
+   * Unmark a match from the retrying set
+   *
+   * @param matchId - ID of the match
+   */
+  unmarkRetrying(matchId: string): void {
+    this.retryingMatchIds.delete(matchId);
+  }
+
+  /**
+   * Get buffer statistics for monitoring
+   *
+   * @returns Current buffer statistics
+   */
+  getBufferStats(): BufferStats {
+    const now = Date.now();
+    let oldestTimestamp = now;
+
+    for (const match of this.matches.values()) {
+      if (match.timestamp < oldestTimestamp) {
+        oldestTimestamp = match.timestamp;
+      }
+    }
+
+    const totalMatches = this.matches.size;
+
+    return {
+      totalMatches,
+      retryingCount: this.retryingMatchIds.size,
+      oldestMatchAge: totalMatches > 0 ? now - oldestTimestamp : 0,
+      thresholdBreached: this.getBreachedThreshold(totalMatches),
+    };
+  }
+
+  /**
+   * Merge matches into the buffer without clearing existing state
+   *
+   * Used to load disk-spilled matches on startup. Deduplicates by matchId.
+   *
+   * @param matches - Matches to merge
+   */
+  mergeMatches(matches: Match[]): void {
+    for (const match of matches) {
+      if (this.matches.has(match.matchId)) {
+        continue;
+      }
+
+      matchSchema.parse(match);
+
+      this.matches.set(match.matchId, match);
+
+      if (!this.matchesByLendOrder.has(match.lendOrderId)) {
+        this.matchesByLendOrder.set(match.lendOrderId, []);
+      }
+      this.matchesByLendOrder.get(match.lendOrderId)!.push(match.matchId);
+
+      if (!this.matchesByBorrowOrder.has(match.borrowOrderId)) {
+        this.matchesByBorrowOrder.set(match.borrowOrderId, []);
+      }
+      this.matchesByBorrowOrder.get(match.borrowOrderId)!.push(match.matchId);
+    }
+  }
+
+  /**
+   * Get the highest warning threshold breached by the current buffer size
+   *
+   * @param size - Current buffer size
+   * @returns Highest threshold breached, or null if none
+   */
+  private getBreachedThreshold(size: number): number | null {
+    let breached: number | null = null;
+    for (const threshold of this.warningThresholds) {
+      if (size >= threshold) {
+        breached = threshold;
+      }
+    }
+    return breached;
+  }
+
+  /**
+   * Check buffer thresholds and fire callbacks if new thresholds are crossed
+   */
+  private checkThresholds(): void {
+    if (!this.bufferEventHandler) return;
+
+    const size = this.matches.size;
+    const breached = this.getBreachedThreshold(size);
+
+    // Fire warning if a new (higher) threshold was crossed
+    if (breached !== null && breached !== this.lastReportedThreshold) {
+      this.lastReportedThreshold = breached;
+      this.bufferEventHandler.onThresholdBreached(size, breached);
+    }
+
+    // Reset tracking when buffer shrinks below all thresholds
+    if (breached === null && this.lastReportedThreshold !== null) {
+      this.lastReportedThreshold = null;
+    }
+
+    // Fire disk spill if threshold is set and exceeded
+    if (this.diskSpillThreshold > 0 && size >= this.diskSpillThreshold) {
+      this.bufferEventHandler.onDiskSpillNeeded(this.getAllMatches());
     }
   }
 
@@ -412,4 +578,3 @@ export class ExecutionEngine {
     }
   }
 }
-

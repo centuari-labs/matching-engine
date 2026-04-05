@@ -9,7 +9,10 @@ import { MatchingEngine } from '../core/matching-engine';
 import { NatsService } from './nats-service';
 import { RedisService } from './redis-service';
 import { SnapshotService } from './snapshot-service';
+import { RetryService } from './retry-service';
+import { DiskPersistenceService } from './disk-persistence-service';
 import { PostgresDbClient } from './db/postgres-db-client';
+import { loadBufferConfig } from '../config/buffer-config';
 import * as dotenv from 'dotenv';
 
 // Load environment variables from .env file
@@ -22,6 +25,8 @@ let natsService: NatsService | null = null;
 let redisService: RedisService | null = null;
 let matchingEngine: MatchingEngine | null = null;
 let snapshotService: SnapshotService | null = null;
+let retryService: RetryService | null = null;
+let diskPersistenceService: DiskPersistenceService | null = null;
 let snapshotTimer: NodeJS.Timeout | null = null;
 let isShuttingDown = false;
 
@@ -57,6 +62,23 @@ async function handleShutdown(signal: string): Promise<void> {
       }
     }
 
+    // Flush unpublished matches to disk and shutdown retry service
+    if (matchingEngine && diskPersistenceService) {
+      try {
+        const unpublished = matchingEngine.getExecutionEngine().getUnpublishedMatches();
+        if (unpublished.length > 0) {
+          await diskPersistenceService.flush(unpublished);
+          console.log(`✓ Flushed ${unpublished.length} unpublished matches to disk`);
+        }
+      } catch (error) {
+        console.warn('Failed to flush unpublished matches to disk:', error);
+      }
+    }
+
+    if (retryService) {
+      retryService.shutdown();
+    }
+
     // Disconnect from NATS
     if (natsService) {
       await natsService.disconnect();
@@ -82,7 +104,7 @@ async function handleShutdown(signal: string): Promise<void> {
  */
 function handleUncaughtError(error: Error): void {
   console.error('Uncaught error:', error);
-  
+
   // Attempt graceful shutdown
   handleShutdown('UNCAUGHT_ERROR').catch(() => {
     process.exit(1);
@@ -113,7 +135,9 @@ async function main(): Promise<void> {
       console.log();
     } catch (redisError) {
       console.warn('⚠ Redis connection failed, settlement publishing disabled');
-      console.warn(`  Error: ${redisError instanceof Error ? redisError.message : 'Unknown error'}`);
+      console.warn(
+        `  Error: ${redisError instanceof Error ? redisError.message : 'Unknown error'}`
+      );
       console.log();
       redisService = null;
     }
@@ -137,16 +161,38 @@ async function main(): Promise<void> {
       console.log('Snapshot service: Disabled\n');
     }
 
+    // Initialize buffer management (retry + disk persistence)
+    console.log('Initializing buffer management...');
+    const bufferConfig = loadBufferConfig();
+    diskPersistenceService = new DiskPersistenceService(bufferConfig.diskSpillDir);
+    retryService = new RetryService(diskPersistenceService, bufferConfig);
+    console.log(
+      `  Retry backoff: ${bufferConfig.retryInitialDelayMs}ms initial, ${bufferConfig.retryMaxDelayMs}ms max`
+    );
+    console.log(`  Warning thresholds: ${bufferConfig.warningThresholds.join(', ')}`);
+    console.log(`  Disk spill threshold: ${bufferConfig.diskSpillThreshold}`);
+    console.log(`  Disk spill directory: ${bufferConfig.diskSpillDir}`);
+    console.log('✓ Buffer management initialized\n');
+
     // Initialize matching engine with optional settlement publisher (Redis) and snapshot service
     console.log('Initializing matching engine...');
-    matchingEngine = new MatchingEngine(redisService ?? undefined, snapshotService ?? undefined);
+    matchingEngine = new MatchingEngine(
+      redisService ?? undefined,
+      snapshotService ?? undefined,
+      retryService,
+      bufferConfig.warningThresholds,
+      bufferConfig.diskSpillThreshold
+    );
+    retryService.setExecutionEngine(matchingEngine.getExecutionEngine());
     console.log('✓ Matching engine initialized\n');
 
     // Restore state from snapshot if available (unless reset requested)
     if (snapshotService) {
       const snapshotResetOnStartup = process.env.SNAPSHOT_RESET_ON_STARTUP === 'true';
       if (snapshotResetOnStartup) {
-        console.log('SNAPSHOT_RESET_ON_STARTUP=true: Starting with empty state (skipping restore)\n');
+        console.log(
+          'SNAPSHOT_RESET_ON_STARTUP=true: Starting with empty state (skipping restore)\n'
+        );
       } else {
         console.log('Attempting to restore state from snapshot...');
         const restored = await matchingEngine.restoreFromSnapshot();
@@ -155,6 +201,31 @@ async function main(): Promise<void> {
         } else {
           console.log('  No snapshot found or restore failed, starting with empty state\n');
         }
+      }
+    }
+
+    // Restore disk-spilled matches if any exist from a previous crash
+    if (diskPersistenceService && matchingEngine) {
+      try {
+        const hasSpill = await diskPersistenceService.exists();
+        if (hasSpill) {
+          console.log('Loading disk-spilled unpublished matches...');
+          const spilledMatches = await diskPersistenceService.load();
+          if (spilledMatches.length > 0) {
+            matchingEngine.getExecutionEngine().mergeMatches(spilledMatches);
+            console.log(`✓ Merged ${spilledMatches.length} matches from disk spill`);
+            // Retry publishing all recovered matches
+            for (const match of spilledMatches) {
+              matchingEngine.getExecutionEngine().retryPublish(match.matchId);
+            }
+            console.log('✓ Queued recovered matches for publishing\n');
+          }
+        }
+      } catch (error) {
+        console.warn(
+          '⚠ Failed to load disk-spilled matches:',
+          error instanceof Error ? error.message : 'Unknown error'
+        );
       }
     }
 
@@ -213,10 +284,7 @@ async function main(): Promise<void> {
 
     // Start periodic snapshot timer if enabled
     if (snapshotService && matchingEngine) {
-      const snapshotIntervalSeconds = parseInt(
-        process.env.SNAPSHOT_INTERVAL_SECONDS || '30',
-        10
-      );
+      const snapshotIntervalSeconds = parseInt(process.env.SNAPSHOT_INTERVAL_SECONDS || '30', 10);
       if (snapshotIntervalSeconds > 0) {
         snapshotTimer = setInterval(() => {
           matchingEngine!.saveSnapshot().catch((error) => {
@@ -275,4 +343,3 @@ if (require.main === module) {
 
 // Export for testing
 export { main, handleShutdown, startService };
-

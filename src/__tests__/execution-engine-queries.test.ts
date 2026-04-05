@@ -6,10 +6,7 @@
 
 import { ExecutionEngine } from '../core/execution-engine';
 import { createMatch } from './factories/match-factory';
-import {
-  DEFAULT_LOAN_TOKEN,
-  DEFAULT_MATURITY,
-} from './factories/order-factory';
+import { DEFAULT_LOAN_TOKEN, DEFAULT_MATURITY } from './factories/order-factory';
 
 describe('ExecutionEngine Queries', () => {
   let engine: ExecutionEngine;
@@ -176,6 +173,91 @@ describe('ExecutionEngine Queries', () => {
       const stats = engine.getStatistics(DEFAULT_LOAN_TOKEN, DEFAULT_MATURITY);
       expect(stats).not.toBeNull();
       expect(stats!.totalVolume).toBe(1250000n);
+    });
+  });
+
+  describe('getBufferStats', () => {
+    it('should return zero stats for empty engine', () => {
+      const stats = engine.getBufferStats();
+      expect(stats.totalMatches).toBe(0);
+      expect(stats.retryingCount).toBe(0);
+      expect(stats.oldestMatchAge).toBe(0);
+      expect(stats.thresholdBreached).toBeNull();
+    });
+
+    it('should return correct totalMatches count', () => {
+      engine.restoreMatches([createMatch(), createMatch(), createMatch()]);
+
+      const stats = engine.getBufferStats();
+      expect(stats.totalMatches).toBe(3);
+    });
+
+    it('should track retrying matches', () => {
+      const match = createMatch();
+      engine.restoreMatches([match]);
+
+      engine.markRetrying(match.matchId);
+
+      const stats = engine.getBufferStats();
+      expect(stats.retryingCount).toBe(1);
+    });
+
+    it('should calculate oldest match age', () => {
+      const oldMatch = createMatch({ timestamp: Date.now() - 60000 });
+      const newMatch = createMatch({ timestamp: Date.now() });
+      engine.restoreMatches([oldMatch, newMatch]);
+
+      const stats = engine.getBufferStats();
+      expect(stats.oldestMatchAge).toBeGreaterThanOrEqual(59000);
+    });
+
+    it('should report breached threshold', () => {
+      const thresholds = [2, 5, 10];
+      const engineWithThresholds = new ExecutionEngine(undefined, undefined, thresholds);
+
+      engineWithThresholds.restoreMatches([createMatch(), createMatch(), createMatch()]);
+
+      const stats = engineWithThresholds.getBufferStats();
+      expect(stats.thresholdBreached).toBe(2);
+    });
+
+    it('should report null when no threshold is breached', () => {
+      const thresholds = [100, 500];
+      const engineWithThresholds = new ExecutionEngine(undefined, undefined, thresholds);
+
+      engineWithThresholds.restoreMatches([createMatch()]);
+
+      const stats = engineWithThresholds.getBufferStats();
+      expect(stats.thresholdBreached).toBeNull();
+    });
+  });
+
+  describe('mergeMatches', () => {
+    it('should merge matches without clearing existing state', () => {
+      const existing = createMatch();
+      const newMatch = createMatch();
+
+      engine.restoreMatches([existing]);
+      engine.mergeMatches([newMatch]);
+
+      expect(engine.matchCount).toBe(2);
+      expect(engine.getMatch(existing.matchId)).not.toBeNull();
+      expect(engine.getMatch(newMatch.matchId)).not.toBeNull();
+    });
+
+    it('should deduplicate by matchId', () => {
+      const match = createMatch();
+
+      engine.restoreMatches([match]);
+      engine.mergeMatches([match]);
+
+      expect(engine.matchCount).toBe(1);
+    });
+  });
+
+  describe('retryPublish', () => {
+    it('should no-op for unknown matchId', () => {
+      expect(() => engine.retryPublish('unknown-id')).not.toThrow();
     });
   });
 });

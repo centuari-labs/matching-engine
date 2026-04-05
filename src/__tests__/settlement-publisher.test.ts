@@ -11,8 +11,14 @@
 import { ExecutionEngine } from '../core/execution-engine';
 import { MatchingEngine } from '../core/matching-engine';
 import type { SettlementPublisher } from '../types/settlement';
+import type { BufferEventHandler } from '../types/buffer';
 import type { Match } from '../types/matches';
-import { generateOrderId, generateMatchId, calculateMakerFee, calculateTakerFee } from '../utils/helpers';
+import {
+  generateOrderId,
+  generateMatchId,
+  calculateMakerFee,
+  calculateTakerFee,
+} from '../utils/helpers';
 import type { LendLimitOrder, BorrowLimitOrder } from '../types/orders';
 import {
   createLendLimitOrder,
@@ -533,9 +539,9 @@ describe('SettlementPublisher Integration', () => {
           maturity,
           borrowerIsTaker: true,
           makerFeeAmount: calculateMakerFee(matchedAmount),
-        takerFeeAmount: calculateTakerFee(matchedAmount),
-        lenderSettlementFeeAmount: '5000',
-        borrowerSettlementFeeAmount: '5000',
+          takerFeeAmount: calculateTakerFee(matchedAmount),
+          lenderSettlementFeeAmount: '5000',
+          borrowerSettlementFeeAmount: '5000',
         });
       }
 
@@ -581,9 +587,9 @@ describe('SettlementPublisher Integration', () => {
           maturity,
           borrowerIsTaker: true,
           makerFeeAmount: calculateMakerFee(matchedAmount),
-        takerFeeAmount: calculateTakerFee(matchedAmount),
-        lenderSettlementFeeAmount: '5000',
-        borrowerSettlementFeeAmount: '5000',
+          takerFeeAmount: calculateTakerFee(matchedAmount),
+          lenderSettlementFeeAmount: '5000',
+          borrowerSettlementFeeAmount: '5000',
         });
       }
 
@@ -594,6 +600,163 @@ describe('SettlementPublisher Integration', () => {
       expect(mockPublisher.publishedMatches).toHaveLength(5);
 
       console.warn = originalWarn;
+    });
+  });
+
+  describe('BufferEventHandler integration', () => {
+    let mockPublisher: MockSettlementPublisher;
+    let mockHandler: jest.Mocked<BufferEventHandler>;
+    let executionEngine: ExecutionEngine;
+
+    beforeEach(() => {
+      mockPublisher = new MockSettlementPublisher();
+      mockHandler = {
+        onPublishFailed: jest.fn(),
+        onPublishSucceeded: jest.fn(),
+        onThresholdBreached: jest.fn(),
+        onDiskSpillNeeded: jest.fn(),
+      };
+      executionEngine = new ExecutionEngine(mockPublisher, mockHandler);
+    });
+
+    afterEach(() => {
+      mockPublisher.reset();
+    });
+
+    it('should call onPublishSucceeded on successful publish', async () => {
+      const matchedAmount = '1000000';
+      const match = executionEngine.recordMatch({
+        marketId: generateMatchId(),
+        lendOrderId: generateOrderId(),
+        borrowOrderId: generateOrderId(),
+        lenderWallet: walletAddress1,
+        borrowerWallet: walletAddress2,
+        matchedAmount,
+        rate: 500,
+        loanToken,
+        maturity,
+        borrowerIsTaker: true,
+        makerFeeAmount: calculateMakerFee(matchedAmount),
+        takerFeeAmount: calculateTakerFee(matchedAmount),
+        lenderSettlementFeeAmount: '5000',
+        borrowerSettlementFeeAmount: '5000',
+      });
+
+      await new Promise((resolve) => setTimeout(resolve, 50));
+
+      expect(mockHandler.onPublishSucceeded).toHaveBeenCalledWith(match.matchId);
+      expect(mockHandler.onPublishFailed).not.toHaveBeenCalled();
+    });
+
+    it('should call onPublishFailed when publish returns null', async () => {
+      mockPublisher.shouldReturnNull = true;
+      const originalWarn = console.warn;
+      console.warn = jest.fn();
+
+      const matchedAmount = '1000000';
+      executionEngine.recordMatch({
+        marketId: generateMatchId(),
+        lendOrderId: generateOrderId(),
+        borrowOrderId: generateOrderId(),
+        lenderWallet: walletAddress1,
+        borrowerWallet: walletAddress2,
+        matchedAmount,
+        rate: 500,
+        loanToken,
+        maturity,
+        borrowerIsTaker: true,
+        makerFeeAmount: calculateMakerFee(matchedAmount),
+        takerFeeAmount: calculateTakerFee(matchedAmount),
+        lenderSettlementFeeAmount: '5000',
+        borrowerSettlementFeeAmount: '5000',
+      });
+
+      await new Promise((resolve) => setTimeout(resolve, 50));
+
+      expect(mockHandler.onPublishFailed).toHaveBeenCalled();
+      expect(mockHandler.onPublishSucceeded).not.toHaveBeenCalled();
+
+      console.warn = originalWarn;
+    });
+
+    it('should call onPublishFailed when publish throws', async () => {
+      mockPublisher.shouldFail = true;
+      const originalError = console.error;
+      console.error = jest.fn();
+
+      const matchedAmount = '1000000';
+      executionEngine.recordMatch({
+        marketId: generateMatchId(),
+        lendOrderId: generateOrderId(),
+        borrowOrderId: generateOrderId(),
+        lenderWallet: walletAddress1,
+        borrowerWallet: walletAddress2,
+        matchedAmount,
+        rate: 500,
+        loanToken,
+        maturity,
+        borrowerIsTaker: true,
+        makerFeeAmount: calculateMakerFee(matchedAmount),
+        takerFeeAmount: calculateTakerFee(matchedAmount),
+        lenderSettlementFeeAmount: '5000',
+        borrowerSettlementFeeAmount: '5000',
+      });
+
+      await new Promise((resolve) => setTimeout(resolve, 50));
+
+      expect(mockHandler.onPublishFailed).toHaveBeenCalled();
+
+      console.error = originalError;
+    });
+
+    it('should fire onThresholdBreached when threshold is crossed', () => {
+      const handler: jest.Mocked<BufferEventHandler> = {
+        onPublishFailed: jest.fn(),
+        onPublishSucceeded: jest.fn(),
+        onThresholdBreached: jest.fn(),
+        onDiskSpillNeeded: jest.fn(),
+      };
+      // Use engine without publisher so matches stay in memory
+      const engine = new ExecutionEngine(undefined, handler, [2, 5]);
+      const matchedAmount = '1000000';
+
+      // First match: no threshold
+      engine.recordMatch({
+        marketId: generateMatchId(),
+        lendOrderId: generateOrderId(),
+        borrowOrderId: generateOrderId(),
+        lenderWallet: walletAddress1,
+        borrowerWallet: walletAddress2,
+        matchedAmount,
+        rate: 500,
+        loanToken,
+        maturity,
+        borrowerIsTaker: true,
+        makerFeeAmount: calculateMakerFee(matchedAmount),
+        takerFeeAmount: calculateTakerFee(matchedAmount),
+        lenderSettlementFeeAmount: '5000',
+        borrowerSettlementFeeAmount: '5000',
+      });
+      expect(handler.onThresholdBreached).not.toHaveBeenCalled();
+
+      // Second match: crosses threshold of 2
+      engine.recordMatch({
+        marketId: generateMatchId(),
+        lendOrderId: generateOrderId(),
+        borrowOrderId: generateOrderId(),
+        lenderWallet: walletAddress1,
+        borrowerWallet: walletAddress2,
+        matchedAmount,
+        rate: 500,
+        loanToken,
+        maturity,
+        borrowerIsTaker: true,
+        makerFeeAmount: calculateMakerFee(matchedAmount),
+        takerFeeAmount: calculateTakerFee(matchedAmount),
+        lenderSettlementFeeAmount: '5000',
+        borrowerSettlementFeeAmount: '5000',
+      });
+      expect(handler.onThresholdBreached).toHaveBeenCalledWith(2, 2);
     });
   });
 });

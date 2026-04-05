@@ -1,13 +1,10 @@
 import { OrderBook } from './order-book';
 import { ExecutionEngine } from './execution-engine';
-import type {
-  Order,
-  LendLimitOrder,
-  BorrowLimitOrder,
-} from '../types/orders';
+import type { Order, LendLimitOrder, BorrowLimitOrder } from '../types/orders';
 import { OrderSide, OrderStatus, isLimitOrder } from '../types/orders';
 import type { Match, MatchResult, OrderBookSnapshot, AffectedOrder } from '../types/matches';
 import type { SettlementPublisher } from '../types/settlement';
+import type { BufferStats, BufferEventHandler } from '../types/buffer';
 import type { SnapshotService } from '../services/snapshot-service';
 import {
   minBigNumber,
@@ -34,11 +31,41 @@ export class MatchingEngine {
    *
    * @param settlementPublisher - Optional publisher for settlement matches (e.g., Redis)
    * @param snapshotService - Optional snapshot service for state persistence
+   * @param bufferEventHandler - Optional handler for buffer events (retry, thresholds, disk spill)
+   * @param warningThresholds - Buffer size thresholds that trigger warnings
+   * @param diskSpillThreshold - Buffer size that triggers disk spill
    */
-  constructor(settlementPublisher?: SettlementPublisher, snapshotService?: SnapshotService) {
+  constructor(
+    settlementPublisher?: SettlementPublisher,
+    snapshotService?: SnapshotService,
+    bufferEventHandler?: BufferEventHandler,
+    warningThresholds: number[] = [],
+    diskSpillThreshold: number = 0
+  ) {
     this.orderBook = new OrderBook();
-    this.executionEngine = new ExecutionEngine(settlementPublisher);
+    this.executionEngine = new ExecutionEngine(
+      settlementPublisher,
+      bufferEventHandler,
+      warningThresholds,
+      diskSpillThreshold
+    );
     this.snapshotService = snapshotService ?? null;
+  }
+
+  /**
+   * Get the execution engine instance
+   *
+   * Used by the retry service to call retryPublish on individual matches.
+   */
+  getExecutionEngine(): ExecutionEngine {
+    return this.executionEngine;
+  }
+
+  /**
+   * Get buffer statistics for monitoring
+   */
+  getBufferStats(): BufferStats {
+    return this.executionEngine.getBufferStats();
   }
 
   /**
@@ -133,11 +160,7 @@ export class MatchingEngine {
     for (const market of order.markets) {
       if (isZero(remainingAmount)) break;
 
-      const makerOrders = this.orderBook.getBestOrders(
-        makerSide,
-        order.loanToken,
-        market.maturity
-      );
+      const makerOrders = this.orderBook.getBestOrders(makerSide, order.loanToken, market.maturity);
 
       for (const makerOrder of makerOrders) {
         if (isZero(remainingAmount)) break;
@@ -177,7 +200,11 @@ export class MatchingEngine {
           makerOrder.remainingSettlementFeeAmount ?? makerOrder.settlementFeeAmount;
 
         const takerFeeResult = this.calculateSettlementFee(order, matchAmount, takerRemainingFee);
-        const makerFeeResult = this.calculateSettlementFee(makerOrder, matchAmount, makerCurrentFee);
+        const makerFeeResult = this.calculateSettlementFee(
+          makerOrder,
+          matchAmount,
+          makerCurrentFee
+        );
 
         takerRemainingFee = takerFeeResult.remainingAfter;
 
@@ -207,10 +234,7 @@ export class MatchingEngine {
 
         // Update remaining amounts
         remainingAmount = subtractBigNumbers(remainingAmount, matchAmount);
-        const makerRemainingAmount = subtractBigNumbers(
-          makerOrder.remainingAmount,
-          matchAmount
-        );
+        const makerRemainingAmount = subtractBigNumbers(makerOrder.remainingAmount, matchAmount);
 
         // Update maker order in book and track as affected
         const makerStatus = isZero(makerRemainingAmount)
@@ -221,7 +245,9 @@ export class MatchingEngine {
           this.orderBook.removeOrder(makerOrder.orderId);
         } else {
           this.orderBook.updateOrderAmount(
-            makerOrder.orderId, makerRemainingAmount, makerFeeResult.remainingAfter
+            makerOrder.orderId,
+            makerRemainingAmount,
+            makerFeeResult.remainingAfter
           );
         }
 
@@ -320,8 +346,7 @@ export class MatchingEngine {
       originalAmount: order.originalAmount,
       remainingAmount: order.remainingAmount,
       settlementFeeAmount: order.settlementFeeAmount,
-      remainingSettlementFeeAmount:
-        order.remainingSettlementFeeAmount ?? order.settlementFeeAmount,
+      remainingSettlementFeeAmount: order.remainingSettlementFeeAmount ?? order.settlementFeeAmount,
     };
   }
 
