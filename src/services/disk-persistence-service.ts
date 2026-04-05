@@ -10,6 +10,9 @@ import * as fs from 'fs/promises';
 import * as path from 'path';
 import type { Match } from '../types/matches';
 import { matchSchema } from '../types/matches';
+import { createLogger } from '../utils/logger';
+
+const log = createLogger('disk-persistence');
 
 export class DiskPersistenceService {
   private readonly dir: string;
@@ -42,7 +45,7 @@ export class DiskPersistenceService {
     await fs.writeFile(this.tempFilePath, lines, 'utf-8');
     await fs.rename(this.tempFilePath, this.filePath);
 
-    console.log(`[DiskPersistence] Flushed ${matches.length} matches to ${this.filePath}`);
+    log.info({ count: matches.length, path: this.filePath }, 'flushed matches to disk');
   }
 
   /**
@@ -63,15 +66,13 @@ export class DiskPersistenceService {
         const match = matchSchema.parse(parsed);
         matches.push(match);
       } catch (error) {
-        console.warn(
-          `[DiskPersistence] Skipping malformed line ${i + 1}: ${error instanceof Error ? error.message : 'Unknown error'}`
-        );
+        log.warn({ line: i + 1, err: error }, 'skipping malformed line in spill file');
       }
     }
 
     // Delete file after successful load
     await fs.unlink(this.filePath);
-    console.log(`[DiskPersistence] Loaded ${matches.length} matches from disk, file removed`);
+    log.info({ count: matches.length }, 'loaded matches from disk, file removed');
 
     return matches;
   }

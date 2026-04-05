@@ -11,6 +11,9 @@ import type { BufferEventHandler } from '../types/buffer';
 import type { BufferConfig } from '../config/buffer-config';
 import type { ExecutionEngine } from '../core/execution-engine';
 import type { DiskPersistenceService } from './disk-persistence-service';
+import { createLogger } from '../utils/logger';
+
+const log = createLogger('retry-service');
 
 export class RetryService implements BufferEventHandler {
   private executionEngine: ExecutionEngine | null = null;
@@ -104,9 +107,7 @@ export class RetryService implements BufferEventHandler {
    * Called when buffer size crosses a warning threshold
    */
   onThresholdBreached(currentSize: number, threshold: number): void {
-    console.warn(
-      `[RetryService] Buffer threshold breached: ${currentSize} matches in buffer (threshold: ${threshold})`
-    );
+    log.warn({ currentSize, threshold }, 'buffer threshold breached');
   }
 
   /**
@@ -114,7 +115,7 @@ export class RetryService implements BufferEventHandler {
    */
   onDiskSpillNeeded(matches: Match[]): void {
     this.diskService.flush(matches).catch((error) => {
-      console.error('[RetryService] Failed to flush matches to disk:', error);
+      log.error({ err: error }, 'failed to flush matches to disk');
     });
   }
 

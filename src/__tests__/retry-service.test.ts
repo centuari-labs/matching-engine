@@ -172,16 +172,8 @@ describe('RetryService', () => {
   });
 
   describe('onThresholdBreached', () => {
-    it('should log a warning', () => {
-      const warnSpy = jest.spyOn(console, 'warn').mockImplementation();
-
-      retryService.onThresholdBreached(1500, 1000);
-
-      expect(warnSpy).toHaveBeenCalledWith(
-        expect.stringContaining('Buffer threshold breached: 1500 matches')
-      );
-
-      warnSpy.mockRestore();
+    it('should not throw', () => {
+      expect(() => retryService.onThresholdBreached(1500, 1000)).not.toThrow();
     });
   });
 

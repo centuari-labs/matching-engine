@@ -3,6 +3,9 @@ import { matchSchema } from '../types/matches';
 import type { SettlementPublisher } from '../types/settlement';
 import type { BufferStats, BufferEventHandler } from '../types/buffer';
 import { generateMatchId } from '../utils/helpers';
+import { createLogger } from '../utils/logger';
+
+const log = createLogger('execution-engine');
 
 /**
  * ExecutionEngine handles recording and managing match results
@@ -108,8 +111,7 @@ export class ExecutionEngine {
     };
 
     // Log match creation for observability and debugging
-    // eslint-disable-next-line no-console
-    console.log('[MatchingEngine] Match created', {
+    log.info({
       matchId: match.matchId,
       marketId: match.marketId,
       lendOrderId: match.lendOrderId,
@@ -125,7 +127,7 @@ export class ExecutionEngine {
       takerFeeAmount: match.takerFeeAmount,
       lenderSettlementFeeAmount: match.lenderSettlementFeeAmount,
       borrowerSettlementFeeAmount: match.borrowerSettlementFeeAmount,
-    });
+    }, 'match created');
 
     // Validate match against schema
     matchSchema.parse(match);
@@ -175,18 +177,13 @@ export class ExecutionEngine {
           this.bufferEventHandler?.onPublishSucceeded(match.matchId);
         } else {
           // Failed: keep in memory, notify handler for retry
-          console.warn(
-            `Settlement publish returned null for match ${match.matchId}, keeping in memory`
-          );
+          log.warn({ matchId: match.matchId }, 'settlement publish returned null, keeping in memory');
           this.bufferEventHandler?.onPublishFailed(match);
         }
       })
       .catch((error) => {
         // Error: keep in memory, notify handler for retry
-        console.error(
-          `Failed to publish settlement match ${match.matchId}, keeping in memory:`,
-          error
-        );
+        log.error({ matchId: match.matchId, err: error }, 'failed to publish settlement match, keeping in memory');
         this.bufferEventHandler?.onPublishFailed(match);
       });
   }

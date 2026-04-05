@@ -93,15 +93,10 @@ describe('DiskPersistenceService', () => {
       const content = JSON.stringify(match) + '\n' + 'not-valid-json\n';
       await fs.writeFile(path.join(tempDir, 'unpublished-matches.jsonl'), content, 'utf-8');
 
-      const warnSpy = jest.spyOn(console, 'warn').mockImplementation();
-
       const loaded = await service.load();
 
       expect(loaded).toHaveLength(1);
       expect(loaded[0].matchId).toBe(match.matchId);
-      expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('Skipping malformed line'));
-
-      warnSpy.mockRestore();
     });
 
     it('should throw when file does not exist', async () => {

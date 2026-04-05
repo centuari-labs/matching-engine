@@ -169,11 +169,8 @@ describe('RedisService', () => {
     it('should not connect twice', async () => {
       await redisService.connect();
 
-      const consoleSpy = jest.spyOn(console, 'warn').mockImplementation();
+      // Should not throw — warning is handled by global logger mock
       await redisService.connect();
-
-      expect(consoleSpy).toHaveBeenCalledWith('Redis service is already connected');
-      consoleSpy.mockRestore();
     });
 
     it('should disconnect from Redis', async () => {
@@ -187,11 +184,8 @@ describe('RedisService', () => {
     it('should handle disconnect when not connected', async () => {
       const service = new RedisService(testConfig);
 
-      const consoleSpy = jest.spyOn(console, 'warn').mockImplementation();
+      // Should not throw — warning is handled by global logger mock
       await service.disconnect();
-
-      expect(consoleSpy).toHaveBeenCalledWith('Redis service is not connected');
-      consoleSpy.mockRestore();
     });
 
     it('should return null client when not connected', () => {
@@ -219,13 +213,10 @@ describe('RedisService', () => {
     it('should return null when not connected', async () => {
       const service = new RedisService(testConfig);
 
-      const consoleSpy = jest.spyOn(console, 'warn').mockImplementation();
       const match = createTestMatch();
       const messageId = await service.publishSettlementMatch(match);
 
       expect(messageId).toBeNull();
-      expect(consoleSpy).toHaveBeenCalled();
-      consoleSpy.mockRestore();
     });
 
     it('should include all match fields in published data', async () => {
@@ -275,13 +266,10 @@ describe('RedisService', () => {
         await client.quit();
       }
 
-      const consoleSpy = jest.spyOn(console, 'error').mockImplementation();
       const match = createTestMatch();
       const messageId = await redisService.publishSettlementMatch(match);
 
       expect(messageId).toBeNull();
-      expect(consoleSpy).toHaveBeenCalled();
-      consoleSpy.mockRestore();
     });
   });
 
@@ -346,22 +334,9 @@ describe('RedisService', () => {
       await redisService.connect();
       await redisService.disconnect();
 
-      // Second connection should handle existing group
+      // Second connection should handle existing group — should not throw
       const service2 = new RedisService(testConfig);
-      const consoleSpy = jest.spyOn(console, 'log').mockImplementation();
-      
-      // Should not throw
       await service2.connect();
-
-      // Should log that group already exists or created successfully
-      const logCalls = consoleSpy.mock.calls.flat();
-      const hasGroupMessage = logCalls.some((msg) =>
-        typeof msg === 'string' &&
-        (msg.includes('already exists') || msg.includes('Created consumer group'))
-      );
-      expect(hasGroupMessage || consoleSpy.mock.calls.length > 0).toBe(true);
-      
-      consoleSpy.mockRestore();
       await service2.disconnect();
     });
   });
@@ -402,7 +377,6 @@ describe('RedisService', () => {
           'COUNT',
           1
         );
-        console.log("MESSAGES: ", messages)
         expect(messages.length).toBeGreaterThan(0);
       }
     });

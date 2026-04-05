@@ -14,6 +14,9 @@ import {
   calculateTakerFee,
   calculateProRataSettlementFee,
 } from '../utils/helpers';
+import { createLogger } from '../utils/logger';
+
+const log = createLogger('matching-engine');
 
 /**
  * MatchingEngine is the core component that matches lend and borrow orders
@@ -424,7 +427,7 @@ export class MatchingEngine {
       await this.snapshotService.saveSnapshot(this.orderBook, this.executionEngine);
     } catch (error) {
       // Log but don't throw - snapshot failures shouldn't block operations
-      console.error('Failed to save snapshot:', error);
+      log.error({ err: error }, 'failed to save snapshot');
     } finally {
       resolveNext();
     }
@@ -443,7 +446,7 @@ export class MatchingEngine {
     // Fire-and-forget - don't await
     this.saveSnapshot().catch((error) => {
       // Already logged in saveSnapshot, but catch to prevent unhandled rejection
-      console.warn('Async snapshot save failed:', error);
+      log.warn({ err: error }, 'async snapshot save failed');
     });
   }
 
@@ -472,12 +475,10 @@ export class MatchingEngine {
       // Restore execution engine
       this.executionEngine.restoreMatches(snapshotData.matches);
 
-      console.log(
-        `State restored from snapshot: ${snapshotData.metadata.orderCount} orders, ${snapshotData.metadata.matchCount} matches`
-      );
+      log.info({ orderCount: snapshotData.metadata.orderCount, matchCount: snapshotData.metadata.matchCount }, 'state restored from snapshot');
       return true;
     } catch (error) {
-      console.error('Failed to restore from snapshot:', error);
+      log.error({ err: error }, 'failed to restore from snapshot');
       return false;
     }
   }

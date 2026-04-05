@@ -26,6 +26,9 @@ import type { Match, MatchResult } from '../types/matches';
 import { OrderSide, OrderStatus, OrderType } from '../types/orders';
 import { NATS_TOPICS } from '../config/nats-config';
 import { addBigNumbers, subtractBigNumbers, isZero, generateOrderId } from '../utils/helpers';
+import { createLogger } from '../utils/logger';
+
+const log = createLogger('message-handlers');
 
 /**
  * Handler context containing dependencies
@@ -74,7 +77,7 @@ function publishError(ctx: HandlerContext, error: ErrorMessage): void {
     const message = JSON.stringify(error);
     ctx.nc.publish(NATS_TOPICS.ERRORS, message);
   } catch (err) {
-    console.error('Failed to publish error message:', err);
+    log.error({ err }, 'failed to publish error message');
   }
 }
 
@@ -192,7 +195,7 @@ function publishOrderStatusUpdates(
       ctx.nc.publish(NATS_TOPICS.ORDERS_STATUS, JSON.stringify(statusMessage));
     }
   } catch (err) {
-    console.error('Failed to publish order status updates:', err);
+    log.error({ err, orderId }, 'failed to publish order status updates');
     publishError(
       ctx,
       createErrorMessage(
@@ -233,7 +236,7 @@ function publishMatchCreatedEvents(
       ctx.nc.publish(NATS_TOPICS.MATCHES_CREATED, JSON.stringify(tradeEvent));
     }
   } catch (err) {
-    console.error('Failed to publish match created events:', err);
+    log.error({ err }, 'failed to publish match created events');
   }
 }
 
@@ -250,7 +253,7 @@ function handleOrder<T extends Order>(
   try {
     const order = parseMessage(data, schema);
 
-    console.log(`Processing ${label}: ${order.orderId}`);
+    log.debug({ orderId: order.orderId, type: label }, 'processing order');
 
     const result = ctx.engine.submitOrder(order);
 
@@ -269,9 +272,9 @@ function handleOrder<T extends Order>(
       publishMatchCreatedEvents(ctx, order.assetId, order.side, result.matches);
     }
 
-    console.log(`${label} ${order.orderId} processed: ${result.matches.length} matches`);
+    log.debug({ orderId: order.orderId, matchCount: result.matches.length, type: label }, 'order processed');
   } catch (error) {
-    console.error(`Error handling ${label}:`, error);
+    log.error({ err: error, type: label }, 'error handling order');
     const errorMsg = error instanceof Error ? error.message : 'Unknown error';
     publishError(ctx, createErrorMessage(ERROR_CODES.INVALID_ORDER, errorMsg));
   }
@@ -300,14 +303,12 @@ export function handleCancelOrder(ctx: HandlerContext, data: Uint8Array): void {
     // Parse and validate the cancellation request
     const request = parseMessage(data, cancelOrderMessageSchema);
 
-    console.log(
-      `Processing cancel request for order: ${request.orderId} from wallet: ${request.walletAddress}`
-    );
+    log.debug({ orderId: request.orderId, walletAddress: request.walletAddress }, 'processing cancel request');
 
     // Get order info before cancellation (needed for status message)
     const orderInfo = ctx.engine.getOrderInfo(request.orderId);
     if (!orderInfo) {
-      console.warn(`Order ${request.orderId} not found for cancellation`);
+      log.warn({ orderId: request.orderId }, 'order not found for cancellation');
       publishError(
         ctx,
         createErrorMessage(
@@ -323,7 +324,7 @@ export function handleCancelOrder(ctx: HandlerContext, data: Uint8Array): void {
     const success = ctx.engine.cancelOrder(request.orderId, request.walletAddress);
 
     if (success) {
-      console.log(`Order ${request.orderId} cancelled successfully`);
+      log.info({ orderId: request.orderId }, 'order cancelled successfully');
 
       // Publish status update with filled amounts
       const statusMessage = createOrderStatusMessage({
@@ -337,7 +338,7 @@ export function handleCancelOrder(ctx: HandlerContext, data: Uint8Array): void {
       });
       ctx.nc.publish(NATS_TOPICS.ORDERS_STATUS, JSON.stringify(statusMessage));
     } else {
-      console.warn(`Wallet address mismatch for order ${request.orderId}`);
+      log.warn({ orderId: request.orderId }, 'wallet address mismatch for cancel request');
       publishError(
         ctx,
         createErrorMessage(
@@ -348,7 +349,7 @@ export function handleCancelOrder(ctx: HandlerContext, data: Uint8Array): void {
       );
     }
   } catch (error) {
-    console.error('Error handling cancel order:', error);
+    log.error({ err: error }, 'error handling cancel order');
     const errorMsg = error instanceof Error ? error.message : 'Unknown error';
     publishError(ctx, createErrorMessage(ERROR_CODES.INVALID_ORDER, errorMsg));
   }

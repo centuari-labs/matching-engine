@@ -13,6 +13,9 @@ import {
 } from '../types/messages';
 import { matchSchema, type Match } from '../types/matches';
 import type { DbClient } from '../types/db';
+import { createLogger } from '../utils/logger';
+
+const log = createLogger('db-writer-service');
 
 export interface DbWriterOptions {
   /**
@@ -171,17 +174,17 @@ export class DbWriterService {
 
         void this.handleOrderStatusMessage(msg.data)
           .catch((error) => {
-            console.error('DB Writer: failed to handle order status message', error);
+            log.error({ err: error }, 'failed to handle order status message');
           })
           .finally(() => {
             inFlight -= 1;
           });
       }
     })().catch((error) => {
-      console.error('DB Writer: NATS subscription loop failed', error);
+      log.error({ err: error }, 'NATS subscription loop failed');
     });
 
-    console.log(`DbWriterService subscribed to ${NATS_TOPICS.ORDERS_STATUS}`);
+    log.info({ topic: NATS_TOPICS.ORDERS_STATUS }, 'subscribed to NATS topic');
   }
 
   private async handleOrderStatusMessage(data: Uint8Array): Promise<void> {
@@ -191,7 +194,7 @@ export class DbWriterService {
     try {
       parsed = JSON.parse(text);
     } catch (error) {
-      console.error('DB Writer: failed to parse order status JSON', error, text);
+      log.error({ err: error, rawMessage: text }, 'failed to parse order status JSON');
       return;
     }
 
@@ -199,7 +202,7 @@ export class DbWriterService {
     try {
       message = orderStatusMessageSchema.parse(parsed);
     } catch (error) {
-      console.error('DB Writer: invalid order status message', error, parsed);
+      log.error({ err: error }, 'invalid order status message');
       return;
     }
 
@@ -227,17 +230,17 @@ export class DbWriterService {
 
         void this.handleCancelledRemainderMessage(msg.data)
           .catch((error) => {
-            console.error('DB Writer: failed to handle cancelled remainder message', error);
+            log.error({ err: error }, 'failed to handle cancelled remainder message');
           })
           .finally(() => {
             inFlight -= 1;
           });
       }
     })().catch((error) => {
-      console.error('DB Writer: cancelled remainder subscription loop failed', error);
+      log.error({ err: error }, 'cancelled remainder subscription loop failed');
     });
 
-    console.log(`DbWriterService subscribed to ${NATS_TOPICS.ORDERS_CANCELLED_REMAINDER}`);
+    log.info({ topic: NATS_TOPICS.ORDERS_CANCELLED_REMAINDER }, 'subscribed to NATS topic');
   }
 
   private async handleCancelledRemainderMessage(data: Uint8Array): Promise<void> {
@@ -247,7 +250,7 @@ export class DbWriterService {
     try {
       parsed = JSON.parse(text);
     } catch (error) {
-      console.error('DB Writer: failed to parse cancelled remainder JSON', error, text);
+      log.error({ err: error, rawMessage: text }, 'failed to parse cancelled remainder JSON');
       return;
     }
 
@@ -255,7 +258,7 @@ export class DbWriterService {
     try {
       message = cancelledRemainderMessageSchema.parse(parsed);
     } catch (error) {
-      console.error('DB Writer: invalid cancelled remainder message', error, parsed);
+      log.error({ err: error }, 'invalid cancelled remainder message');
       return;
     }
 
@@ -278,20 +281,13 @@ export class DbWriterService {
         '0',
         'MKSTREAM'
       );
-      console.log(
-        `DbWriterService created consumer group '${this.options.redisConsumerGroup}' for stream '${REDIS_STREAMS.SETTLEMENT_MATCHES}'`
-      );
+      log.info({ group: this.options.redisConsumerGroup, stream: REDIS_STREAMS.SETTLEMENT_MATCHES }, 'created consumer group');
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       if (message.includes('BUSYGROUP')) {
-        console.log(
-          `DbWriterService consumer group '${this.options.redisConsumerGroup}' already exists`
-        );
+        log.info({ group: this.options.redisConsumerGroup }, 'consumer group already exists');
       } else {
-        console.warn(
-          'DbWriterService: failed to create Redis consumer group',
-          error
-        );
+        log.warn({ err: error }, 'failed to create Redis consumer group');
       }
     }
   }
@@ -349,7 +345,7 @@ export class DbWriterService {
 
             void this.handleRedisEntry(id, fields)
               .catch((error) => {
-                console.error('DB Writer: failed to handle Redis match entry', error);
+                log.error({ err: error }, 'failed to handle Redis match entry');
               })
               .finally(() => {
                 inFlight -= 1;
@@ -357,7 +353,7 @@ export class DbWriterService {
           }
         }
       } catch (error) {
-        console.error('DB Writer: Redis worker error, retrying...', error);
+        log.error({ err: error }, 'Redis worker error, retrying');
         await new Promise((resolve) => setTimeout(resolve, 1000));
       }
     }
@@ -374,7 +370,7 @@ export class DbWriterService {
     try {
       validated = matchSchema.parse(match);
     } catch (error) {
-      console.error('DB Writer: invalid match entry from Redis', error, match);
+      log.error({ err: error }, 'invalid match entry from Redis');
       // Acknowledge the bad entry so it does not block the consumer group.
       await this.redis.xack(
         REDIS_STREAMS.SETTLEMENT_MATCHES,
@@ -394,17 +390,11 @@ export class DbWriterService {
         break; // Success — proceed to ACK
       } catch (error) {
         if (attempt === maxRetries) {
-          console.error(
-            `DB Writer: match ${validated.matchId} failed after ${maxRetries} attempts, leaving un-ACKd for PEL recovery`,
-            error
-          );
+          log.error({ matchId: validated.matchId, attempts: maxRetries, err: error }, 'match insert failed after all attempts, leaving un-ACKd for PEL recovery');
           throw error; // Propagate — do NOT ACK
         }
         const backoffMs = 100 * Math.pow(2, attempt - 1);
-        console.warn(
-          `DB Writer: match ${validated.matchId} insert attempt ${attempt}/${maxRetries} failed, retrying in ${backoffMs}ms`,
-          error
-        );
+        log.warn({ matchId: validated.matchId, attempt, maxRetries, backoffMs, err: error }, 'match insert failed, retrying');
         await new Promise((resolve) => setTimeout(resolve, backoffMs));
       }
     }
@@ -462,23 +452,18 @@ export class DbWriterService {
         const entries = result[1] as [string, string[]][];
         if (!entries || entries.length === 0) continue;
 
-        console.log(
-          `DB Writer: reclaiming ${entries.length} pending entries from PEL`
-        );
+        log.info({ count: entries.length }, 'reclaiming pending entries from PEL');
 
         for (const [id, fields] of entries) {
           try {
             await this.handleRedisEntry(id, fields);
           } catch (error) {
-            console.error(
-              `DB Writer: PEL recovery failed for entry ${id}`,
-              error
-            );
+            log.error({ entryId: id, err: error }, 'PEL recovery failed for entry');
             // Entry remains in PEL — will be retried on next cycle
           }
         }
       } catch (error) {
-        console.error('DB Writer: PEL recovery loop error', error);
+        log.error({ err: error }, 'PEL recovery loop error');
       }
     }
   }
