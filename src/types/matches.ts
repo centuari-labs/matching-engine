@@ -114,6 +114,8 @@ export interface MatchResult {
   } | null;
   /** Array of maker orders affected by the matching */
   affectedMakerOrders: AffectedOrder[];
+  /** Taker's remaining settlement fee pool after all matches in this submission */
+  takerRemainingSettlementFeeAmount?: string;
 }
 
 /**

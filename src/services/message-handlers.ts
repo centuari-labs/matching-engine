@@ -250,8 +250,6 @@ export function handleLendMarketOrder(ctx: HandlerContext, data: Uint8Array): vo
   try {
     // Parse and validate the order
     const order = parseMessage(data, lendMarketOrderSchema);
-    // Initialize remaining settlement fee pool for internal tracking
-    order.remainingSettlementFeeAmount = order.settlementFeeAmount;
 
     console.log(`Processing lend market order: ${order.orderId}`);
 
@@ -262,7 +260,7 @@ export function handleLendMarketOrder(ctx: HandlerContext, data: Uint8Array): vo
     publishOrderStatusUpdates(ctx, order.orderId, result, {
       originalAmount: order.originalAmount,
       settlementFeeAmount: order.settlementFeeAmount,
-      remainingSettlementFeeAmount: order.remainingSettlementFeeAmount,
+      remainingSettlementFeeAmount: result.takerRemainingSettlementFeeAmount,
       walletAddress: order.walletAddress,
       assetId: order.assetId,
       side: order.side,
@@ -299,8 +297,6 @@ export function handleLendLimitOrder(ctx: HandlerContext, data: Uint8Array): voi
   try {
     // Parse and validate the order
     const order = parseMessage(data, lendLimitOrderSchema);
-    // Initialize remaining settlement fee pool for internal tracking
-    order.remainingSettlementFeeAmount = order.settlementFeeAmount;
 
     console.log(`Processing lend limit order: ${order.orderId} at rate ${order.rate}`);
 
@@ -311,7 +307,7 @@ export function handleLendLimitOrder(ctx: HandlerContext, data: Uint8Array): voi
     publishOrderStatusUpdates(ctx, order.orderId, result, {
       originalAmount: order.originalAmount,
       settlementFeeAmount: order.settlementFeeAmount,
-      remainingSettlementFeeAmount: order.remainingSettlementFeeAmount,
+      remainingSettlementFeeAmount: result.takerRemainingSettlementFeeAmount,
       walletAddress: order.walletAddress,
       assetId: order.assetId,
       side: order.side,
@@ -348,8 +344,6 @@ export function handleBorrowMarketOrder(ctx: HandlerContext, data: Uint8Array): 
   try {
     // Parse and validate the order
     const order = parseMessage(data, borrowMarketOrderSchema);
-    // Initialize remaining settlement fee pool for internal tracking
-    order.remainingSettlementFeeAmount = order.settlementFeeAmount;
 
     console.log(`Processing borrow market order: ${order.orderId}`);
 
@@ -360,7 +354,7 @@ export function handleBorrowMarketOrder(ctx: HandlerContext, data: Uint8Array): 
     publishOrderStatusUpdates(ctx, order.orderId, result, {
       originalAmount: order.originalAmount,
       settlementFeeAmount: order.settlementFeeAmount,
-      remainingSettlementFeeAmount: order.remainingSettlementFeeAmount,
+      remainingSettlementFeeAmount: result.takerRemainingSettlementFeeAmount,
       walletAddress: order.walletAddress,
       assetId: order.assetId,
       side: order.side,
@@ -397,8 +391,6 @@ export function handleBorrowLimitOrder(ctx: HandlerContext, data: Uint8Array): v
   try {
     // Parse and validate the order
     const order = parseMessage(data, borrowLimitOrderSchema);
-    // Initialize remaining settlement fee pool for internal tracking
-    order.remainingSettlementFeeAmount = order.settlementFeeAmount;
 
     console.log(`Processing borrow limit order: ${order.orderId} at rate ${order.rate}`);
 
@@ -409,7 +401,7 @@ export function handleBorrowLimitOrder(ctx: HandlerContext, data: Uint8Array): v
     publishOrderStatusUpdates(ctx, order.orderId, result, {
       originalAmount: order.originalAmount,
       settlementFeeAmount: order.settlementFeeAmount,
-      remainingSettlementFeeAmount: order.remainingSettlementFeeAmount,
+      remainingSettlementFeeAmount: result.takerRemainingSettlementFeeAmount,
       walletAddress: order.walletAddress,
       assetId: order.assetId,
       side: order.side,
