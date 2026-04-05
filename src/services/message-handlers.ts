@@ -13,6 +13,7 @@ import {
   borrowMarketOrderSchema,
   borrowLimitOrderSchema,
 } from '../types/orders';
+import type { Order } from '../types/orders';
 import {
   cancelOrderMessageSchema,
   createErrorMessage,
@@ -141,7 +142,7 @@ function publishOrderStatusUpdates(
         settlementFeeAmount: originalOrder.settlementFeeAmount,
         remainingSettlementFeeAmount: isFull
           ? '0'
-          : originalOrder.remainingSettlementFeeAmount ?? '0',
+          : (originalOrder.remainingSettlementFeeAmount ?? '0'),
       });
       ctx.nc.publish(NATS_TOPICS.ORDERS_STATUS, JSON.stringify(takerStatusMessage));
 
@@ -153,8 +154,7 @@ function publishOrderStatusUpdates(
         originalOrder.side &&
         originalOrder.marketIds
       ) {
-        const remainingSettlementFee =
-          originalOrder.remainingSettlementFeeAmount ?? '0';
+        const remainingSettlementFee = originalOrder.remainingSettlementFeeAmount ?? '0';
 
         const cancelledRemainder: CancelledRemainderMessage = {
           orderId: generateOrderId(),
@@ -170,10 +170,7 @@ function publishOrderStatusUpdates(
           cancelReason: 'IOC',
           timestamp: Date.now(),
         };
-        ctx.nc.publish(
-          NATS_TOPICS.ORDERS_CANCELLED_REMAINDER,
-          JSON.stringify(cancelledRemainder)
-        );
+        ctx.nc.publish(NATS_TOPICS.ORDERS_CANCELLED_REMAINDER, JSON.stringify(cancelledRemainder));
       }
     } else if (originalOrder) {
       // Market order with no matches — cancel it so DB Writer updates the row
@@ -241,22 +238,22 @@ function publishMatchCreatedEvents(
 }
 
 /**
- * Handle lend market order messages
- *
- * @param ctx - Handler context
- * @param data - Raw message data
+ * Generic order handler — all order types share the same processing pipeline.
+ * Only the Zod schema (for validation) and the log label differ.
  */
-export function handleLendMarketOrder(ctx: HandlerContext, data: Uint8Array): void {
+function handleOrder<T extends Order>(
+  ctx: HandlerContext,
+  data: Uint8Array,
+  schema: { parse: (data: unknown) => T },
+  label: string
+): void {
   try {
-    // Parse and validate the order
-    const order = parseMessage(data, lendMarketOrderSchema);
+    const order = parseMessage(data, schema);
 
-    console.log(`Processing lend market order: ${order.orderId}`);
+    console.log(`Processing ${label}: ${order.orderId}`);
 
-    // Submit to matching engine
     const result = ctx.engine.submitOrder(order);
 
-    // Publish order status updates for taker and affected maker orders
     publishOrderStatusUpdates(ctx, order.orderId, result, {
       originalAmount: order.originalAmount,
       settlementFeeAmount: order.settlementFeeAmount,
@@ -268,165 +265,29 @@ export function handleLendMarketOrder(ctx: HandlerContext, data: Uint8Array): vo
       marketIds: order.markets.map((m) => m.marketId),
     });
 
-    // Publish recent-trade events for each match
     if (result.matches.length > 0) {
       publishMatchCreatedEvents(ctx, order.assetId, order.side, result.matches);
     }
 
-    console.log(
-      `Lend market order ${order.orderId} processed: ${result.matches.length} matches`
-    );
+    console.log(`${label} ${order.orderId} processed: ${result.matches.length} matches`);
   } catch (error) {
-    console.error('Error handling lend market order:', error);
-    const errorMsg =
-      error instanceof Error ? error.message : 'Unknown error';
-    publishError(
-      ctx,
-      createErrorMessage(ERROR_CODES.INVALID_ORDER, errorMsg)
-    );
+    console.error(`Error handling ${label}:`, error);
+    const errorMsg = error instanceof Error ? error.message : 'Unknown error';
+    publishError(ctx, createErrorMessage(ERROR_CODES.INVALID_ORDER, errorMsg));
   }
 }
 
-/**
- * Handle lend limit order messages
- *
- * @param ctx - Handler context
- * @param data - Raw message data
- */
-export function handleLendLimitOrder(ctx: HandlerContext, data: Uint8Array): void {
-  try {
-    // Parse and validate the order
-    const order = parseMessage(data, lendLimitOrderSchema);
+export const handleLendMarketOrder = (ctx: HandlerContext, data: Uint8Array): void =>
+  handleOrder(ctx, data, lendMarketOrderSchema, 'lend market order');
 
-    console.log(`Processing lend limit order: ${order.orderId} at rate ${order.rate}`);
+export const handleLendLimitOrder = (ctx: HandlerContext, data: Uint8Array): void =>
+  handleOrder(ctx, data, lendLimitOrderSchema, 'lend limit order');
 
-    // Submit to matching engine
-    const result = ctx.engine.submitOrder(order);
+export const handleBorrowMarketOrder = (ctx: HandlerContext, data: Uint8Array): void =>
+  handleOrder(ctx, data, borrowMarketOrderSchema, 'borrow market order');
 
-    // Publish order status updates for taker and affected maker orders
-    publishOrderStatusUpdates(ctx, order.orderId, result, {
-      originalAmount: order.originalAmount,
-      settlementFeeAmount: order.settlementFeeAmount,
-      remainingSettlementFeeAmount: result.takerRemainingSettlementFeeAmount,
-      walletAddress: order.walletAddress,
-      assetId: order.assetId,
-      side: order.side,
-      type: order.type,
-      marketIds: order.markets.map((m) => m.marketId),
-    });
-
-    // Publish recent-trade events for each match
-    if (result.matches.length > 0) {
-      publishMatchCreatedEvents(ctx, order.assetId, order.side, result.matches);
-    }
-
-    console.log(
-      `Lend limit order ${order.orderId} processed: ${result.matches.length} matches`
-    );
-  } catch (error) {
-    console.error('Error handling lend limit order:', error);
-    const errorMsg =
-      error instanceof Error ? error.message : 'Unknown error';
-    publishError(
-      ctx,
-      createErrorMessage(ERROR_CODES.INVALID_ORDER, errorMsg)
-    );
-  }
-}
-
-/**
- * Handle borrow market order messages
- *
- * @param ctx - Handler context
- * @param data - Raw message data
- */
-export function handleBorrowMarketOrder(ctx: HandlerContext, data: Uint8Array): void {
-  try {
-    // Parse and validate the order
-    const order = parseMessage(data, borrowMarketOrderSchema);
-
-    console.log(`Processing borrow market order: ${order.orderId}`);
-
-    // Submit to matching engine
-    const result = ctx.engine.submitOrder(order);
-
-    // Publish order status updates for taker and affected maker orders
-    publishOrderStatusUpdates(ctx, order.orderId, result, {
-      originalAmount: order.originalAmount,
-      settlementFeeAmount: order.settlementFeeAmount,
-      remainingSettlementFeeAmount: result.takerRemainingSettlementFeeAmount,
-      walletAddress: order.walletAddress,
-      assetId: order.assetId,
-      side: order.side,
-      type: order.type,
-      marketIds: order.markets.map((m) => m.marketId),
-    });
-
-    // Publish recent-trade events for each match
-    if (result.matches.length > 0) {
-      publishMatchCreatedEvents(ctx, order.assetId, order.side, result.matches);
-    }
-
-    console.log(
-      `Borrow market order ${order.orderId} processed: ${result.matches.length} matches`
-    );
-  } catch (error) {
-    console.error('Error handling borrow market order:', error);
-    const errorMsg =
-      error instanceof Error ? error.message : 'Unknown error';
-    publishError(
-      ctx,
-      createErrorMessage(ERROR_CODES.INVALID_ORDER, errorMsg)
-    );
-  }
-}
-
-/**
- * Handle borrow limit order messages
- *
- * @param ctx - Handler context
- * @param data - Raw message data
- */
-export function handleBorrowLimitOrder(ctx: HandlerContext, data: Uint8Array): void {
-  try {
-    // Parse and validate the order
-    const order = parseMessage(data, borrowLimitOrderSchema);
-
-    console.log(`Processing borrow limit order: ${order.orderId} at rate ${order.rate}`);
-
-    // Submit to matching engine
-    const result = ctx.engine.submitOrder(order);
-
-    // Publish order status updates for taker and affected maker orders
-    publishOrderStatusUpdates(ctx, order.orderId, result, {
-      originalAmount: order.originalAmount,
-      settlementFeeAmount: order.settlementFeeAmount,
-      remainingSettlementFeeAmount: result.takerRemainingSettlementFeeAmount,
-      walletAddress: order.walletAddress,
-      assetId: order.assetId,
-      side: order.side,
-      type: order.type,
-      marketIds: order.markets.map((m) => m.marketId),
-    });
-
-    // Publish recent-trade events for each match
-    if (result.matches.length > 0) {
-      publishMatchCreatedEvents(ctx, order.assetId, order.side, result.matches);
-    }
-
-    console.log(
-      `Borrow limit order ${order.orderId} processed: ${result.matches.length} matches`
-    );
-  } catch (error) {
-    console.error('Error handling borrow limit order:', error);
-    const errorMsg =
-      error instanceof Error ? error.message : 'Unknown error';
-    publishError(
-      ctx,
-      createErrorMessage(ERROR_CODES.INVALID_ORDER, errorMsg)
-    );
-  }
-}
+export const handleBorrowLimitOrder = (ctx: HandlerContext, data: Uint8Array): void =>
+  handleOrder(ctx, data, borrowLimitOrderSchema, 'borrow limit order');
 
 /**
  * Handle order cancellation messages
@@ -439,7 +300,9 @@ export function handleCancelOrder(ctx: HandlerContext, data: Uint8Array): void {
     // Parse and validate the cancellation request
     const request = parseMessage(data, cancelOrderMessageSchema);
 
-    console.log(`Processing cancel request for order: ${request.orderId} from wallet: ${request.walletAddress}`);
+    console.log(
+      `Processing cancel request for order: ${request.orderId} from wallet: ${request.walletAddress}`
+    );
 
     // Get order info before cancellation (needed for status message)
     const orderInfo = ctx.engine.getOrderInfo(request.orderId);
@@ -486,12 +349,7 @@ export function handleCancelOrder(ctx: HandlerContext, data: Uint8Array): void {
     }
   } catch (error) {
     console.error('Error handling cancel order:', error);
-    const errorMsg =
-      error instanceof Error ? error.message : 'Unknown error';
-    publishError(
-      ctx,
-      createErrorMessage(ERROR_CODES.INVALID_ORDER, errorMsg)
-    );
+    const errorMsg = error instanceof Error ? error.message : 'Unknown error';
+    publishError(ctx, createErrorMessage(ERROR_CODES.INVALID_ORDER, errorMsg));
   }
 }
-
