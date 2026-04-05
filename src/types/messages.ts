@@ -6,6 +6,7 @@
  */
 
 import { z } from 'zod';
+import { matchSchema } from './matches';
 import type { MatchResult } from './matches';
 import { ethereumAddressSchema, OrderSide, OrderType } from './orders';
 
@@ -48,12 +49,18 @@ export const matchCreatedMessageSchema = z.object({
   /**
    * Array of matches created from this order
    */
-  matches: z.array(z.any()), // Using any here since Match type is complex
+  matches: z.array(matchSchema),
 
   /**
    * Remaining order if partially filled, null if fully filled
    */
-  remainingOrder: z.any().nullable(),
+  remainingOrder: z
+    .object({
+      orderId: z.string().uuid(),
+      remainingAmount: z.string().regex(/^\d+$/, 'Amount must be a positive integer string'),
+      status: z.string(),
+    })
+    .nullable(),
 
   /**
    * Timestamp when matches were created
@@ -155,18 +162,28 @@ export const cancelledRemainderMessageSchema = z.object({
 export type CancelledRemainderMessage = z.infer<typeof cancelledRemainderMessageSchema>;
 
 /**
+ * Schema for individual order entries in an order book snapshot
+ */
+export const orderBookEntrySchema = z.object({
+  orderId: z.string().uuid(),
+  rate: z.number().int().min(0).max(10000).optional(),
+  amount: z.string().regex(/^\d+$/, 'Amount must be a positive integer string'),
+  timestamp: z.number().int().positive(),
+});
+
+/**
  * Schema for order book snapshot responses
  */
 export const orderBookSnapshotMessageSchema = z.object({
   /**
    * Lend orders grouped by token and maturity
    */
-  lendOrders: z.record(z.string(), z.record(z.string(), z.array(z.any()))),
+  lendOrders: z.record(z.string(), z.record(z.string(), z.array(orderBookEntrySchema))),
 
   /**
    * Borrow orders grouped by token and maturity
    */
-  borrowOrders: z.record(z.string(), z.record(z.string(), z.array(z.any()))),
+  borrowOrders: z.record(z.string(), z.record(z.string(), z.array(orderBookEntrySchema))),
 
   /**
    * Timestamp of the snapshot
@@ -218,7 +235,7 @@ export const errorMessageSchema = z.object({
   /**
    * Optional additional error details
    */
-  details: z.record(z.any()).optional(),
+  details: z.record(z.string(), z.unknown()).optional(),
 });
 
 /**
