@@ -238,3 +238,142 @@ describe('fieldsToMatch edge cases', () => {
     expect(converted.matchedAmount).toBe(largeAmount);
   });
 });
+
+/**
+ * Tests for DbWriterService.handleRedisEntry() retry logic.
+ *
+ * Uses a minimal DbWriterService instantiation with mock NATS, Redis, and
+ * DbClient to verify that transient DB failures are retried and that entries
+ * are only ACK'd after successful persistence.
+ */
+describe('handleRedisEntry retry logic', () => {
+  // eslint-disable-next-line @typescript-eslint/no-var-requires
+  const { DbWriterService } = require('../services/db-writer-service');
+
+  function createMockNats() {
+    return {
+      subscribe: jest.fn(() => ({
+        [Symbol.asyncIterator]: () => ({ next: () => new Promise(() => {}) }),
+        drain: jest.fn(),
+      })),
+    };
+  }
+
+  function createMockRedis() {
+    return {
+      xack: jest.fn().mockResolvedValue(1),
+      xgroup: jest.fn().mockResolvedValue('OK'),
+      xreadgroup: jest.fn().mockResolvedValue(null),
+      xautoclaim: jest.fn().mockResolvedValue(['0-0', [], []]),
+    };
+  }
+
+  function createMockDbClient(insertMatchImpl?: () => Promise<void>) {
+    return {
+      updateOrderStatus: jest.fn().mockResolvedValue(undefined),
+      insertMatch: insertMatchImpl
+        ? jest.fn(insertMatchImpl)
+        : jest.fn().mockResolvedValue(undefined),
+      insertCancelledOrder: jest.fn().mockResolvedValue(undefined),
+      close: jest.fn().mockResolvedValue(undefined),
+    };
+  }
+
+  function buildFields(match: ReturnType<typeof createMatch>): string[] {
+    return [
+      'matchId', match.matchId,
+      'marketId', match.marketId,
+      'lendOrderId', match.lendOrderId,
+      'borrowOrderId', match.borrowOrderId,
+      'lenderWallet', match.lenderWallet,
+      'borrowerWallet', match.borrowerWallet,
+      'matchedAmount', match.matchedAmount,
+      'rate', String(match.rate),
+      'loanToken', match.loanToken,
+      'maturity', String(match.maturity),
+      'timestamp', String(match.timestamp),
+      'borrowerIsTaker', String(match.borrowerIsTaker),
+      'makerFeeAmount', match.makerFeeAmount,
+      'takerFeeAmount', match.takerFeeAmount,
+      'lenderSettlementFeeAmount', match.lenderSettlementFeeAmount,
+      'borrowerSettlementFeeAmount', match.borrowerSettlementFeeAmount,
+    ];
+  }
+
+  /**
+   * Access the private handleRedisEntry method for direct testing.
+   */
+  function getHandler(service: InstanceType<typeof DbWriterService>) {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    return (service as any).handleRedisEntry.bind(service);
+  }
+
+  it('should ACK after successful insert on first attempt', async () => {
+    const redis = createMockRedis();
+    const dbClient = createMockDbClient();
+    const service = new DbWriterService(
+      createMockNats(), redis, dbClient, { maxInsertRetries: 3 }
+    );
+
+    const match = createMatch();
+    const handle = getHandler(service);
+    await handle('entry-1', buildFields(match));
+
+    expect(dbClient.insertMatch).toHaveBeenCalledTimes(1);
+    expect(redis.xack).toHaveBeenCalledTimes(1);
+  });
+
+  it('should retry and succeed on transient failure then ACK', async () => {
+    let callCount = 0;
+    const dbClient = createMockDbClient(async () => {
+      callCount++;
+      if (callCount < 3) throw new Error('transient DB error');
+    });
+    const redis = createMockRedis();
+    const service = new DbWriterService(
+      createMockNats(), redis, dbClient, { maxInsertRetries: 3 }
+    );
+
+    const match = createMatch();
+    const handle = getHandler(service);
+    await handle('entry-2', buildFields(match));
+
+    expect(dbClient.insertMatch).toHaveBeenCalledTimes(3);
+    expect(redis.xack).toHaveBeenCalledTimes(1);
+  });
+
+  it('should NOT ACK after exhausting all retries', async () => {
+    const dbClient = createMockDbClient(async () => {
+      throw new Error('persistent DB error');
+    });
+    const redis = createMockRedis();
+    const service = new DbWriterService(
+      createMockNats(), redis, dbClient, { maxInsertRetries: 3 }
+    );
+
+    const match = createMatch();
+    const handle = getHandler(service);
+
+    await expect(handle('entry-3', buildFields(match))).rejects.toThrow(
+      'persistent DB error'
+    );
+
+    expect(dbClient.insertMatch).toHaveBeenCalledTimes(3);
+    expect(redis.xack).not.toHaveBeenCalled();
+  });
+
+  it('should ACK invalid entries without attempting insert', async () => {
+    const dbClient = createMockDbClient();
+    const redis = createMockRedis();
+    const service = new DbWriterService(
+      createMockNats(), redis, dbClient, { maxInsertRetries: 3 }
+    );
+
+    const handle = getHandler(service);
+    // Empty fields produce an invalid match
+    await handle('entry-4', []);
+
+    expect(dbClient.insertMatch).not.toHaveBeenCalled();
+    expect(redis.xack).toHaveBeenCalledTimes(1);
+  });
+});

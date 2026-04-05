@@ -40,6 +40,21 @@ export interface DbWriterOptions {
    * Maximum number of stream entries to read per XREADGROUP call.
    */
   redisBatchSize?: number;
+
+  /**
+   * Maximum number of retries for transient DB insert failures.
+   */
+  maxInsertRetries?: number;
+
+  /**
+   * How often (ms) the PEL recovery loop runs to reclaim stale entries.
+   */
+  pendingRecoveryIntervalMs?: number;
+
+  /**
+   * Minimum idle time (ms) before a pending entry is reclaimed.
+   */
+  pendingMinIdleMs?: number;
 }
 
 /**
@@ -62,6 +77,8 @@ export class DbWriterService {
   private natsCancelledRemainderSub: Subscription | null = null;
   private redisRunning = false;
   private redisWorkerPromise: Promise<void> | null = null;
+  private pendingRecoveryPromise: Promise<void> | null = null;
+  private pendingRecoveryWakeup: (() => void) | null = null;
 
   constructor(
     nc: NatsConnection,
@@ -81,6 +98,9 @@ export class DbWriterService {
         options?.redisConsumerName ?? `db-writer-${process.pid}`,
       redisBlockTimeoutMs: options?.redisBlockTimeoutMs ?? 5000,
       redisBatchSize: options?.redisBatchSize ?? 50,
+      maxInsertRetries: options?.maxInsertRetries ?? 3,
+      pendingRecoveryIntervalMs: options?.pendingRecoveryIntervalMs ?? 30000,
+      pendingMinIdleMs: options?.pendingMinIdleMs ?? 30000,
     };
   }
 
@@ -92,6 +112,7 @@ export class DbWriterService {
     this.startCancelledRemainderSubscription();
     await this.ensureRedisGroup();
     this.startRedisWorker();
+    this.startPendingRecovery();
   }
 
   /**
@@ -109,9 +130,19 @@ export class DbWriterService {
     }
 
     this.redisRunning = false;
+    // Wake the PEL recovery loop so it exits immediately instead of
+    // blocking on its interval sleep.
+    if (this.pendingRecoveryWakeup) {
+      this.pendingRecoveryWakeup();
+      this.pendingRecoveryWakeup = null;
+    }
     if (this.redisWorkerPromise) {
       await this.redisWorkerPromise;
       this.redisWorkerPromise = null;
+    }
+    if (this.pendingRecoveryPromise) {
+      await this.pendingRecoveryPromise;
+      this.pendingRecoveryPromise = null;
     }
 
     await this.dbClient.close();
@@ -353,7 +384,30 @@ export class DbWriterService {
       return;
     }
 
-    await this.dbClient.insertMatch(validated);
+    // Retry with exponential backoff for transient DB failures.
+    // On exhaustion the error propagates so the entry stays un-ACKd
+    // in the PEL and will be reclaimed by pendingRecoveryLoop.
+    const maxRetries = this.options.maxInsertRetries;
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+      try {
+        await this.dbClient.insertMatch(validated);
+        break; // Success — proceed to ACK
+      } catch (error) {
+        if (attempt === maxRetries) {
+          console.error(
+            `DB Writer: match ${validated.matchId} failed after ${maxRetries} attempts, leaving un-ACKd for PEL recovery`,
+            error
+          );
+          throw error; // Propagate — do NOT ACK
+        }
+        const backoffMs = 100 * Math.pow(2, attempt - 1);
+        console.warn(
+          `DB Writer: match ${validated.matchId} insert attempt ${attempt}/${maxRetries} failed, retrying in ${backoffMs}ms`,
+          error
+        );
+        await new Promise((resolve) => setTimeout(resolve, backoffMs));
+      }
+    }
 
     // Acknowledge within the DB_WRITER consumer group only. Other
     // consumer groups (e.g. Settlement Engine) still see the message
@@ -363,6 +417,70 @@ export class DbWriterService {
       this.options.redisConsumerGroup,
       id
     );
+  }
+
+  /**
+   * Start the PEL (Pending Entries List) recovery loop.
+   */
+  private startPendingRecovery(): void {
+    this.pendingRecoveryPromise = this.pendingRecoveryLoop();
+  }
+
+  /**
+   * Periodically reclaim entries that were delivered but never ACK'd
+   * (e.g. because all retry attempts failed or the process crashed).
+   * Uses XAUTOCLAIM to claim entries idle longer than pendingMinIdleMs.
+   */
+  private async pendingRecoveryLoop(): Promise<void> {
+    const group = this.options.redisConsumerGroup;
+    const consumer = this.options.redisConsumerName;
+    const minIdleMs = this.options.pendingMinIdleMs;
+    const intervalMs = this.options.pendingRecoveryIntervalMs;
+
+    while (this.redisRunning) {
+      await new Promise<void>((resolve) => {
+        const timer = setTimeout(resolve, intervalMs);
+        this.pendingRecoveryWakeup = () => {
+          clearTimeout(timer);
+          resolve();
+        };
+      });
+      if (!this.redisRunning) break;
+
+      try {
+        const result = await this.redis.xautoclaim(
+          REDIS_STREAMS.SETTLEMENT_MATCHES,
+          group,
+          consumer,
+          minIdleMs,
+          '0-0',
+          'COUNT',
+          this.options.redisBatchSize
+        );
+
+        // result: [nextStartId, [[id, fields], ...], deletedIds]
+        const entries = result[1] as [string, string[]][];
+        if (!entries || entries.length === 0) continue;
+
+        console.log(
+          `DB Writer: reclaiming ${entries.length} pending entries from PEL`
+        );
+
+        for (const [id, fields] of entries) {
+          try {
+            await this.handleRedisEntry(id, fields);
+          } catch (error) {
+            console.error(
+              `DB Writer: PEL recovery failed for entry ${id}`,
+              error
+            );
+            // Entry remains in PEL — will be retried on next cycle
+          }
+        }
+      } catch (error) {
+        console.error('DB Writer: PEL recovery loop error', error);
+      }
+    }
   }
 
   /**
