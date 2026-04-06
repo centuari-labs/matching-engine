@@ -87,7 +87,9 @@ export class NatsService {
       log.info('NATS service initialized');
     } catch (error) {
       log.error({ err: error }, 'failed to connect to NATS');
-      throw new Error(`NATS connection failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      throw new Error(
+        `NATS connection failed: ${error instanceof Error ? error.message : 'Unknown error'}`
+      );
     }
   }
 
@@ -161,8 +163,6 @@ export class NatsService {
     this.subscriptions.push(updateSub);
     this.processSubscription(updateSub, (data) => handleUpdateOrder(ctx, data));
     log.info({ topic: NATS_TOPICS.ORDERS_UPDATE }, 'subscribed');
-
-    
   }
 
   /**
@@ -262,4 +262,3 @@ export class NatsService {
     };
   }
 }
-

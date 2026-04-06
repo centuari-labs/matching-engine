@@ -248,7 +248,7 @@ describe('NatsService Integration (requires NATS server)', () => {
     await natsService.connect();
     
     const stats = natsService.getStats();
-    expect(stats.subscriptions).toBe(5); // Updated: 4 order types + cancel (removed orderbook.query)
+    expect(stats.subscriptions).toBe(6); // 4 order types + cancel + update
   });
 
   it('should process lend limit order message', async () => {

@@ -27,25 +27,46 @@ export const cancelOrderMessageSchema = z.object({
   /**
    * Timestamp of the cancellation request
    */
-  timestamp: z.number().int().positive().default(() => Date.now()),
+  timestamp: z.number().int().positive(),
 });
 
-const amountOrQuantitySchema = z.union([z.string(), z.number().transform(n => n.toString())]).optional();
+const digitStringSchema = z
+  .string()
+  .regex(/^\d+$/, 'Amount must be a positive integer string')
+  .optional();
 
-export const updateOrderMessageSchema = z.object({
-  orderId: z.string().uuid(),
-  walletAddress: ethereumAddressSchema,
-  amount: amountOrQuantitySchema,
-  quantity: amountOrQuantitySchema,
-  originalAmount: amountOrQuantitySchema,
-  rate: z.number().int().positive().optional(),
-  settlementFee: amountOrQuantitySchema,
-  settlementFeeAmount: amountOrQuantitySchema,
-  timestamp: z.number().int().positive().default(() => Date.now())
-})
+export const updateOrderMessageSchema = z
+  .object({
+    orderId: z.string().uuid(),
+    walletAddress: ethereumAddressSchema,
+    amount: digitStringSchema,
+    quantity: digitStringSchema,
+    originalAmount: digitStringSchema,
+    rate: z.number().int().positive().optional(),
+    settlementFee: digitStringSchema,
+    settlementFeeAmount: digitStringSchema,
+    timestamp: z
+      .number()
+      .int()
+      .positive()
+      .default(() => Date.now()),
+  })
+  .refine(
+    (obj) =>
+      obj.amount ||
+      obj.quantity ||
+      obj.originalAmount ||
+      obj.rate ||
+      obj.settlementFee ||
+      obj.settlementFeeAmount,
+    {
+      message:
+        'At least one update field (amount, quantity, originalAmount, rate, settlementFee, or settlementFeeAmount) must be provided',
+    }
+  );
 
 /**
- * Type for order cancellation messages
+ * Type for order update messages
  */
 export type UpdateOrderMessage = z.infer<typeof updateOrderMessageSchema>;
 
@@ -233,9 +254,7 @@ export const orderBookSnapshotMessageSchema = z.object({
 /**
  * Type for order book snapshot messages
  */
-export type OrderBookSnapshotMessage = z.infer<
-  typeof orderBookSnapshotMessageSchema
->;
+export type OrderBookSnapshotMessage = z.infer<typeof orderBookSnapshotMessageSchema>;
 
 /**
  * Schema for error notifications
@@ -334,7 +353,10 @@ export function createErrorMessage(
  * @param result - Match result from the matching engine
  * @returns Formatted match created message
  */
-export function createMatchCreatedMessage(orderId: string, result: MatchResult): MatchCreatedMessage {
+export function createMatchCreatedMessage(
+  orderId: string,
+  result: MatchResult
+): MatchCreatedMessage {
   return {
     orderId,
     matches: result.matches,
@@ -403,4 +425,3 @@ export function createOrderStatusMessage(source: OrderStatusSource): OrderStatus
     timestamp: Date.now(),
   };
 }
-

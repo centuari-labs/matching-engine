@@ -132,7 +132,7 @@ describe('NATS Configuration', () => {
       const { NATS_TOPICS } = require('../config/nats-config');
 
       expect(typeof NATS_TOPICS).toBe('object');
-      expect(Object.keys(NATS_TOPICS).length).toBe(9);
+      expect(Object.keys(NATS_TOPICS).length).toBe(11);
     });
   });
 

@@ -26,7 +26,15 @@ import {
 import type { Match, MatchResult } from '../types/matches';
 import { OrderSide, OrderStatus, OrderType } from '../types/orders';
 import { NATS_TOPICS } from '../config/nats-config';
-import { addBigNumbers, subtractBigNumbers, isZero, generateOrderId } from '../utils/helpers';
+import type { Order } from '../types/orders';
+import { isLimitOrder } from '../types/orders';
+import {
+  addBigNumbers,
+  subtractBigNumbers,
+  isZero,
+  generateOrderId,
+  calculateProRataSettlementFee,
+} from '../utils/helpers';
 import { createLogger } from '../utils/logger';
 
 const log = createLogger('message-handlers');
@@ -273,7 +281,10 @@ function handleOrder<T extends Order>(
       publishMatchCreatedEvents(ctx, order.assetId, order.side, result.matches);
     }
 
-    log.debug({ orderId: order.orderId, matchCount: result.matches.length, type: label }, 'order processed');
+    log.debug(
+      { orderId: order.orderId, matchCount: result.matches.length, type: label },
+      'order processed'
+    );
   } catch (error) {
     log.error({ err: error, type: label }, 'error handling order');
     const errorMsg = error instanceof Error ? error.message : 'Unknown error';
@@ -304,7 +315,10 @@ export function handleCancelOrder(ctx: HandlerContext, data: Uint8Array): void {
     // Parse and validate the cancellation request
     const request = parseMessage(data, cancelOrderMessageSchema);
 
-    log.debug({ orderId: request.orderId, walletAddress: request.walletAddress }, 'processing cancel request');
+    log.debug(
+      { orderId: request.orderId, walletAddress: request.walletAddress },
+      'processing cancel request'
+    );
 
     // Get order info before cancellation (needed for status message)
     const orderInfo = ctx.engine.getOrderInfo(request.orderId);
@@ -391,49 +405,62 @@ export function handleUpdateOrder(ctx: HandlerContext, data: Uint8Array): void {
       let newOriginalAmount = oldOrder.originalAmount;
       let newRemainingAmount = oldOrder.remainingAmount;
       let newSettlementFeeAmount = oldOrder.settlementFeeAmount;
-      let newRemainingSettlementFeeAmount = oldOrder.remainingSettlementFeeAmount ?? oldOrder.settlementFeeAmount;
+      let newRemainingSettlementFeeAmount =
+        oldOrder.remainingSettlementFeeAmount ?? oldOrder.settlementFeeAmount;
 
       if (targetQuantity) {
         const filledAmount = subtractBigNumbers(oldOrder.originalAmount, oldOrder.remainingAmount);
         newOriginalAmount = targetQuantity;
-        newRemainingAmount = subtractBigNumbers(targetQuantity, filledAmount);
 
-        // Ensure remaining amount is not negative
-        if (BigInt(newRemainingAmount) < 0n) {
+        // Ensure new total quantity is not less than already filled amount
+        if (BigInt(targetQuantity) < BigInt(filledAmount)) {
           throw new Error('New total quantity cannot be less than already filled amount');
         }
+        newRemainingAmount = subtractBigNumbers(targetQuantity, filledAmount);
 
         // Recalculate settlement fees pro-rata if amount changed but not explicitly provided
         if (!targetSettlementFee) {
-          const oldTotal = BigInt(oldOrder.originalAmount);
-          const newTotal = BigInt(newOriginalAmount);
-          newSettlementFeeAmount = ((BigInt(oldOrder.settlementFeeAmount) * newTotal) / oldTotal).toString();
-
-          const remaining = BigInt(newRemainingAmount);
-          newRemainingSettlementFeeAmount = ((BigInt(newSettlementFeeAmount) * remaining) / newTotal).toString();
+          newSettlementFeeAmount = calculateProRataSettlementFee(
+            oldOrder.settlementFeeAmount,
+            newOriginalAmount,
+            oldOrder.originalAmount
+          );
+          newRemainingSettlementFeeAmount = calculateProRataSettlementFee(
+            newSettlementFeeAmount,
+            newRemainingAmount,
+            newOriginalAmount
+          );
         }
       }
 
       if (targetSettlementFee) {
         newSettlementFeeAmount = targetSettlementFee;
         // Recalculate remaining fee pro-rata based on new total fee
-        const total = BigInt(newOriginalAmount);
-        const remaining = BigInt(newRemainingAmount);
-        newRemainingSettlementFeeAmount = ((BigInt(newSettlementFeeAmount) * remaining) / total).toString();
+        newRemainingSettlementFeeAmount = calculateProRataSettlementFee(
+          newSettlementFeeAmount,
+          newRemainingAmount,
+          newOriginalAmount
+        );
       }
 
-      const newRate = request.rate ?? (oldOrder as any).rate;
+      const oldRate = isLimitOrder(oldOrder) ? oldOrder.rate : undefined;
+      const newRate = request.rate ?? oldRate;
 
-      // Construct updated order (keeping same ID)
-      const updatedOrder = {
+      // Construct updated order (keeping same ID).
+      // We must rebuild via the base fields and re-assign rate only for limit orders,
+      // because the Order union discriminates on rate (undefined for market, number for limit).
+      const baseUpdate = {
         ...oldOrder,
         originalAmount: newOriginalAmount,
         remainingAmount: newRemainingAmount,
-        rate: newRate,
         settlementFeeAmount: newSettlementFeeAmount,
         remainingSettlementFeeAmount: newRemainingSettlementFeeAmount,
         timestamp: request.timestamp,
-      } as Order;
+      };
+
+      const updatedOrder: Order = isLimitOrder(oldOrder)
+        ? ({ ...baseUpdate, rate: newRate ?? oldOrder.rate } as typeof oldOrder)
+        : (baseUpdate as Order);
 
       // Re-submit to the matching engine
       const updateResult = ctx.engine.submitOrder(updatedOrder);
@@ -443,7 +470,7 @@ export function handleUpdateOrder(ctx: HandlerContext, data: Uint8Array): void {
         orderId: request.orderId,
         originalAmount: newOriginalAmount,
         remainingAmount: newRemainingAmount,
-        rate: newRate,
+        rate: newRate ?? 0,
         settlementFeeAmount: newSettlementFeeAmount,
         remainingSettlementFeeAmount: newRemainingSettlementFeeAmount,
         timestamp: request.timestamp,
@@ -451,10 +478,16 @@ export function handleUpdateOrder(ctx: HandlerContext, data: Uint8Array): void {
 
       ctx.nc.publish(NATS_TOPICS.ORDERS_UPDATED, JSON.stringify(updateEvent));
 
-      const oldRate = (oldOrder as any).rate;
-      const oldOriginalAmount = oldOrder.originalAmount;
-
-      log.debug({ orderId: request.orderId, oldRate, newRate, oldOriginalAmount, newOriginalAmount }, 'order updated');
+      log.debug(
+        {
+          orderId: request.orderId,
+          oldRate,
+          newRate,
+          oldOriginalAmount: oldOrder.originalAmount,
+          newOriginalAmount,
+        },
+        'order updated'
+      );
 
       publishOrderStatusUpdates(ctx, request.orderId, updateResult, {
         originalAmount: newOriginalAmount,
@@ -468,10 +501,18 @@ export function handleUpdateOrder(ctx: HandlerContext, data: Uint8Array): void {
       });
 
       if (updateResult.matches.length > 0) {
-        publishMatchCreatedEvents(ctx, updatedOrder.assetId, updatedOrder.side, updateResult.matches);
+        publishMatchCreatedEvents(
+          ctx,
+          updatedOrder.assetId,
+          updatedOrder.side,
+          updateResult.matches
+        );
       }
 
-      log.debug({ orderId: request.orderId, matchCount: updateResult.matches.length }, 'order re-published');
+      log.debug(
+        { orderId: request.orderId, matchCount: updateResult.matches.length },
+        'order re-published'
+      );
     } else {
       let errorCode: ErrorCode = ERROR_CODES.VALIDATION_ERROR;
       let errorMessage = 'Wallet address does not match order owner';
@@ -485,22 +526,11 @@ export function handleUpdateOrder(ctx: HandlerContext, data: Uint8Array): void {
       }
 
       log.warn({ orderId: request.orderId, errorMessage }, 'error handling update order');
-      publishError(
-        ctx,
-        createErrorMessage(
-          errorCode as any,
-          errorMessage,
-          request.orderId
-        )
-      );
+      publishError(ctx, createErrorMessage(errorCode, errorMessage, request.orderId));
     }
   } catch (error) {
     log.error({ err: error }, 'error handling update order');
-    const errorMsg =
-      error instanceof Error ? error.message : 'Unknown error';
-    publishError(
-      ctx,
-      createErrorMessage(ERROR_CODES.INVALID_ORDER, errorMsg)
-    );
+    const errorMsg = error instanceof Error ? error.message : 'Unknown error';
+    publishError(ctx, createErrorMessage(ERROR_CODES.INVALID_ORDER, errorMsg));
   }
 }
