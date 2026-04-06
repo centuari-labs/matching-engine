@@ -6,6 +6,7 @@
  */
 
 import { z } from 'zod';
+import { matchSchema } from './matches';
 import type { MatchResult } from './matches';
 import { ethereumAddressSchema, OrderSide, OrderType } from './orders';
 
@@ -82,12 +83,18 @@ export const matchCreatedMessageSchema = z.object({
   /**
    * Array of matches created from this order
    */
-  matches: z.array(z.any()), // Using any here since Match type is complex
+  matches: z.array(matchSchema),
 
   /**
    * Remaining order if partially filled, null if fully filled
    */
-  remainingOrder: z.any().nullable(),
+  remainingOrder: z
+    .object({
+      orderId: z.string().uuid(),
+      remainingAmount: z.string().regex(/^\d+$/, 'Amount must be a positive integer string'),
+      status: z.string(),
+    })
+    .nullable(),
 
   /**
    * Timestamp when matches were created
@@ -134,6 +141,11 @@ export const orderStatusMessageSchema = z.object({
   filledSettlementFeeAmount: z.string(),
 
   /**
+   * Reason why the order was cancelled (only present when status is CANCELLED)
+   */
+  cancelReason: z.enum(['USER_CANCELLED', 'IOC']).optional(),
+
+  /**
    * Timestamp of the status update
    */
   timestamp: z.number().int().positive(),
@@ -172,6 +184,8 @@ export const cancelledRemainderMessageSchema = z.object({
   settlementFee: z.string().regex(/^\d+$/, 'Settlement fee must be a positive integer string'),
   /** Market IDs the order participated in */
   marketIds: z.array(z.string().uuid()).min(1),
+  /** Reason for cancellation */
+  cancelReason: z.enum(['USER_CANCELLED', 'IOC']).optional(),
   /** Timestamp */
   timestamp: z.number().int().positive(),
 });
@@ -182,18 +196,28 @@ export const cancelledRemainderMessageSchema = z.object({
 export type CancelledRemainderMessage = z.infer<typeof cancelledRemainderMessageSchema>;
 
 /**
+ * Schema for individual order entries in an order book snapshot
+ */
+export const orderBookEntrySchema = z.object({
+  orderId: z.string().uuid(),
+  rate: z.number().int().min(0).max(10000).optional(),
+  amount: z.string().regex(/^\d+$/, 'Amount must be a positive integer string'),
+  timestamp: z.number().int().positive(),
+});
+
+/**
  * Schema for order book snapshot responses
  */
 export const orderBookSnapshotMessageSchema = z.object({
   /**
    * Lend orders grouped by token and maturity
    */
-  lendOrders: z.record(z.string(), z.record(z.string(), z.array(z.any()))),
+  lendOrders: z.record(z.string(), z.record(z.string(), z.array(orderBookEntrySchema))),
 
   /**
    * Borrow orders grouped by token and maturity
    */
-  borrowOrders: z.record(z.string(), z.record(z.string(), z.array(z.any()))),
+  borrowOrders: z.record(z.string(), z.record(z.string(), z.array(orderBookEntrySchema))),
 
   /**
    * Timestamp of the snapshot
@@ -245,7 +269,7 @@ export const errorMessageSchema = z.object({
   /**
    * Optional additional error details
    */
-  details: z.record(z.any()).optional(),
+  details: z.record(z.string(), z.unknown()).optional(),
 });
 
 /**
@@ -338,6 +362,8 @@ export interface OrderStatusSource {
   settlementFeeAmount: string;
   /** Remaining settlement fee pool (may be lazily initialized) */
   remainingSettlementFeeAmount?: string;
+  /** Reason for cancellation (only when status is CANCELLED) */
+  cancelReason?: 'USER_CANCELLED' | 'IOC';
 }
 
 /**
@@ -354,6 +380,7 @@ export function createOrderStatusMessage(source: OrderStatusSource): OrderStatus
     originalAmount,
     settlementFeeAmount,
     remainingSettlementFeeAmount,
+    cancelReason,
   } = source;
 
   const filledQuantity =
@@ -372,6 +399,7 @@ export function createOrderStatusMessage(source: OrderStatusSource): OrderStatus
     remainingAmount,
     filledQuantity,
     filledSettlementFeeAmount,
+    ...(cancelReason ? { cancelReason } : {}),
     timestamp: Date.now(),
   };
 }

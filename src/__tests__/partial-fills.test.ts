@@ -273,5 +273,217 @@ describe('Partial Fills', () => {
     expect(snapshot.lendOrders).toHaveLength(1);
     expect(BigInt(snapshot.lendOrders[0].amount)).toBe(BigInt(largeAmount) - BigInt('1000'));
   });
+
+  describe('updateOrderAmount behavior', () => {
+    it('should reduce maker order remainingAmount after partial fill', () => {
+      const lendOrder = createLendLimitOrder({
+        walletAddress: walletAddress1,
+        loanToken,
+        markets: marketsFromMaturities([maturity]),
+        originalAmount: '1000000',
+        remainingAmount: '1000000',
+        settlementFeeAmount: '10000',
+        rate: 500,
+      });
+
+      engine.submitOrder(lendOrder);
+
+      const borrowOrder = createBorrowLimitOrder({
+        walletAddress: walletAddress2,
+        loanToken,
+        markets: marketsFromMaturities([maturity]),
+        originalAmount: '400000',
+        remainingAmount: '400000',
+        settlementFeeAmount: '10000',
+        rate: 600,
+      });
+
+      engine.submitOrder(borrowOrder);
+
+      const snapshot = engine.getOrderBook(loanToken, maturity, 10);
+      expect(snapshot.lendOrders).toHaveLength(1);
+      expect(snapshot.lendOrders[0].amount).toBe('600000');
+    });
+
+    it('should set maker order status to PartiallyFilled after partial fill', () => {
+      const lendOrder = createLendLimitOrder({
+        walletAddress: walletAddress1,
+        loanToken,
+        markets: marketsFromMaturities([maturity]),
+        originalAmount: '1000000',
+        remainingAmount: '1000000',
+        settlementFeeAmount: '10000',
+        rate: 500,
+      });
+
+      engine.submitOrder(lendOrder);
+
+      const borrowOrder = createBorrowLimitOrder({
+        walletAddress: walletAddress2,
+        loanToken,
+        markets: marketsFromMaturities([maturity]),
+        originalAmount: '300000',
+        remainingAmount: '300000',
+        settlementFeeAmount: '10000',
+        rate: 600,
+      });
+
+      const result = engine.submitOrder(borrowOrder);
+
+      expect(result.affectedMakerOrders).toHaveLength(1);
+      expect(result.affectedMakerOrders[0].orderId).toBe(lendOrder.orderId);
+      expect(result.affectedMakerOrders[0].status).toBe('PARTIALLY_FILLED');
+      expect(result.affectedMakerOrders[0].remainingAmount).toBe('700000');
+    });
+
+    it('should remove maker order from book on full fill', () => {
+      const lendOrder = createLendLimitOrder({
+        walletAddress: walletAddress1,
+        loanToken,
+        markets: marketsFromMaturities([maturity]),
+        originalAmount: '500000',
+        remainingAmount: '500000',
+        settlementFeeAmount: '10000',
+        rate: 500,
+      });
+
+      engine.submitOrder(lendOrder);
+
+      const borrowOrder = createBorrowLimitOrder({
+        walletAddress: walletAddress2,
+        loanToken,
+        markets: marketsFromMaturities([maturity]),
+        originalAmount: '500000',
+        remainingAmount: '500000',
+        settlementFeeAmount: '10000',
+        rate: 600,
+      });
+
+      engine.submitOrder(borrowOrder);
+
+      const snapshot = engine.getOrderBook(loanToken, maturity, 10);
+      expect(snapshot.lendOrders).toHaveLength(0);
+      expect(engine.getOrderStatus(lendOrder.orderId)).toBeNull();
+    });
+
+    it('should decrement correctly across multiple sequential partial fills', () => {
+      const lendOrder = createLendLimitOrder({
+        walletAddress: walletAddress1,
+        loanToken,
+        markets: marketsFromMaturities([maturity]),
+        originalAmount: '1000000',
+        remainingAmount: '1000000',
+        settlementFeeAmount: '10000',
+        rate: 500,
+      });
+
+      engine.submitOrder(lendOrder);
+
+      // First partial fill: 200000
+      engine.submitOrder(createBorrowLimitOrder({
+        walletAddress: walletAddress2,
+        loanToken,
+        markets: marketsFromMaturities([maturity]),
+        originalAmount: '200000',
+        remainingAmount: '200000',
+        settlementFeeAmount: '10000',
+        rate: 600,
+      }));
+
+      let snapshot = engine.getOrderBook(loanToken, maturity, 10);
+      expect(snapshot.lendOrders[0].amount).toBe('800000');
+
+      // Second partial fill: 350000
+      engine.submitOrder(createBorrowLimitOrder({
+        walletAddress: walletAddress2,
+        loanToken,
+        markets: marketsFromMaturities([maturity]),
+        originalAmount: '350000',
+        remainingAmount: '350000',
+        settlementFeeAmount: '10000',
+        rate: 600,
+        timestamp: Date.now() + 10,
+      }));
+
+      snapshot = engine.getOrderBook(loanToken, maturity, 10);
+      expect(snapshot.lendOrders[0].amount).toBe('450000');
+    });
+
+    it('should allow cancellation after partial fill', () => {
+      const lendOrder = createLendLimitOrder({
+        walletAddress: walletAddress1,
+        loanToken,
+        markets: marketsFromMaturities([maturity]),
+        originalAmount: '1000000',
+        remainingAmount: '1000000',
+        settlementFeeAmount: '10000',
+        rate: 500,
+      });
+
+      engine.submitOrder(lendOrder);
+
+      engine.submitOrder(createBorrowLimitOrder({
+        walletAddress: walletAddress2,
+        loanToken,
+        markets: marketsFromMaturities([maturity]),
+        originalAmount: '300000',
+        remainingAmount: '300000',
+        settlementFeeAmount: '10000',
+        rate: 600,
+      }));
+
+      // Order should still be in book with 700000 remaining
+      expect(engine.hasOrder(lendOrder.orderId)).toBe(true);
+
+      // Cancel should succeed
+      const cancelled = engine.cancelOrder(lendOrder.orderId, walletAddress1);
+      expect(cancelled).toBe(true);
+      expect(engine.hasOrder(lendOrder.orderId)).toBe(false);
+    });
+
+    it('should allow remaining amount to be matched by a new counter-order', () => {
+      const lendOrder = createLendLimitOrder({
+        walletAddress: walletAddress1,
+        loanToken,
+        markets: marketsFromMaturities([maturity]),
+        originalAmount: '1000000',
+        remainingAmount: '1000000',
+        settlementFeeAmount: '10000',
+        rate: 500,
+      });
+
+      engine.submitOrder(lendOrder);
+
+      // First partial fill
+      engine.submitOrder(createBorrowLimitOrder({
+        walletAddress: walletAddress2,
+        loanToken,
+        markets: marketsFromMaturities([maturity]),
+        originalAmount: '600000',
+        remainingAmount: '600000',
+        settlementFeeAmount: '10000',
+        rate: 600,
+      }));
+
+      // Second order matches the remaining 400000
+      const result = engine.submitOrder(createBorrowLimitOrder({
+        walletAddress: walletAddress2,
+        loanToken,
+        markets: marketsFromMaturities([maturity]),
+        originalAmount: '400000',
+        remainingAmount: '400000',
+        settlementFeeAmount: '10000',
+        rate: 600,
+        timestamp: Date.now() + 10,
+      }));
+
+      expect(result.matches).toHaveLength(1);
+      expect(result.matches[0].matchedAmount).toBe('400000');
+      expect(result.matches[0].lendOrderId).toBe(lendOrder.orderId);
+
+      // Lend order should now be fully filled and removed
+      expect(engine.hasOrder(lendOrder.orderId)).toBe(false);
+    });
+  });
 });
 

@@ -51,6 +51,7 @@ export class PostgresDbClient implements DbClient {
           status = $2,
           filled_quantity = $3::numeric,
           filled_settlement_fee = $4::numeric,
+          cancel_reason = $6,
           updated_at = to_timestamp($5 / 1000.0)
         WHERE id = $1
         `,
@@ -60,6 +61,7 @@ export class PostgresDbClient implements DbClient {
           event.filledQuantity,
           event.filledSettlementFeeAmount,
           event.timestamp,
+          event.cancelReason ?? null,
         ]
       );
 
@@ -208,22 +210,60 @@ export class PostgresDbClient implements DbClient {
         ]
       );
 
-      // Lock lender balance for pending settlement (skip duplicates)
+      // Lock both lender and borrower balances for pending settlement.
+      // Sort updates by account ID to prevent deadlocks when concurrent
+      // transactions lock the same two accounts in opposite roles.
       if (insertResult.rowCount && insertResult.rowCount > 0) {
-        await client.query(
-          `
-          UPDATE portfolio
-          SET locked_amount = locked_amount + ($1::numeric + $2::numeric),
-              updated_at = NOW()
-          WHERE account_id = $3 AND asset_id = $4
+        const lenderTradeFee = event.borrowerIsTaker
+          ? event.makerFeeAmount
+          : event.takerFeeAmount;
+        const borrowerTradeFee = event.borrowerIsTaker
+          ? event.takerFeeAmount
+          : event.makerFeeAmount;
+
+        const lenderUpdate = {
+          accountId: lenderAccountId,
+          amounts: [event.matchedAmount, event.lenderSettlementFeeAmount, lenderTradeFee],
+          query: `
+            UPDATE portfolio
+            SET locked_amount = locked_amount + ($1::numeric + $2::numeric + $3::numeric),
+                updated_at = NOW()
+            WHERE account_id = $4 AND asset_id = $5
           `,
-          [
+          params: [
             event.matchedAmount,
             event.lenderSettlementFeeAmount,
+            lenderTradeFee,
             lenderAccountId,
             assetId,
-          ]
-        );
+          ],
+        };
+
+        const borrowerUpdate = {
+          accountId: borrowerAccountId,
+          amounts: [event.borrowerSettlementFeeAmount, borrowerTradeFee],
+          query: `
+            UPDATE portfolio
+            SET locked_amount = locked_amount + ($1::numeric + $2::numeric),
+                updated_at = NOW()
+            WHERE account_id = $3 AND asset_id = $4
+          `,
+          params: [
+            event.borrowerSettlementFeeAmount,
+            borrowerTradeFee,
+            borrowerAccountId,
+            assetId,
+          ],
+        };
+
+        // Always lock lower account ID first to prevent deadlocks
+        const ordered = lenderAccountId < borrowerAccountId
+          ? [lenderUpdate, borrowerUpdate]
+          : [borrowerUpdate, lenderUpdate];
+
+        for (const update of ordered) {
+          await client.query(update.query, update.params);
+        }
       }
 
       await client.query('COMMIT');
@@ -248,12 +288,12 @@ export class PostgresDbClient implements DbClient {
         INSERT INTO orders (
           id, account_id, asset_id, side, type, rate, quantity,
           filled_quantity, settlement_fee, filled_settlement_fee,
-          status, created_at, updated_at
+          status, cancel_reason, created_at, updated_at
         )
         VALUES (
           $1, $2, $3, $4, $5, $6, $7,
           0, $8, 0,
-          'CANCELLED', to_timestamp($9 / 1000.0), to_timestamp($9 / 1000.0)
+          'CANCELLED', $10, to_timestamp($9 / 1000.0), to_timestamp($9 / 1000.0)
         )
         ON CONFLICT (id) DO NOTHING
         `,
@@ -267,6 +307,7 @@ export class PostgresDbClient implements DbClient {
           event.quantity,
           event.settlementFee,
           event.timestamp,
+          event.cancelReason ?? 'IOC',
         ]
       );
 

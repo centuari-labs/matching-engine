@@ -1,15 +1,10 @@
 import { OrderBook } from './order-book';
 import { ExecutionEngine } from './execution-engine';
-import type {
-  LendMarketOrder,
-  LendLimitOrder,
-  BorrowMarketOrder,
-  BorrowLimitOrder,
-} from '../types/orders';
-import { OrderSide, OrderStatus, OrderType, isLimitOrder, type Order } from '../types/orders';
-
+import type { Order, LendLimitOrder, BorrowLimitOrder } from '../types/orders';
+import { OrderSide, OrderStatus, isLimitOrder } from '../types/orders';
 import type { Match, MatchResult, OrderBookSnapshot, AffectedOrder } from '../types/matches';
 import type { SettlementPublisher } from '../types/settlement';
+import type { BufferStats, BufferEventHandler } from '../types/buffer';
 import type { SnapshotService } from '../services/snapshot-service';
 import {
   minBigNumber,
@@ -19,6 +14,9 @@ import {
   calculateTakerFee,
   calculateProRataSettlementFee,
 } from '../utils/helpers';
+import { createLogger } from '../utils/logger';
+
+const log = createLogger('matching-engine');
 
 /**
  * MatchingEngine is the core component that matches lend and borrow orders
@@ -36,44 +34,70 @@ export class MatchingEngine {
    *
    * @param settlementPublisher - Optional publisher for settlement matches (e.g., Redis)
    * @param snapshotService - Optional snapshot service for state persistence
+   * @param bufferEventHandler - Optional handler for buffer events (retry, thresholds, disk spill)
+   * @param warningThresholds - Buffer size thresholds that trigger warnings
+   * @param diskSpillThreshold - Buffer size that triggers disk spill
+   * @param maxBufferSize - Hard cap on buffer size (0 = unlimited)
    */
-  constructor(settlementPublisher?: SettlementPublisher, snapshotService?: SnapshotService) {
+  constructor(
+    settlementPublisher?: SettlementPublisher,
+    snapshotService?: SnapshotService,
+    bufferEventHandler?: BufferEventHandler,
+    warningThresholds: number[] = [],
+    diskSpillThreshold: number = 0,
+    maxBufferSize: number = 0
+  ) {
     this.orderBook = new OrderBook();
-    this.executionEngine = new ExecutionEngine(settlementPublisher);
+    this.executionEngine = new ExecutionEngine(
+      settlementPublisher,
+      bufferEventHandler,
+      warningThresholds,
+      diskSpillThreshold,
+      maxBufferSize
+    );
     this.snapshotService = snapshotService ?? null;
   }
 
   /**
-   * Calculate and deduct the settlement fee for a single match for a given order.
+   * Get the execution engine instance
    *
-   * Uses the order's total settlementFeeAmount as the full-fee pool and
-   * tracks a remaining pool in-memory keyed by orderId. For a match with
-   * matchedAmount, it:
-   *  - Computes a pro-rata fee with rounding up
-   *  - Clamps it to the remaining pool to avoid over-collection
-   *  - Deducts the actual fee from the remaining pool
+   * Used by the retry service to call retryPublish on individual matches.
+   */
+  getExecutionEngine(): ExecutionEngine {
+    return this.executionEngine;
+  }
+
+  /**
+   * Get buffer statistics for monitoring
+   */
+  getBufferStats(): BufferStats {
+    return this.executionEngine.getBufferStats();
+  }
+
+  /**
+   * Calculate the settlement fee for a single match (pure — no mutation).
+   *
+   * Computes a pro-rata fee (rounded up), clamped to the caller-provided
+   * remaining pool, and returns both the fee charged and the new remaining.
    *
    * @param order - The order paying the settlement fee
    * @param matchedAmount - Matched amount for this fill
-   * @returns The actual fee charged for this match
+   * @param currentRemaining - Current remaining settlement fee pool
+   * @returns The actual fee charged and the updated remaining pool
    */
-  private calculateAndConsumeSettlementFee(order: Order, matchedAmount: string): string {
-    const totalFee = order.settlementFeeAmount;
-    const originalAmount = order.originalAmount;
-
-    // Initialize remainingSettlementFeeAmount lazily if it is not set (for
-    // backwards compatibility in tests or any internal callers that only set
-    // settlementFeeAmount).
-    const currentRemaining =
-      (order as any).remainingSettlementFeeAmount ?? order.settlementFeeAmount;
-
-    const proRata = calculateProRataSettlementFee(totalFee, matchedAmount, originalAmount);
+  private calculateSettlementFee(
+    order: Order,
+    matchedAmount: string,
+    currentRemaining: string
+  ): { actualFee: string; remainingAfter: string } {
+    const proRata = calculateProRataSettlementFee(
+      order.settlementFeeAmount,
+      matchedAmount,
+      order.originalAmount
+    );
     const actualFee = minBigNumber(proRata, currentRemaining);
-
     const remainingAfter = subtractBigNumbers(currentRemaining, actualFee);
-    (order as any).remainingSettlementFeeAmount = remainingAfter;
-
-    return actualFee;
+    return { actualFee, remainingAfter };
   }
 
   /**
@@ -87,21 +111,7 @@ export class MatchingEngine {
     const matches: Match[] = [];
     const affectedMakerOrders: AffectedOrder[] = [];
 
-    if (order.side === OrderSide.Lend) {
-      // Match lend order against borrow orders
-      if (order.type === OrderType.Market) {
-        this.matchLendMarketOrder(order as LendMarketOrder, matches, affectedMakerOrders);
-      } else {
-        this.matchLendLimitOrder(order as LendLimitOrder, matches, affectedMakerOrders);
-      }
-    } else {
-      // Match borrow order against lend orders
-      if (order.type === OrderType.Market) {
-        this.matchBorrowMarketOrder(order as BorrowMarketOrder, matches, affectedMakerOrders);
-      } else {
-        this.matchBorrowLimitOrder(order as BorrowLimitOrder, matches, affectedMakerOrders);
-      }
-    }
+    const takerRemainingFee = this.matchAgainstBook(order, matches, affectedMakerOrders);
 
     // Market orders have IOC behavior - never added to book
     // Only limit orders can remain in the book
@@ -123,491 +133,153 @@ export class MatchingEngine {
       matches,
       remainingOrder,
       affectedMakerOrders,
+      takerRemainingSettlementFeeAmount: takerRemainingFee,
     };
   }
 
   /**
-   * Match a lend market order against borrow limit orders
-   * Market orders match at the best available rate (highest borrow rate)
+   * Match a taker order against the opposite side of the order book.
+   *
+   * Handles all four combinations (lend/borrow × market/limit) in a single
+   * loop.  Behaviour is driven by `order.side` and `order.type`:
+   *
+   *  - **Side** determines which book side to scan, which wallet is
+   *    lender/borrower, and the `borrowerIsTaker` flag.
+   *  - **Type** determines rate filtering (market orders accept any rate;
+   *    limit orders enforce a minimum/maximum) and whether the remainder is
+   *    added to the book (limit) or discarded (market / IOC).
+   *
+   * @returns The taker's remaining settlement fee pool after all matches
    */
-  private matchLendMarketOrder(
-    order: LendMarketOrder,
+  private matchAgainstBook(
+    order: Order,
     matches: Match[],
     affectedMakerOrders: AffectedOrder[]
-  ): void {
-    let remainingAmount = order.remainingAmount;
+  ): string {
+    const takerIsLender = order.side === OrderSide.Lend;
+    const takerIsLimit = isLimitOrder(order);
+    const makerSide = takerIsLender ? OrderSide.Borrow : OrderSide.Lend;
 
-    // Try to match with each market (maturity)
+    let remainingAmount = order.remainingAmount;
+    let takerRemainingFee = order.settlementFeeAmount;
+
     for (const market of order.markets) {
-      const maturity = market.maturity;
       if (isZero(remainingAmount)) break;
 
-      // Get borrow orders for this maturity (sorted by rate descending - highest first)
-      const borrowOrders = this.orderBook.getBestOrders(
-        OrderSide.Borrow,
-        order.loanToken,
-        maturity
-      );
+      const makerOrders = this.orderBook.getBestOrders(makerSide, order.loanToken, market.maturity);
 
-      for (const borrowOrder of borrowOrders) {
+      for (const makerOrder of makerOrders) {
         if (isZero(remainingAmount)) break;
 
-        // Skip self-matching: lend and borrow orders from the same wallet cannot match
-        if (order.walletAddress.toLowerCase() === borrowOrder.walletAddress.toLowerCase()) {
+        // Skip self-matching
+        if (order.walletAddress.toLowerCase() === makerOrder.walletAddress.toLowerCase()) {
           continue;
         }
 
-        // Only match with limit orders (market orders don't have rates)
-        if (!isLimitOrder(borrowOrder)) continue;
+        // Only match against limit orders (they have a rate to execute at)
+        if (!isLimitOrder(makerOrder)) continue;
 
-        const borrowLimitOrder = borrowOrder as BorrowLimitOrder;
+        const makerRate = (makerOrder as LendLimitOrder | BorrowLimitOrder).rate;
 
-        // Calculate match amount
-        const matchAmount = minBigNumber(remainingAmount, borrowOrder.remainingAmount);
-
-        // Calculate trading fees
-        const makerFeeAmount = calculateMakerFee(matchAmount);
-        const takerFeeAmount = calculateTakerFee(matchAmount);
-        // borrowerIsTaker is false, so borrower is maker, lender (order) is taker
-
-        // Calculate settlement fees (both sides pay from their own fee pools)
-        const lenderSettlementFeeAmount = this.calculateAndConsumeSettlementFee(
-          order,
-          matchAmount
-        );
-        const borrowerSettlementFeeAmount = this.calculateAndConsumeSettlementFee(
-          borrowOrder,
-          matchAmount
-        );
-
-        // Create match at borrow order's rate
-        const match = this.executionEngine.recordMatch({
-          marketId: market.marketId,
-          lendOrderId: order.orderId,
-          borrowOrderId: borrowOrder.orderId,
-          lenderWallet: order.walletAddress,
-          borrowerWallet: borrowOrder.walletAddress,
-          matchedAmount: matchAmount,
-          rate: borrowLimitOrder.rate,
-          loanToken: order.loanToken,
-          maturity,
-          borrowerIsTaker: false,
-          makerFeeAmount,
-          takerFeeAmount,
-          lenderSettlementFeeAmount,
-          borrowerSettlementFeeAmount,
-        });
-
-        matches.push(match);
-
-        // Update remaining amounts
-        remainingAmount = subtractBigNumbers(remainingAmount, matchAmount);
-        const borrowRemainingAmount = subtractBigNumbers(
-          borrowOrder.remainingAmount,
-          matchAmount
-        );
-
-        // Update borrow order in order book and track affected order
-        if (isZero(borrowRemainingAmount)) {
-          this.orderBook.removeOrder(borrowOrder.orderId);
-          affectedMakerOrders.push({
-            orderId: borrowOrder.orderId,
-            status: OrderStatus.Filled,
-            remainingAmount: borrowRemainingAmount,
-            originalAmount: borrowOrder.originalAmount,
-            settlementFeeAmount: borrowOrder.settlementFeeAmount,
-            remainingSettlementFeeAmount: (borrowOrder as any).remainingSettlementFeeAmount,
-          });
-        } else {
-          this.orderBook.updateOrderAmount(borrowOrder.orderId, borrowRemainingAmount);
-          affectedMakerOrders.push({
-            orderId: borrowOrder.orderId,
-            status: OrderStatus.PartiallyFilled,
-            remainingAmount: borrowRemainingAmount,
-            originalAmount: borrowOrder.originalAmount,
-            settlementFeeAmount: borrowOrder.settlementFeeAmount,
-            remainingSettlementFeeAmount: (borrowOrder as any).remainingSettlementFeeAmount,
-          });
-        }
-      }
-    }
-
-    // Market orders have Immediate-or-Cancel (IOC) behavior
-    // - If fully filled: order is complete, not added to book
-    // - If partially filled: matched portion executes, remaining is rejected (not added to book)
-    // - If no matches: order is rejected, not added to book
-    // Market orders are NEVER added to the order book - they execute immediately or are rejected
-  }
-
-  /**
-   * Match a lend limit order against borrow orders
-   * Matches with borrow orders that have rate >= lend rate
-   */
-  private matchLendLimitOrder(
-    order: LendLimitOrder,
-    matches: Match[],
-    affectedMakerOrders: AffectedOrder[]
-  ): void {
-    let remainingAmount = order.remainingAmount;
-
-    // Try to match with each market (maturity)
-    for (const market of order.markets) {
-      const maturity = market.maturity;
-      if (isZero(remainingAmount)) break;
-
-      // Get borrow orders for this maturity (sorted by rate descending - highest first)
-      const borrowOrders = this.orderBook.getBestOrders(
-        OrderSide.Borrow,
-        order.loanToken,
-        maturity
-      );
-
-      for (const borrowOrder of borrowOrders) {
-        if (isZero(remainingAmount)) break;
-
-        // Skip self-matching: lend and borrow orders from the same wallet cannot match
-        if (order.walletAddress.toLowerCase() === borrowOrder.walletAddress.toLowerCase()) {
-          continue;
-        }
-
-        // Check if borrow order has acceptable rate and determine execution rate
-        let executionRate: number;
-        if (isLimitOrder(borrowOrder)) {
-          const borrowRate = (borrowOrder as BorrowLimitOrder).rate;
-          // Lender wants minimum rate, borrower willing to pay maximum rate
-          // Match only if borrowRate >= lendRate
-          if (borrowRate < order.rate) {
-            continue; // Borrow rate too low, skip
+        // Rate filtering for limit taker orders
+        if (takerIsLimit) {
+          const takerRate = (order as LendLimitOrder | BorrowLimitOrder).rate;
+          if (takerIsLender) {
+            // Lender wants minimum rate; skip if maker's borrow rate is too low
+            if (makerRate < takerRate) continue;
+          } else {
+            // Borrower accepts maximum rate; stop if maker's lend rate is too high
+            // (lend orders are sorted ascending, so all subsequent are higher)
+            if (makerRate > takerRate) break;
           }
-          // Use maker's rate (borrow order already in the book)
-          executionRate = borrowRate;
-        } else {
-          // Market order - matches at lend order's rate (shouldn't happen in practice)
-          executionRate = order.rate;
         }
 
         // Calculate match amount
-        const matchAmount = minBigNumber(remainingAmount, borrowOrder.remainingAmount);
+        const matchAmount = minBigNumber(remainingAmount, makerOrder.remainingAmount);
 
         // Calculate trading fees
         const makerFeeAmount = calculateMakerFee(matchAmount);
         const takerFeeAmount = calculateTakerFee(matchAmount);
-        // borrowerIsTaker is false, so borrower is maker, lender (order) is taker
 
         // Calculate settlement fees (both sides pay from their own fee pools)
-        const lenderSettlementFeeAmount = this.calculateAndConsumeSettlementFee(
-          order,
-          matchAmount
-        );
-        const borrowerSettlementFeeAmount = this.calculateAndConsumeSettlementFee(
-          borrowOrder,
-          matchAmount
+        const makerCurrentFee =
+          makerOrder.remainingSettlementFeeAmount ?? makerOrder.settlementFeeAmount;
+
+        const takerFeeResult = this.calculateSettlementFee(order, matchAmount, takerRemainingFee);
+        const makerFeeResult = this.calculateSettlementFee(
+          makerOrder,
+          matchAmount,
+          makerCurrentFee
         );
 
+        takerRemainingFee = takerFeeResult.remainingAfter;
+
+        // Record the match — assign lender/borrower roles based on taker side
         const match = this.executionEngine.recordMatch({
           marketId: market.marketId,
-          lendOrderId: order.orderId,
-          borrowOrderId: borrowOrder.orderId,
-          lenderWallet: order.walletAddress,
-          borrowerWallet: borrowOrder.walletAddress,
+          lendOrderId: takerIsLender ? order.orderId : makerOrder.orderId,
+          borrowOrderId: takerIsLender ? makerOrder.orderId : order.orderId,
+          lenderWallet: takerIsLender ? order.walletAddress : makerOrder.walletAddress,
+          borrowerWallet: takerIsLender ? makerOrder.walletAddress : order.walletAddress,
           matchedAmount: matchAmount,
-          rate: executionRate,
+          rate: makerRate,
           loanToken: order.loanToken,
-          maturity,
-          borrowerIsTaker: false,
+          maturity: market.maturity,
+          borrowerIsTaker: !takerIsLender,
           makerFeeAmount,
           takerFeeAmount,
-          lenderSettlementFeeAmount,
-          borrowerSettlementFeeAmount,
+          lenderSettlementFeeAmount: takerIsLender
+            ? takerFeeResult.actualFee
+            : makerFeeResult.actualFee,
+          borrowerSettlementFeeAmount: takerIsLender
+            ? makerFeeResult.actualFee
+            : takerFeeResult.actualFee,
         });
 
         matches.push(match);
 
         // Update remaining amounts
         remainingAmount = subtractBigNumbers(remainingAmount, matchAmount);
-        const borrowRemainingAmount = subtractBigNumbers(
-          borrowOrder.remainingAmount,
-          matchAmount
-        );
+        const makerRemainingAmount = subtractBigNumbers(makerOrder.remainingAmount, matchAmount);
 
-        // Update borrow order in order book and track affected order
-        if (isZero(borrowRemainingAmount)) {
-          this.orderBook.removeOrder(borrowOrder.orderId);
-          affectedMakerOrders.push({
-            orderId: borrowOrder.orderId,
-            status: OrderStatus.Filled,
-            remainingAmount: borrowRemainingAmount,
-            originalAmount: borrowOrder.originalAmount,
-            settlementFeeAmount: borrowOrder.settlementFeeAmount,
-            remainingSettlementFeeAmount: (borrowOrder as any).remainingSettlementFeeAmount,
-          });
+        // Update maker order in book and track as affected
+        const makerStatus = isZero(makerRemainingAmount)
+          ? OrderStatus.Filled
+          : OrderStatus.PartiallyFilled;
+
+        if (isZero(makerRemainingAmount)) {
+          this.orderBook.removeOrder(makerOrder.orderId);
         } else {
-          this.orderBook.updateOrderAmount(borrowOrder.orderId, borrowRemainingAmount);
-          affectedMakerOrders.push({
-            orderId: borrowOrder.orderId,
-            status: OrderStatus.PartiallyFilled,
-            remainingAmount: borrowRemainingAmount,
-            originalAmount: borrowOrder.originalAmount,
-            settlementFeeAmount: borrowOrder.settlementFeeAmount,
-            remainingSettlementFeeAmount: (borrowOrder as any).remainingSettlementFeeAmount,
-          });
-        }
-      }
-    }
-
-    // Update lend order status and add to order book if not fully filled
-    const updatedOrder: LendLimitOrder = {
-      ...order,
-      remainingAmount,
-      status: isZero(remainingAmount)
-        ? OrderStatus.Filled
-        : matches.length > 0
-          ? OrderStatus.PartiallyFilled
-          : OrderStatus.Open,
-    };
-
-    if (!isZero(remainingAmount)) {
-      this.orderBook.addOrder(updatedOrder);
-    }
-  }
-
-  /**
-   * Match a borrow market order against lend limit orders
-   * Market orders match at the best available rate (lowest lend rate)
-   */
-  private matchBorrowMarketOrder(
-    order: BorrowMarketOrder,
-    matches: Match[],
-    affectedMakerOrders: AffectedOrder[]
-  ): void {
-    let remainingAmount = order.remainingAmount;
-
-    // Try to match with each market (maturity)
-    for (const market of order.markets) {
-      const maturity = market.maturity;
-      if (isZero(remainingAmount)) break;
-
-      // Get lend orders for this maturity (sorted by rate ascending - lowest first)
-      const lendOrders = this.orderBook.getBestOrders(
-        OrderSide.Lend,
-        order.loanToken,
-        maturity
-      );
-
-      for (const lendOrder of lendOrders) {
-        if (isZero(remainingAmount)) break;
-
-        // Skip self-matching: lend and borrow orders from the same wallet cannot match
-        if (order.walletAddress.toLowerCase() === lendOrder.walletAddress.toLowerCase()) {
-          continue;
+          this.orderBook.updateOrderAmount(
+            makerOrder.orderId,
+            makerRemainingAmount,
+            makerFeeResult.remainingAfter
+          );
         }
 
-        // Only match with limit orders (market orders don't have rates)
-        if (!isLimitOrder(lendOrder)) continue;
-
-        const lendLimitOrder = lendOrder as LendLimitOrder;
-
-        // Calculate match amount
-        const matchAmount = minBigNumber(remainingAmount, lendOrder.remainingAmount);
-
-        // Calculate trading fees
-        const makerFeeAmount = calculateMakerFee(matchAmount);
-        const takerFeeAmount = calculateTakerFee(matchAmount);
-        // borrowerIsTaker is true, so borrower (order) is taker, lender is maker
-
-        // Calculate settlement fees (both sides pay from their own fee pools)
-        const lenderSettlementFeeAmount = this.calculateAndConsumeSettlementFee(
-          lendOrder,
-          matchAmount
-        );
-        const borrowerSettlementFeeAmount = this.calculateAndConsumeSettlementFee(
-          order,
-          matchAmount
-        );
-
-        // Create match at lend order's rate
-        const match = this.executionEngine.recordMatch({
-          marketId: market.marketId,
-          lendOrderId: lendOrder.orderId,
-          borrowOrderId: order.orderId,
-          lenderWallet: lendOrder.walletAddress,
-          borrowerWallet: order.walletAddress,
-          matchedAmount: matchAmount,
-          rate: lendLimitOrder.rate,
-          loanToken: order.loanToken,
-          maturity,
-          borrowerIsTaker: true,
-          makerFeeAmount,
-          takerFeeAmount,
-          lenderSettlementFeeAmount,
-          borrowerSettlementFeeAmount,
+        affectedMakerOrders.push({
+          orderId: makerOrder.orderId,
+          status: makerStatus,
+          remainingAmount: makerRemainingAmount,
+          originalAmount: makerOrder.originalAmount,
+          settlementFeeAmount: makerOrder.settlementFeeAmount,
+          remainingSettlementFeeAmount: makerFeeResult.remainingAfter,
         });
-
-        matches.push(match);
-
-        // Update remaining amounts
-        remainingAmount = subtractBigNumbers(remainingAmount, matchAmount);
-        const lendRemainingAmount = subtractBigNumbers(lendOrder.remainingAmount, matchAmount);
-
-        // Update lend order in order book and track affected order
-        if (isZero(lendRemainingAmount)) {
-          this.orderBook.removeOrder(lendOrder.orderId);
-          affectedMakerOrders.push({
-            orderId: lendOrder.orderId,
-            status: OrderStatus.Filled,
-            remainingAmount: lendRemainingAmount,
-            originalAmount: lendOrder.originalAmount,
-            settlementFeeAmount: lendOrder.settlementFeeAmount,
-            remainingSettlementFeeAmount: (lendOrder as any).remainingSettlementFeeAmount,
-          });
-        } else {
-          this.orderBook.updateOrderAmount(lendOrder.orderId, lendRemainingAmount);
-          affectedMakerOrders.push({
-            orderId: lendOrder.orderId,
-            status: OrderStatus.PartiallyFilled,
-            remainingAmount: lendRemainingAmount,
-            originalAmount: lendOrder.originalAmount,
-            settlementFeeAmount: lendOrder.settlementFeeAmount,
-            remainingSettlementFeeAmount: (lendOrder as any).remainingSettlementFeeAmount,
-          });
-        }
       }
     }
 
-    // Market orders have Immediate-or-Cancel (IOC) behavior
-    // - If fully filled: order is complete, not added to book
-    // - If partially filled: matched portion executes, remaining is rejected (not added to book)
-    // - If no matches: order is rejected, not added to book
-    // Market orders are NEVER added to the order book - they execute immediately or are rejected
-  }
-
-  /**
-   * Match a borrow limit order against lend orders
-   * Matches with lend orders that have rate <= borrow rate
-   */
-  private matchBorrowLimitOrder(
-    order: BorrowLimitOrder,
-    matches: Match[],
-    affectedMakerOrders: AffectedOrder[]
-  ): void {
-    let remainingAmount = order.remainingAmount;
-
-    // Try to match with each market (maturity)
-    for (const market of order.markets) {
-      const maturity = market.maturity;
-      if (isZero(remainingAmount)) break;
-
-      // Get lend orders for this maturity (sorted by rate ascending - lowest first)
-      const lendOrders = this.orderBook.getBestOrders(
-        OrderSide.Lend,
-        order.loanToken,
-        maturity
-      );
-
-      for (const lendOrder of lendOrders) {
-        if (isZero(remainingAmount)) break;
-
-        // Skip self-matching: lend and borrow orders from the same wallet cannot match
-        if (order.walletAddress.toLowerCase() === lendOrder.walletAddress.toLowerCase()) {
-          continue;
-        }
-
-        // Check if lend order has acceptable rate and determine execution rate
-        let executionRate: number;
-        if (isLimitOrder(lendOrder)) {
-          const lendRate = (lendOrder as LendLimitOrder).rate;
-          // Borrower willing to pay maximum rate, lender wants minimum rate
-          // Match only if lendRate <= borrowRate
-          if (lendRate > order.rate) {
-            break; // Lend rate too high, and rest will be higher (sorted), stop
-          }
-          // Use maker's rate (lend order already in the book)
-          executionRate = lendRate;
-        } else {
-          // Market order - matches at borrow order's rate (shouldn't happen in practice)
-          executionRate = order.rate;
-        }
-
-        // Calculate match amount
-        const matchAmount = minBigNumber(remainingAmount, lendOrder.remainingAmount);
-
-        // Calculate trading fees
-        const makerFeeAmount = calculateMakerFee(matchAmount);
-        const takerFeeAmount = calculateTakerFee(matchAmount);
-        // borrowerIsTaker is true, so borrower (order) is taker, lender is maker
-
-        // Calculate settlement fees (both sides pay from their own fee pools)
-        const lenderSettlementFeeAmount = this.calculateAndConsumeSettlementFee(
-          lendOrder,
-          matchAmount
-        );
-        const borrowerSettlementFeeAmount = this.calculateAndConsumeSettlementFee(
-          order,
-          matchAmount
-        );
-
-        const match = this.executionEngine.recordMatch({
-          marketId: market.marketId,
-          lendOrderId: lendOrder.orderId,
-          borrowOrderId: order.orderId,
-          lenderWallet: lendOrder.walletAddress,
-          borrowerWallet: order.walletAddress,
-          matchedAmount: matchAmount,
-          rate: executionRate,
-          loanToken: order.loanToken,
-          maturity,
-          borrowerIsTaker: true,
-          makerFeeAmount,
-          takerFeeAmount,
-          lenderSettlementFeeAmount,
-          borrowerSettlementFeeAmount,
-        });
-
-        matches.push(match);
-
-        // Update remaining amounts
-        remainingAmount = subtractBigNumbers(remainingAmount, matchAmount);
-        const lendRemainingAmount = subtractBigNumbers(lendOrder.remainingAmount, matchAmount);
-
-        // Update lend order in order book and track affected order
-        if (isZero(lendRemainingAmount)) {
-          this.orderBook.removeOrder(lendOrder.orderId);
-          affectedMakerOrders.push({
-            orderId: lendOrder.orderId,
-            status: OrderStatus.Filled,
-            remainingAmount: lendRemainingAmount,
-            originalAmount: lendOrder.originalAmount,
-            settlementFeeAmount: lendOrder.settlementFeeAmount,
-            remainingSettlementFeeAmount: (lendOrder as any).remainingSettlementFeeAmount,
-          });
-        } else {
-          this.orderBook.updateOrderAmount(lendOrder.orderId, lendRemainingAmount);
-          affectedMakerOrders.push({
-            orderId: lendOrder.orderId,
-            status: OrderStatus.PartiallyFilled,
-            remainingAmount: lendRemainingAmount,
-            originalAmount: lendOrder.originalAmount,
-            settlementFeeAmount: lendOrder.settlementFeeAmount,
-            remainingSettlementFeeAmount: (lendOrder as any).remainingSettlementFeeAmount,
-          });
-        }
-      }
+    // Limit orders: add remainder to the book if not fully filled
+    // Market orders: IOC — never added to the book
+    if (takerIsLimit && !isZero(remainingAmount)) {
+      this.orderBook.addOrder({
+        ...order,
+        remainingAmount,
+        remainingSettlementFeeAmount: takerRemainingFee,
+        status: matches.length > 0 ? OrderStatus.PartiallyFilled : OrderStatus.Open,
+      });
     }
 
-    // Update borrow order status and add to order book if not fully filled
-    const updatedOrder: BorrowLimitOrder = {
-      ...order,
-      remainingAmount,
-      status: isZero(remainingAmount)
-        ? OrderStatus.Filled
-        : matches.length > 0
-          ? OrderStatus.PartiallyFilled
-          : OrderStatus.Open,
-    };
-
-    if (!isZero(remainingAmount)) {
-      this.orderBook.addOrder(updatedOrder);
-    }
+    return takerRemainingFee;
   }
 
   /**
@@ -705,8 +377,7 @@ export class MatchingEngine {
       originalAmount: order.originalAmount,
       remainingAmount: order.remainingAmount,
       settlementFeeAmount: order.settlementFeeAmount,
-      remainingSettlementFeeAmount:
-        (order as any).remainingSettlementFeeAmount ?? order.settlementFeeAmount,
+      remainingSettlementFeeAmount: order.remainingSettlementFeeAmount ?? order.settlementFeeAmount,
     };
   }
 
@@ -784,7 +455,7 @@ export class MatchingEngine {
       await this.snapshotService.saveSnapshot(this.orderBook, this.executionEngine);
     } catch (error) {
       // Log but don't throw - snapshot failures shouldn't block operations
-      console.error('Failed to save snapshot:', error);
+      log.error({ err: error }, 'failed to save snapshot');
     } finally {
       resolveNext();
     }
@@ -803,7 +474,7 @@ export class MatchingEngine {
     // Fire-and-forget - don't await
     this.saveSnapshot().catch((error) => {
       // Already logged in saveSnapshot, but catch to prevent unhandled rejection
-      console.warn('Async snapshot save failed:', error);
+      log.warn({ err: error }, 'async snapshot save failed');
     });
   }
 
@@ -832,12 +503,16 @@ export class MatchingEngine {
       // Restore execution engine
       this.executionEngine.restoreMatches(snapshotData.matches);
 
-      console.log(
-        `State restored from snapshot: ${snapshotData.metadata.orderCount} orders, ${snapshotData.metadata.matchCount} matches`
+      log.info(
+        {
+          orderCount: snapshotData.metadata.orderCount,
+          matchCount: snapshotData.metadata.matchCount,
+        },
+        'state restored from snapshot'
       );
       return true;
     } catch (error) {
-      console.error('Failed to restore from snapshot:', error);
+      log.error({ err: error }, 'failed to restore from snapshot');
       return false;
     }
   }
@@ -872,4 +547,3 @@ export class MatchingEngine {
     return { added, skipped };
   }
 }
-

@@ -15,6 +15,18 @@ import {
 } from '../types/messages';
 import { matchSchema, type Match } from '../types/matches';
 import type { DbClient } from '../types/db';
+import { createLogger } from '../utils/logger';
+
+const log = createLogger('db-writer-service');
+
+const DB_WRITER_DEFAULTS = {
+  MAX_CONCURRENCY: 10,
+  REDIS_BLOCK_TIMEOUT_MS: 5000,
+  REDIS_BATCH_SIZE: 50,
+  MAX_INSERT_RETRIES: 3,
+  PENDING_RECOVERY_INTERVAL_MS: 30000,
+  PENDING_MIN_IDLE_MS: 30000,
+} as const;
 
 export interface DbWriterOptions {
   /**
@@ -42,6 +54,21 @@ export interface DbWriterOptions {
    * Maximum number of stream entries to read per XREADGROUP call.
    */
   redisBatchSize?: number;
+
+  /**
+   * Maximum number of retries for transient DB insert failures.
+   */
+  maxInsertRetries?: number;
+
+  /**
+   * How often (ms) the PEL recovery loop runs to reclaim stale entries.
+   */
+  pendingRecoveryIntervalMs?: number;
+
+  /**
+   * Minimum idle time (ms) before a pending entry is reclaimed.
+   */
+  pendingMinIdleMs?: number;
 }
 
 /**
@@ -64,6 +91,8 @@ export class DbWriterService {
   private natsCancelledRemainderSub: Subscription | null = null;
   private redisRunning = false;
   private redisWorkerPromise: Promise<void> | null = null;
+  private pendingRecoveryPromise: Promise<void> | null = null;
+  private pendingRecoveryWakeup: (() => void) | null = null;
 
   constructor(
     nc: NatsConnection,
@@ -76,13 +105,17 @@ export class DbWriterService {
     this.dbClient = dbClient;
 
     this.options = {
-      maxConcurrency: options?.maxConcurrency ?? 10,
+      maxConcurrency: options?.maxConcurrency ?? DB_WRITER_DEFAULTS.MAX_CONCURRENCY,
       redisConsumerGroup:
         options?.redisConsumerGroup ?? REDIS_CONSUMER_GROUPS.DB_WRITER,
       redisConsumerName:
         options?.redisConsumerName ?? `db-writer-${process.pid}`,
-      redisBlockTimeoutMs: options?.redisBlockTimeoutMs ?? 5000,
-      redisBatchSize: options?.redisBatchSize ?? 50,
+      redisBlockTimeoutMs: options?.redisBlockTimeoutMs ?? DB_WRITER_DEFAULTS.REDIS_BLOCK_TIMEOUT_MS,
+      redisBatchSize: options?.redisBatchSize ?? DB_WRITER_DEFAULTS.REDIS_BATCH_SIZE,
+      maxInsertRetries: options?.maxInsertRetries ?? DB_WRITER_DEFAULTS.MAX_INSERT_RETRIES,
+      pendingRecoveryIntervalMs:
+        options?.pendingRecoveryIntervalMs ?? DB_WRITER_DEFAULTS.PENDING_RECOVERY_INTERVAL_MS,
+      pendingMinIdleMs: options?.pendingMinIdleMs ?? DB_WRITER_DEFAULTS.PENDING_MIN_IDLE_MS,
     };
   }
 
@@ -94,6 +127,7 @@ export class DbWriterService {
     this.startCancelledRemainderSubscription();
     await this.ensureRedisGroup();
     this.startRedisWorker();
+    this.startPendingRecovery();
   }
 
   /**
@@ -111,9 +145,19 @@ export class DbWriterService {
     }
 
     this.redisRunning = false;
+    // Wake the PEL recovery loop so it exits immediately instead of
+    // blocking on its interval sleep.
+    if (this.pendingRecoveryWakeup) {
+      this.pendingRecoveryWakeup();
+      this.pendingRecoveryWakeup = null;
+    }
     if (this.redisWorkerPromise) {
       await this.redisWorkerPromise;
       this.redisWorkerPromise = null;
+    }
+    if (this.pendingRecoveryPromise) {
+      await this.pendingRecoveryPromise;
+      this.pendingRecoveryPromise = null;
     }
 
     await this.dbClient.close();
@@ -142,17 +186,17 @@ export class DbWriterService {
 
         void this.handleOrderStatusMessage(msg.data)
           .catch((error) => {
-            console.error('DB Writer: failed to handle order status message', error);
+            log.error({ err: error }, 'failed to handle order status message');
           })
           .finally(() => {
             inFlight -= 1;
           });
       }
     })().catch((error) => {
-      console.error('DB Writer: NATS subscription loop failed', error);
+      log.error({ err: error }, 'NATS subscription loop failed');
     });
 
-    console.log(`DbWriterService subscribed to ${NATS_TOPICS.ORDERS_STATUS}`);
+    log.info({ topic: NATS_TOPICS.ORDERS_STATUS }, 'subscribed to NATS topic');
 
     const updatedSub = this.nc.subscribe(NATS_TOPICS.ORDERS_UPDATED);
     (async () => {
@@ -163,16 +207,16 @@ export class DbWriterService {
         inFlight += 1;
         void this.handleOrderUpdatedMessage(msg.data)
           .catch((error) => {
-            console.error('DB Writer: failed to handle order updated message', error);
+            log.error({ err: error }, 'failed to handle order updated message');
           })
           .finally(() => {
             inFlight -= 1;
           });
       }
     })().catch((error) => {
-      console.error('DB Writer: NATS updated subscription loop failed', error);
+      log.error({ err: error }, 'NATS updated subscription loop failed');
     });
-    console.log(`DbWriterService subscribed to ${NATS_TOPICS.ORDERS_UPDATED}`);
+    log.info({ topic: NATS_TOPICS.ORDERS_STATUS }, 'subscribed to NATS topic');
   }
 
   private async handleOrderStatusMessage(data: Uint8Array): Promise<void> {
@@ -182,7 +226,7 @@ export class DbWriterService {
     try {
       parsed = JSON.parse(text);
     } catch (error) {
-      console.error('DB Writer: failed to parse order status JSON', error, text);
+      log.error({ err: error, rawMessage: text }, 'failed to parse order status JSON');
       return;
     }
 
@@ -190,7 +234,7 @@ export class DbWriterService {
     try {
       message = orderStatusMessageSchema.parse(parsed);
     } catch (error) {
-      console.error('DB Writer: invalid order status message', error, parsed);
+      log.error({ err: error }, 'invalid order status message');
       return;
     }
 
@@ -204,7 +248,7 @@ export class DbWriterService {
     try {
       parsed = JSON.parse(text);
     } catch (error) {
-      console.error('DB Writer: failed to parse order update JSON', error, text);
+      log.error({ err: error, rawMessage: text }, 'failed to parse order update JSON');
       return;
     }
 
@@ -212,7 +256,7 @@ export class DbWriterService {
     try {
       message = orderUpdatedMessageSchema.parse(parsed);
     } catch (error) {
-      console.error('DB Writer: invalid order update message', error, parsed);
+      log.error({ err: error }, 'invalid order update message');
       return;
     }
 
@@ -240,17 +284,17 @@ export class DbWriterService {
 
         void this.handleCancelledRemainderMessage(msg.data)
           .catch((error) => {
-            console.error('DB Writer: failed to handle cancelled remainder message', error);
+            log.error({ err: error }, 'failed to handle cancelled remainder message');
           })
           .finally(() => {
             inFlight -= 1;
           });
       }
     })().catch((error) => {
-      console.error('DB Writer: cancelled remainder subscription loop failed', error);
+      log.error({ err: error }, 'cancelled remainder subscription loop failed');
     });
 
-    console.log(`DbWriterService subscribed to ${NATS_TOPICS.ORDERS_CANCELLED_REMAINDER}`);
+    log.info({ topic: NATS_TOPICS.ORDERS_CANCELLED_REMAINDER }, 'subscribed to NATS topic');
   }
 
   private async handleCancelledRemainderMessage(data: Uint8Array): Promise<void> {
@@ -260,7 +304,7 @@ export class DbWriterService {
     try {
       parsed = JSON.parse(text);
     } catch (error) {
-      console.error('DB Writer: failed to parse cancelled remainder JSON', error, text);
+      log.error({ err: error, rawMessage: text }, 'failed to parse cancelled remainder JSON');
       return;
     }
 
@@ -268,7 +312,7 @@ export class DbWriterService {
     try {
       message = cancelledRemainderMessageSchema.parse(parsed);
     } catch (error) {
-      console.error('DB Writer: invalid cancelled remainder message', error, parsed);
+      log.error({ err: error }, 'invalid cancelled remainder message');
       return;
     }
 
@@ -291,20 +335,13 @@ export class DbWriterService {
         '0',
         'MKSTREAM'
       );
-      console.log(
-        `DbWriterService created consumer group '${this.options.redisConsumerGroup}' for stream '${REDIS_STREAMS.SETTLEMENT_MATCHES}'`
-      );
+      log.info({ group: this.options.redisConsumerGroup, stream: REDIS_STREAMS.SETTLEMENT_MATCHES }, 'created consumer group');
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       if (message.includes('BUSYGROUP')) {
-        console.log(
-          `DbWriterService consumer group '${this.options.redisConsumerGroup}' already exists`
-        );
+        log.info({ group: this.options.redisConsumerGroup }, 'consumer group already exists');
       } else {
-        console.warn(
-          'DbWriterService: failed to create Redis consumer group',
-          error
-        );
+        log.warn({ err: error }, 'failed to create Redis consumer group');
       }
     }
   }
@@ -362,7 +399,7 @@ export class DbWriterService {
 
             void this.handleRedisEntry(id, fields)
               .catch((error) => {
-                console.error('DB Writer: failed to handle Redis match entry', error);
+                log.error({ err: error }, 'failed to handle Redis match entry');
               })
               .finally(() => {
                 inFlight -= 1;
@@ -370,7 +407,7 @@ export class DbWriterService {
           }
         }
       } catch (error) {
-        console.error('DB Writer: Redis worker error, retrying...', error);
+        log.error({ err: error }, 'Redis worker error, retrying');
         await new Promise((resolve) => setTimeout(resolve, 1000));
       }
     }
@@ -387,7 +424,7 @@ export class DbWriterService {
     try {
       validated = matchSchema.parse(match);
     } catch (error) {
-      console.error('DB Writer: invalid match entry from Redis', error, match);
+      log.error({ err: error }, 'invalid match entry from Redis');
       // Acknowledge the bad entry so it does not block the consumer group.
       await this.redis.xack(
         REDIS_STREAMS.SETTLEMENT_MATCHES,
@@ -397,7 +434,24 @@ export class DbWriterService {
       return;
     }
 
-    await this.dbClient.insertMatch(validated);
+    // Retry with exponential backoff for transient DB failures.
+    // On exhaustion the error propagates so the entry stays un-ACKd
+    // in the PEL and will be reclaimed by pendingRecoveryLoop.
+    const maxRetries = this.options.maxInsertRetries;
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+      try {
+        await this.dbClient.insertMatch(validated);
+        break; // Success — proceed to ACK
+      } catch (error) {
+        if (attempt === maxRetries) {
+          log.error({ matchId: validated.matchId, attempts: maxRetries, err: error }, 'match insert failed after all attempts, leaving un-ACKd for PEL recovery');
+          throw error; // Propagate — do NOT ACK
+        }
+        const backoffMs = 100 * Math.pow(2, attempt - 1);
+        log.warn({ matchId: validated.matchId, attempt, maxRetries, backoffMs, err: error }, 'match insert failed, retrying');
+        await new Promise((resolve) => setTimeout(resolve, backoffMs));
+      }
+    }
 
     // Acknowledge within the DB_WRITER consumer group only. Other
     // consumer groups (e.g. Settlement Engine) still see the message
@@ -407,6 +461,65 @@ export class DbWriterService {
       this.options.redisConsumerGroup,
       id
     );
+  }
+
+  /**
+   * Start the PEL (Pending Entries List) recovery loop.
+   */
+  private startPendingRecovery(): void {
+    this.pendingRecoveryPromise = this.pendingRecoveryLoop();
+  }
+
+  /**
+   * Periodically reclaim entries that were delivered but never ACK'd
+   * (e.g. because all retry attempts failed or the process crashed).
+   * Uses XAUTOCLAIM to claim entries idle longer than pendingMinIdleMs.
+   */
+  private async pendingRecoveryLoop(): Promise<void> {
+    const group = this.options.redisConsumerGroup;
+    const consumer = this.options.redisConsumerName;
+    const minIdleMs = this.options.pendingMinIdleMs;
+    const intervalMs = this.options.pendingRecoveryIntervalMs;
+
+    while (this.redisRunning) {
+      await new Promise<void>((resolve) => {
+        const timer = setTimeout(resolve, intervalMs);
+        this.pendingRecoveryWakeup = () => {
+          clearTimeout(timer);
+          resolve();
+        };
+      });
+      if (!this.redisRunning) break;
+
+      try {
+        const result = await this.redis.xautoclaim(
+          REDIS_STREAMS.SETTLEMENT_MATCHES,
+          group,
+          consumer,
+          minIdleMs,
+          '0-0',
+          'COUNT',
+          this.options.redisBatchSize
+        );
+
+        // result: [nextStartId, [[id, fields], ...], deletedIds]
+        const entries = result[1] as [string, string[]][];
+        if (!entries || entries.length === 0) continue;
+
+        log.info({ count: entries.length }, 'reclaiming pending entries from PEL');
+
+        for (const [id, fields] of entries) {
+          try {
+            await this.handleRedisEntry(id, fields);
+          } catch (error) {
+            log.error({ entryId: id, err: error }, 'PEL recovery failed for entry');
+            // Entry remains in PEL — will be retried on next cycle
+          }
+        }
+      } catch (error) {
+        log.error({ err: error }, 'PEL recovery loop error');
+      }
+    }
   }
 
   /**
