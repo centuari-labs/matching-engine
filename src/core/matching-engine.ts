@@ -314,6 +314,31 @@ export class MatchingEngine {
     return true;
   }
 
+  updateOrder(orderId: string, walletAddress: string): Order | 'NOT_FOUND' | 'WALLET_MISMATCH' | 'INVALID_STATUS' {
+    const order = this.orderBook.getOrder(orderId);
+    if (!order) {
+      return 'NOT_FOUND';
+    }
+
+    // Validate wallet address matches the order owner
+    if (order.walletAddress.toLowerCase() !== walletAddress.toLowerCase()) {
+      return 'WALLET_MISMATCH';
+    }
+
+    // Only allow update of open or partially filled orders
+    if (order.status !== OrderStatus.Open && order.status !== OrderStatus.PartiallyFilled) {
+      return 'INVALID_STATUS';
+    }
+
+    // Remove from order book
+    this.orderBook.removeOrder(orderId);
+
+    // Save snapshot after order deactivation (non-blocking)
+    this.saveSnapshotAsync();
+
+    return order;
+  }
+
   /**
    * Get order status
    *

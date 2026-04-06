@@ -45,22 +45,38 @@ function fieldsToMatch(fields: string[]): Record<string, unknown> {
  */
 function matchToFields(match: ReturnType<typeof createMatch>): string[] {
   return [
-    'matchId', match.matchId,
-    'marketId', match.marketId,
-    'lendOrderId', match.lendOrderId,
-    'borrowOrderId', match.borrowOrderId,
-    'lenderWallet', match.lenderWallet,
-    'borrowerWallet', match.borrowerWallet,
-    'matchedAmount', match.matchedAmount,
-    'rate', String(match.rate),
-    'loanToken', match.loanToken,
-    'maturity', String(match.maturity),
-    'timestamp', String(match.timestamp),
-    'borrowerIsTaker', String(match.borrowerIsTaker),
-    'makerFeeAmount', match.makerFeeAmount,
-    'takerFeeAmount', match.takerFeeAmount,
-    'lenderSettlementFeeAmount', match.lenderSettlementFeeAmount,
-    'borrowerSettlementFeeAmount', match.borrowerSettlementFeeAmount,
+    'matchId',
+    match.matchId,
+    'marketId',
+    match.marketId,
+    'lendOrderId',
+    match.lendOrderId,
+    'borrowOrderId',
+    match.borrowOrderId,
+    'lenderWallet',
+    match.lenderWallet,
+    'borrowerWallet',
+    match.borrowerWallet,
+    'matchedAmount',
+    match.matchedAmount,
+    'rate',
+    String(match.rate),
+    'loanToken',
+    match.loanToken,
+    'maturity',
+    String(match.maturity),
+    'timestamp',
+    String(match.timestamp),
+    'borrowerIsTaker',
+    String(match.borrowerIsTaker),
+    'makerFeeAmount',
+    match.makerFeeAmount,
+    'takerFeeAmount',
+    match.takerFeeAmount,
+    'lenderSettlementFeeAmount',
+    match.lenderSettlementFeeAmount,
+    'borrowerSettlementFeeAmount',
+    match.borrowerSettlementFeeAmount,
   ];
 }
 
@@ -103,18 +119,30 @@ describe('fieldsToMatch conversion', () => {
     const match = createMatch();
     // Build fields without fee fields
     const fields = [
-      'matchId', match.matchId,
-      'marketId', match.marketId,
-      'lendOrderId', match.lendOrderId,
-      'borrowOrderId', match.borrowOrderId,
-      'lenderWallet', match.lenderWallet,
-      'borrowerWallet', match.borrowerWallet,
-      'matchedAmount', match.matchedAmount,
-      'rate', String(match.rate),
-      'loanToken', match.loanToken,
-      'maturity', String(match.maturity),
-      'timestamp', String(match.timestamp),
-      'borrowerIsTaker', String(match.borrowerIsTaker),
+      'matchId',
+      match.matchId,
+      'marketId',
+      match.marketId,
+      'lendOrderId',
+      match.lendOrderId,
+      'borrowOrderId',
+      match.borrowOrderId,
+      'lenderWallet',
+      match.lenderWallet,
+      'borrowerWallet',
+      match.borrowerWallet,
+      'matchedAmount',
+      match.matchedAmount,
+      'rate',
+      String(match.rate),
+      'loanToken',
+      match.loanToken,
+      'maturity',
+      String(match.maturity),
+      'timestamp',
+      String(match.timestamp),
+      'borrowerIsTaker',
+      String(match.borrowerIsTaker),
       // Fee fields omitted
     ];
 
@@ -172,21 +200,36 @@ describe('fieldsToMatch validation with matchSchema', () => {
     const match = createMatch();
     // Build fields without matchId
     const fields = [
-      'marketId', match.marketId,
-      'lendOrderId', match.lendOrderId,
-      'borrowOrderId', match.borrowOrderId,
-      'lenderWallet', match.lenderWallet,
-      'borrowerWallet', match.borrowerWallet,
-      'matchedAmount', match.matchedAmount,
-      'rate', String(match.rate),
-      'loanToken', match.loanToken,
-      'maturity', String(match.maturity),
-      'timestamp', String(match.timestamp),
-      'borrowerIsTaker', String(match.borrowerIsTaker),
-      'makerFeeAmount', match.makerFeeAmount,
-      'takerFeeAmount', match.takerFeeAmount,
-      'lenderSettlementFeeAmount', match.lenderSettlementFeeAmount,
-      'borrowerSettlementFeeAmount', match.borrowerSettlementFeeAmount,
+      'marketId',
+      match.marketId,
+      'lendOrderId',
+      match.lendOrderId,
+      'borrowOrderId',
+      match.borrowOrderId,
+      'lenderWallet',
+      match.lenderWallet,
+      'borrowerWallet',
+      match.borrowerWallet,
+      'matchedAmount',
+      match.matchedAmount,
+      'rate',
+      String(match.rate),
+      'loanToken',
+      match.loanToken,
+      'maturity',
+      String(match.maturity),
+      'timestamp',
+      String(match.timestamp),
+      'borrowerIsTaker',
+      String(match.borrowerIsTaker),
+      'makerFeeAmount',
+      match.makerFeeAmount,
+      'takerFeeAmount',
+      match.takerFeeAmount,
+      'lenderSettlementFeeAmount',
+      match.lenderSettlementFeeAmount,
+      'borrowerSettlementFeeAmount',
+      match.borrowerSettlementFeeAmount,
     ];
 
     const converted = fieldsToMatch(fields);
@@ -198,11 +241,7 @@ describe('fieldsToMatch validation with matchSchema', () => {
 describe('fieldsToMatch edge cases', () => {
   it('should ignore extra unknown keys in fields', () => {
     const match = createMatch();
-    const fields = [
-      ...matchToFields(match),
-      'unknownKey', 'unknownValue',
-      'anotherExtra', '12345',
-    ];
+    const fields = [...matchToFields(match), 'unknownKey', 'unknownValue', 'anotherExtra', '12345'];
 
     const converted = fieldsToMatch(fields);
     // Extra keys should not break conversion; schema strips unknown keys
@@ -236,6 +275,104 @@ describe('fieldsToMatch edge cases', () => {
 
     const converted = fieldsToMatch(fields);
     expect(converted.matchedAmount).toBe(largeAmount);
+  });
+});
+
+/**
+ * Tests for DbWriterService.handleOrderUpdatedMessage() logic.
+ *
+ * Verifies that order update messages are parsed, validated, and delegated
+ * to the DbClient without requiring real connections.
+ */
+describe('handleOrderUpdatedMessage', () => {
+  // eslint-disable-next-line @typescript-eslint/no-var-requires
+  const { DbWriterService } = require('../services/db-writer-service');
+
+  function createMockNats() {
+    return {
+      subscribe: jest.fn(() => ({
+        [Symbol.asyncIterator]: () => ({ next: () => new Promise(() => {}) }),
+        drain: jest.fn(),
+      })),
+    };
+  }
+
+  function createMockRedis() {
+    return {
+      xack: jest.fn().mockResolvedValue(1),
+      xgroup: jest.fn().mockResolvedValue('OK'),
+      xreadgroup: jest.fn().mockResolvedValue(null),
+      xautoclaim: jest.fn().mockResolvedValue(['0-0', [], []]),
+    };
+  }
+
+  function createMockDbClient() {
+    return {
+      updateOrderStatus: jest.fn().mockResolvedValue(undefined),
+      insertMatch: jest.fn().mockResolvedValue(undefined),
+      insertCancelledOrder: jest.fn().mockResolvedValue(undefined),
+      updateOrderParameters: jest.fn().mockResolvedValue(undefined),
+      close: jest.fn().mockResolvedValue(undefined),
+    };
+  }
+
+  function getHandler(service: InstanceType<typeof DbWriterService>) {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    return (service as any).handleOrderUpdatedMessage.bind(service);
+  }
+
+  function toBytes(obj: Record<string, unknown>): Uint8Array {
+    return new TextEncoder().encode(JSON.stringify(obj));
+  }
+
+  it('should call dbClient.updateOrderParameters with valid data', async () => {
+    const dbClient = createMockDbClient();
+    const service = new DbWriterService(createMockNats(), createMockRedis(), dbClient);
+    const handle = getHandler(service);
+
+    const orderId = '550e8400-e29b-41d4-a716-446655440000';
+    const event = {
+      orderId,
+      originalAmount: '2000000',
+      remainingAmount: '1000000',
+      rate: 500,
+      settlementFeeAmount: '20000',
+      remainingSettlementFeeAmount: '10000',
+      timestamp: Date.now(),
+    };
+
+    await handle(toBytes(event));
+
+    expect(dbClient.updateOrderParameters).toHaveBeenCalledTimes(1);
+    expect(dbClient.updateOrderParameters).toHaveBeenCalledWith(
+      expect.objectContaining({ orderId, originalAmount: '2000000', rate: 500 })
+    );
+  });
+
+  it('should NOT call dbClient for invalid JSON', async () => {
+    const dbClient = createMockDbClient();
+    const service = new DbWriterService(createMockNats(), createMockRedis(), dbClient);
+    const handle = getHandler(service);
+
+    await handle(new Uint8Array([0xff, 0xfe]));
+
+    expect(dbClient.updateOrderParameters).not.toHaveBeenCalled();
+  });
+
+  it('should NOT call dbClient for schema-invalid data', async () => {
+    const dbClient = createMockDbClient();
+    const service = new DbWriterService(createMockNats(), createMockRedis(), dbClient);
+    const handle = getHandler(service);
+
+    await handle(
+      toBytes({
+        orderId: 'not-a-uuid',
+        originalAmount: '2000000',
+        // Missing required fields
+      })
+    );
+
+    expect(dbClient.updateOrderParameters).not.toHaveBeenCalled();
   });
 });
 
@@ -281,22 +418,38 @@ describe('handleRedisEntry retry logic', () => {
 
   function buildFields(match: ReturnType<typeof createMatch>): string[] {
     return [
-      'matchId', match.matchId,
-      'marketId', match.marketId,
-      'lendOrderId', match.lendOrderId,
-      'borrowOrderId', match.borrowOrderId,
-      'lenderWallet', match.lenderWallet,
-      'borrowerWallet', match.borrowerWallet,
-      'matchedAmount', match.matchedAmount,
-      'rate', String(match.rate),
-      'loanToken', match.loanToken,
-      'maturity', String(match.maturity),
-      'timestamp', String(match.timestamp),
-      'borrowerIsTaker', String(match.borrowerIsTaker),
-      'makerFeeAmount', match.makerFeeAmount,
-      'takerFeeAmount', match.takerFeeAmount,
-      'lenderSettlementFeeAmount', match.lenderSettlementFeeAmount,
-      'borrowerSettlementFeeAmount', match.borrowerSettlementFeeAmount,
+      'matchId',
+      match.matchId,
+      'marketId',
+      match.marketId,
+      'lendOrderId',
+      match.lendOrderId,
+      'borrowOrderId',
+      match.borrowOrderId,
+      'lenderWallet',
+      match.lenderWallet,
+      'borrowerWallet',
+      match.borrowerWallet,
+      'matchedAmount',
+      match.matchedAmount,
+      'rate',
+      String(match.rate),
+      'loanToken',
+      match.loanToken,
+      'maturity',
+      String(match.maturity),
+      'timestamp',
+      String(match.timestamp),
+      'borrowerIsTaker',
+      String(match.borrowerIsTaker),
+      'makerFeeAmount',
+      match.makerFeeAmount,
+      'takerFeeAmount',
+      match.takerFeeAmount,
+      'lenderSettlementFeeAmount',
+      match.lenderSettlementFeeAmount,
+      'borrowerSettlementFeeAmount',
+      match.borrowerSettlementFeeAmount,
     ];
   }
 
@@ -311,9 +464,7 @@ describe('handleRedisEntry retry logic', () => {
   it('should ACK after successful insert on first attempt', async () => {
     const redis = createMockRedis();
     const dbClient = createMockDbClient();
-    const service = new DbWriterService(
-      createMockNats(), redis, dbClient, { maxInsertRetries: 3 }
-    );
+    const service = new DbWriterService(createMockNats(), redis, dbClient, { maxInsertRetries: 3 });
 
     const match = createMatch();
     const handle = getHandler(service);
@@ -330,9 +481,7 @@ describe('handleRedisEntry retry logic', () => {
       if (callCount < 3) throw new Error('transient DB error');
     });
     const redis = createMockRedis();
-    const service = new DbWriterService(
-      createMockNats(), redis, dbClient, { maxInsertRetries: 3 }
-    );
+    const service = new DbWriterService(createMockNats(), redis, dbClient, { maxInsertRetries: 3 });
 
     const match = createMatch();
     const handle = getHandler(service);
@@ -347,16 +496,12 @@ describe('handleRedisEntry retry logic', () => {
       throw new Error('persistent DB error');
     });
     const redis = createMockRedis();
-    const service = new DbWriterService(
-      createMockNats(), redis, dbClient, { maxInsertRetries: 3 }
-    );
+    const service = new DbWriterService(createMockNats(), redis, dbClient, { maxInsertRetries: 3 });
 
     const match = createMatch();
     const handle = getHandler(service);
 
-    await expect(handle('entry-3', buildFields(match))).rejects.toThrow(
-      'persistent DB error'
-    );
+    await expect(handle('entry-3', buildFields(match))).rejects.toThrow('persistent DB error');
 
     expect(dbClient.insertMatch).toHaveBeenCalledTimes(3);
     expect(redis.xack).not.toHaveBeenCalled();
@@ -365,9 +510,7 @@ describe('handleRedisEntry retry logic', () => {
   it('should ACK invalid entries without attempting insert', async () => {
     const dbClient = createMockDbClient();
     const redis = createMockRedis();
-    const service = new DbWriterService(
-      createMockNats(), redis, dbClient, { maxInsertRetries: 3 }
-    );
+    const service = new DbWriterService(createMockNats(), redis, dbClient, { maxInsertRetries: 3 });
 
     const handle = getHandler(service);
     // Empty fields produce an invalid match

@@ -14,6 +14,7 @@ import {
   handleBorrowMarketOrder,
   handleBorrowLimitOrder,
   handleCancelOrder,
+  handleUpdateOrder,
   type HandlerContext,
 } from './message-handlers';
 import { createLogger } from '../utils/logger';
@@ -86,7 +87,9 @@ export class NatsService {
       log.info('NATS service initialized');
     } catch (error) {
       log.error({ err: error }, 'failed to connect to NATS');
-      throw new Error(`NATS connection failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      throw new Error(
+        `NATS connection failed: ${error instanceof Error ? error.message : 'Unknown error'}`
+      );
     }
   }
 
@@ -154,6 +157,12 @@ export class NatsService {
     this.subscriptions.push(cancelSub);
     this.processSubscription(cancelSub, (data) => handleCancelOrder(ctx, data));
     log.info({ topic: NATS_TOPICS.ORDERS_CANCEL }, 'subscribed');
+
+    // Subscribe to update orders
+    const updateSub = this.nc.subscribe(NATS_TOPICS.ORDERS_UPDATE);
+    this.subscriptions.push(updateSub);
+    this.processSubscription(updateSub, (data) => handleUpdateOrder(ctx, data));
+    log.info({ topic: NATS_TOPICS.ORDERS_UPDATE }, 'subscribed');
   }
 
   /**
@@ -253,4 +262,3 @@ export class NatsService {
     };
   }
 }
-

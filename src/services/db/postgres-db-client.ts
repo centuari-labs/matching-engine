@@ -1,5 +1,11 @@
 import { Pool, type PoolConfig, type PoolClient } from 'pg';
-import type { DbClient, MatchEvent, OrderStatusEvent, CancelledRemainderEvent } from '../../types/db';
+import type {
+  DbClient,
+  MatchEvent,
+  OrderStatusEvent,
+  CancelledRemainderEvent,
+  OrderUpdatedEvent,
+} from '../../types/db';
 import type { DbConfig } from '../../config/db-config';
 import { loadDbConfig } from '../../config/db-config';
 import type { Order } from '../../types/orders';
@@ -82,10 +88,7 @@ export class PostgresDbClient implements DbClient {
    * @returns The UUID of the matching asset row
    * @throws Error if no matching asset is found
    */
-  private async findAssetIdByToken(
-    client: PoolClient,
-    tokenAddress: string
-  ): Promise<string> {
+  private async findAssetIdByToken(client: PoolClient, tokenAddress: string): Promise<string> {
     const result = await client.query<{ id: string }>(
       `
         SELECT id
@@ -112,10 +115,7 @@ export class PostgresDbClient implements DbClient {
    * @returns The UUID of the matching account row
    * @throws Error if no matching account is found
    */
-  private async findAccountIdByWallet(
-    client: PoolClient,
-    wallet: string
-  ): Promise<string> {
+  private async findAccountIdByWallet(client: PoolClient, wallet: string): Promise<string> {
     const result = await client.query<{ id: string }>(
       `
         SELECT id
@@ -141,14 +141,8 @@ export class PostgresDbClient implements DbClient {
       await client.query('BEGIN');
 
       const assetId = await this.findAssetIdByToken(client, event.loanToken);
-      const lenderAccountId = await this.findAccountIdByWallet(
-        client,
-        event.lenderWallet
-      );
-      const borrowerAccountId = await this.findAccountIdByWallet(
-        client,
-        event.borrowerWallet
-      );
+      const lenderAccountId = await this.findAccountIdByWallet(client, event.lenderWallet);
+      const borrowerAccountId = await this.findAccountIdByWallet(client, event.borrowerWallet);
 
       const insertResult = await client.query(
         `
@@ -194,7 +188,7 @@ export class PostgresDbClient implements DbClient {
         [
           event.matchId,
           event.lendOrderId, //@note : later change into order market id
-          event.borrowOrderId,//@note : later change into order market id
+          event.borrowOrderId, //@note : later change into order market id
           assetId,
           lenderAccountId,
           borrowerAccountId,
@@ -214,9 +208,7 @@ export class PostgresDbClient implements DbClient {
       // Sort updates by account ID to prevent deadlocks when concurrent
       // transactions lock the same two accounts in opposite roles.
       if (insertResult.rowCount && insertResult.rowCount > 0) {
-        const lenderTradeFee = event.borrowerIsTaker
-          ? event.makerFeeAmount
-          : event.takerFeeAmount;
+        const lenderTradeFee = event.borrowerIsTaker ? event.makerFeeAmount : event.takerFeeAmount;
         const borrowerTradeFee = event.borrowerIsTaker
           ? event.takerFeeAmount
           : event.makerFeeAmount;
@@ -248,18 +240,14 @@ export class PostgresDbClient implements DbClient {
                 updated_at = NOW()
             WHERE account_id = $3 AND asset_id = $4
           `,
-          params: [
-            event.borrowerSettlementFeeAmount,
-            borrowerTradeFee,
-            borrowerAccountId,
-            assetId,
-          ],
+          params: [event.borrowerSettlementFeeAmount, borrowerTradeFee, borrowerAccountId, assetId],
         };
 
         // Always lock lower account ID first to prevent deadlocks
-        const ordered = lenderAccountId < borrowerAccountId
-          ? [lenderUpdate, borrowerUpdate]
-          : [borrowerUpdate, lenderUpdate];
+        const ordered =
+          lenderAccountId < borrowerAccountId
+            ? [lenderUpdate, borrowerUpdate]
+            : [borrowerUpdate, lenderUpdate];
 
         for (const update of ordered) {
           await client.query(update.query, update.params);
@@ -417,8 +405,43 @@ export class PostgresDbClient implements DbClient {
     }
   }
 
+  async updateOrderParameters(event: OrderUpdatedEvent): Promise<void> {
+    const client = await this.pool.connect();
+
+    try {
+      await client.query('BEGIN');
+
+      await client.query(
+        `
+        UPDATE orders
+        SET
+          rate = $2,
+          quantity = $3::numeric,
+          settlement_fee = $4::numeric,
+          filled_settlement_fee = (settlement_fee::numeric - $5::numeric),
+          updated_at = to_timestamp($6 / 1000.0)
+        WHERE id = $1
+        `,
+        [
+          event.orderId,
+          event.rate,
+          event.originalAmount,
+          event.settlementFeeAmount,
+          event.remainingSettlementFeeAmount,
+          event.timestamp,
+        ]
+      );
+
+      await client.query('COMMIT');
+    } catch (error) {
+      await client.query('ROLLBACK');
+      throw error;
+    } finally {
+      client.release();
+    }
+  }
+
   async close(): Promise<void> {
     await this.pool.end();
   }
 }
-

@@ -1,15 +1,14 @@
 import type { NatsConnection, Subscription } from 'nats';
 import Redis from 'ioredis';
 import { NATS_TOPICS } from '../config/nats-config';
-import {
-  REDIS_CONSUMER_GROUPS,
-  REDIS_STREAMS,
-} from '../config/redis-config';
+import { REDIS_CONSUMER_GROUPS, REDIS_STREAMS } from '../config/redis-config';
 import {
   orderStatusMessageSchema,
   cancelledRemainderMessageSchema,
+  orderUpdatedMessageSchema,
   type OrderStatusMessage,
   type CancelledRemainderMessage,
+  type OrderUpdatedMessage,
 } from '../types/messages';
 import { matchSchema, type Match } from '../types/matches';
 import type { DbClient } from '../types/db';
@@ -92,23 +91,17 @@ export class DbWriterService {
   private pendingRecoveryPromise: Promise<void> | null = null;
   private pendingRecoveryWakeup: (() => void) | null = null;
 
-  constructor(
-    nc: NatsConnection,
-    redis: Redis,
-    dbClient: DbClient,
-    options?: DbWriterOptions
-  ) {
+  constructor(nc: NatsConnection, redis: Redis, dbClient: DbClient, options?: DbWriterOptions) {
     this.nc = nc;
     this.redis = redis;
     this.dbClient = dbClient;
 
     this.options = {
       maxConcurrency: options?.maxConcurrency ?? DB_WRITER_DEFAULTS.MAX_CONCURRENCY,
-      redisConsumerGroup:
-        options?.redisConsumerGroup ?? REDIS_CONSUMER_GROUPS.DB_WRITER,
-      redisConsumerName:
-        options?.redisConsumerName ?? `db-writer-${process.pid}`,
-      redisBlockTimeoutMs: options?.redisBlockTimeoutMs ?? DB_WRITER_DEFAULTS.REDIS_BLOCK_TIMEOUT_MS,
+      redisConsumerGroup: options?.redisConsumerGroup ?? REDIS_CONSUMER_GROUPS.DB_WRITER,
+      redisConsumerName: options?.redisConsumerName ?? `db-writer-${process.pid}`,
+      redisBlockTimeoutMs:
+        options?.redisBlockTimeoutMs ?? DB_WRITER_DEFAULTS.REDIS_BLOCK_TIMEOUT_MS,
       redisBatchSize: options?.redisBatchSize ?? DB_WRITER_DEFAULTS.REDIS_BATCH_SIZE,
       maxInsertRetries: options?.maxInsertRetries ?? DB_WRITER_DEFAULTS.MAX_INSERT_RETRIES,
       pendingRecoveryIntervalMs:
@@ -162,39 +155,55 @@ export class DbWriterService {
   }
 
   /**
-   * Subscribe to the ORDERS_STATUS topic and apply updates to the DB.
+   * Subscribe to the ORDERS_STATUS and ORDERS_UPDATED topics and apply updates to the DB.
    */
   private startNatsSubscription(): void {
-    const sub = this.nc.subscribe(NATS_TOPICS.ORDERS_STATUS);
-    this.natsSubscription = sub;
+    this.natsSubscription = this.subscribeBounded(NATS_TOPICS.ORDERS_STATUS, (data) =>
+      this.handleOrderStatusMessage(data)
+    );
 
+    this.subscribeBounded(NATS_TOPICS.ORDERS_UPDATED, (data) =>
+      this.handleOrderUpdatedMessage(data)
+    );
+  }
+
+  /**
+   * Subscribe to a NATS topic with bounded concurrency control.
+   *
+   * @param topic - NATS topic to subscribe to
+   * @param handler - Async handler for each message's raw data
+   * @returns The NATS subscription
+   */
+  private subscribeBounded(
+    topic: string,
+    handler: (data: Uint8Array) => Promise<void>
+  ): Subscription {
+    const sub = this.nc.subscribe(topic);
     const maxConcurrency = this.options.maxConcurrency;
     let inFlight = 0;
 
     (async () => {
       for await (const msg of sub) {
-        // Simple bounded concurrency: if too many messages are in flight,
-        // wait until some of them complete.
-        // This keeps DB load under control.
         while (inFlight >= maxConcurrency) {
           await new Promise((resolve) => setTimeout(resolve, 10));
         }
 
         inFlight += 1;
 
-        void this.handleOrderStatusMessage(msg.data)
+        void handler(msg.data)
           .catch((error) => {
-            log.error({ err: error }, 'failed to handle order status message');
+            log.error({ err: error, topic }, 'failed to handle NATS message');
           })
           .finally(() => {
             inFlight -= 1;
           });
       }
     })().catch((error) => {
-      log.error({ err: error }, 'NATS subscription loop failed');
+      log.error({ err: error, topic }, 'NATS subscription loop failed');
     });
 
-    log.info({ topic: NATS_TOPICS.ORDERS_STATUS }, 'subscribed to NATS topic');
+    log.info({ topic }, 'subscribed to NATS topic');
+    return sub;
   }
 
   private async handleOrderStatusMessage(data: Uint8Array): Promise<void> {
@@ -217,6 +226,28 @@ export class DbWriterService {
     }
 
     await this.dbClient.updateOrderStatus(message);
+  }
+
+  private async handleOrderUpdatedMessage(data: Uint8Array): Promise<void> {
+    const text = new TextDecoder().decode(data);
+    let parsed: unknown;
+
+    try {
+      parsed = JSON.parse(text);
+    } catch (error) {
+      log.error({ err: error, rawMessage: text }, 'failed to parse order update JSON');
+      return;
+    }
+
+    let message: OrderUpdatedMessage;
+    try {
+      message = orderUpdatedMessageSchema.parse(parsed);
+    } catch (error) {
+      log.error({ err: error }, 'invalid order update message');
+      return;
+    }
+
+    await this.dbClient.updateOrderParameters(message);
   }
 
   /**
@@ -291,7 +322,10 @@ export class DbWriterService {
         '0',
         'MKSTREAM'
       );
-      log.info({ group: this.options.redisConsumerGroup, stream: REDIS_STREAMS.SETTLEMENT_MATCHES }, 'created consumer group');
+      log.info(
+        { group: this.options.redisConsumerGroup, stream: REDIS_STREAMS.SETTLEMENT_MATCHES },
+        'created consumer group'
+      );
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       if (message.includes('BUSYGROUP')) {
@@ -369,10 +403,7 @@ export class DbWriterService {
     }
   }
 
-  private async handleRedisEntry(
-    id: string,
-    fields: string[]
-  ): Promise<void> {
+  private async handleRedisEntry(id: string, fields: string[]): Promise<void> {
     const match = this.fieldsToMatch(fields);
 
     // Validate against core schema
@@ -382,11 +413,7 @@ export class DbWriterService {
     } catch (error) {
       log.error({ err: error }, 'invalid match entry from Redis');
       // Acknowledge the bad entry so it does not block the consumer group.
-      await this.redis.xack(
-        REDIS_STREAMS.SETTLEMENT_MATCHES,
-        this.options.redisConsumerGroup,
-        id
-      );
+      await this.redis.xack(REDIS_STREAMS.SETTLEMENT_MATCHES, this.options.redisConsumerGroup, id);
       return;
     }
 
@@ -400,11 +427,17 @@ export class DbWriterService {
         break; // Success — proceed to ACK
       } catch (error) {
         if (attempt === maxRetries) {
-          log.error({ matchId: validated.matchId, attempts: maxRetries, err: error }, 'match insert failed after all attempts, leaving un-ACKd for PEL recovery');
+          log.error(
+            { matchId: validated.matchId, attempts: maxRetries, err: error },
+            'match insert failed after all attempts, leaving un-ACKd for PEL recovery'
+          );
           throw error; // Propagate — do NOT ACK
         }
         const backoffMs = 100 * Math.pow(2, attempt - 1);
-        log.warn({ matchId: validated.matchId, attempt, maxRetries, backoffMs, err: error }, 'match insert failed, retrying');
+        log.warn(
+          { matchId: validated.matchId, attempt, maxRetries, backoffMs, err: error },
+          'match insert failed, retrying'
+        );
         await new Promise((resolve) => setTimeout(resolve, backoffMs));
       }
     }
@@ -412,11 +445,7 @@ export class DbWriterService {
     // Acknowledge within the DB_WRITER consumer group only. Other
     // consumer groups (e.g. Settlement Engine) still see the message
     // independently.
-    await this.redis.xack(
-      REDIS_STREAMS.SETTLEMENT_MATCHES,
-      this.options.redisConsumerGroup,
-      id
-    );
+    await this.redis.xack(REDIS_STREAMS.SETTLEMENT_MATCHES, this.options.redisConsumerGroup, id);
   }
 
   /**
@@ -509,4 +538,3 @@ export class DbWriterService {
     };
   }
 }
-
