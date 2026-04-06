@@ -17,6 +17,15 @@ import { createLogger } from '../utils/logger';
 
 const log = createLogger('db-writer-service');
 
+const DB_WRITER_DEFAULTS = {
+  MAX_CONCURRENCY: 10,
+  REDIS_BLOCK_TIMEOUT_MS: 5000,
+  REDIS_BATCH_SIZE: 50,
+  MAX_INSERT_RETRIES: 3,
+  PENDING_RECOVERY_INTERVAL_MS: 30000,
+  PENDING_MIN_IDLE_MS: 30000,
+} as const;
+
 export interface DbWriterOptions {
   /**
    * Maximum number of concurrent DB operations.
@@ -94,16 +103,17 @@ export class DbWriterService {
     this.dbClient = dbClient;
 
     this.options = {
-      maxConcurrency: options?.maxConcurrency ?? 10,
+      maxConcurrency: options?.maxConcurrency ?? DB_WRITER_DEFAULTS.MAX_CONCURRENCY,
       redisConsumerGroup:
         options?.redisConsumerGroup ?? REDIS_CONSUMER_GROUPS.DB_WRITER,
       redisConsumerName:
         options?.redisConsumerName ?? `db-writer-${process.pid}`,
-      redisBlockTimeoutMs: options?.redisBlockTimeoutMs ?? 5000,
-      redisBatchSize: options?.redisBatchSize ?? 50,
-      maxInsertRetries: options?.maxInsertRetries ?? 3,
-      pendingRecoveryIntervalMs: options?.pendingRecoveryIntervalMs ?? 30000,
-      pendingMinIdleMs: options?.pendingMinIdleMs ?? 30000,
+      redisBlockTimeoutMs: options?.redisBlockTimeoutMs ?? DB_WRITER_DEFAULTS.REDIS_BLOCK_TIMEOUT_MS,
+      redisBatchSize: options?.redisBatchSize ?? DB_WRITER_DEFAULTS.REDIS_BATCH_SIZE,
+      maxInsertRetries: options?.maxInsertRetries ?? DB_WRITER_DEFAULTS.MAX_INSERT_RETRIES,
+      pendingRecoveryIntervalMs:
+        options?.pendingRecoveryIntervalMs ?? DB_WRITER_DEFAULTS.PENDING_RECOVERY_INTERVAL_MS,
+      pendingMinIdleMs: options?.pendingMinIdleMs ?? DB_WRITER_DEFAULTS.PENDING_MIN_IDLE_MS,
     };
   }
 
