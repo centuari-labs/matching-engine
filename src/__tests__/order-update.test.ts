@@ -109,6 +109,18 @@ describe('Order Update logic', () => {
     expect(engine.hasOrder(order.orderId)).toBe(false);
   });
 
+  it('should match wallet address case-insensitively', () => {
+    const order = createLendLimitOrder({
+      walletAddress: walletAddress1,
+    });
+    engine.submitOrder(order);
+
+    // Use upper-case version of the same address
+    const upperCaseWallet = walletAddress1.toUpperCase().replace('0X', '0x');
+    const result = engine.updateOrder(order.orderId, upperCaseWallet);
+    expect(typeof result).toBe('object');
+  });
+
   it('should preserve original order fields in the returned order', () => {
     const order = createLendLimitOrder({
       walletAddress: walletAddress1,
