@@ -50,6 +50,14 @@ const bufferConfigSchema = z.object({
    * @default './unpublished-matches'
    */
   diskSpillDir: z.string().min(1).default('./unpublished-matches'),
+
+  /**
+   * Maximum number of matches allowed in the in-memory buffer.
+   * When exceeded, recordMatch() throws to apply backpressure.
+   * 0 means no limit.
+   * @default 10000
+   */
+  bufferMaxSize: z.number().int().nonnegative().default(10000),
 });
 
 /**
@@ -81,6 +89,7 @@ export function loadBufferConfig(): BufferConfig {
       ? parseInt(process.env.BUFFER_DISK_SPILL_THRESHOLD, 10)
       : 5000,
     diskSpillDir: process.env.BUFFER_DISK_SPILL_DIR || './unpublished-matches',
+    bufferMaxSize: process.env.BUFFER_MAX_SIZE ? parseInt(process.env.BUFFER_MAX_SIZE, 10) : 10000,
   };
 
   const result = bufferConfigSchema.safeParse(config);

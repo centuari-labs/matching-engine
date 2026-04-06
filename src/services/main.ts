@@ -122,11 +122,14 @@ async function main(): Promise<void> {
     log.info('matching engine service starting');
 
     // Display configuration
-    log.info({
-      natsUrl: process.env.NATS_URL || 'nats://localhost:4222',
-      redisUrl: process.env.REDIS_URL || 'redis://localhost:6379',
-      nodeEnv: process.env.NODE_ENV || 'development',
-    }, 'configuration');
+    log.info(
+      {
+        natsUrl: process.env.NATS_URL || 'nats://localhost:4222',
+        redisUrl: process.env.REDIS_URL || 'redis://localhost:6379',
+        nodeEnv: process.env.NODE_ENV || 'development',
+      },
+      'configuration'
+    );
 
     // Initialize Redis service first (optional - continues without it if connection fails)
     // Redis is used as the settlement publisher for the matching engine
@@ -161,13 +164,17 @@ async function main(): Promise<void> {
     const bufferConfig = loadBufferConfig();
     diskPersistenceService = new DiskPersistenceService(bufferConfig.diskSpillDir);
     retryService = new RetryService(diskPersistenceService, bufferConfig);
-    log.info({
-      retryInitialDelayMs: bufferConfig.retryInitialDelayMs,
-      retryMaxDelayMs: bufferConfig.retryMaxDelayMs,
-      warningThresholds: bufferConfig.warningThresholds,
-      diskSpillThreshold: bufferConfig.diskSpillThreshold,
-      diskSpillDir: bufferConfig.diskSpillDir,
-    }, 'buffer management initialized');
+    log.info(
+      {
+        retryInitialDelayMs: bufferConfig.retryInitialDelayMs,
+        retryMaxDelayMs: bufferConfig.retryMaxDelayMs,
+        warningThresholds: bufferConfig.warningThresholds,
+        diskSpillThreshold: bufferConfig.diskSpillThreshold,
+        diskSpillDir: bufferConfig.diskSpillDir,
+        bufferMaxSize: bufferConfig.bufferMaxSize,
+      },
+      'buffer management initialized'
+    );
 
     // Initialize matching engine with optional settlement publisher (Redis) and snapshot service
     log.info('initializing matching engine');
@@ -176,7 +183,8 @@ async function main(): Promise<void> {
       snapshotService ?? undefined,
       retryService,
       bufferConfig.warningThresholds,
-      bufferConfig.diskSpillThreshold
+      bufferConfig.diskSpillThreshold,
+      bufferConfig.bufferMaxSize
     );
     retryService.setExecutionEngine(matchingEngine.getExecutionEngine());
     log.info('matching engine initialized');
@@ -242,24 +250,30 @@ async function main(): Promise<void> {
 
     // Display service statistics
     const natsStats = natsService.getStats();
-    log.info({
-      natsConnected: natsStats.connected,
-      subscriptions: natsStats.subscriptions,
-      natsServer: natsStats.config.url,
-      natsAuth: natsStats.config.hasAuth,
-    }, 'NATS status');
+    log.info(
+      {
+        natsConnected: natsStats.connected,
+        subscriptions: natsStats.subscriptions,
+        natsServer: natsStats.config.url,
+        natsAuth: natsStats.config.hasAuth,
+      },
+      'NATS status'
+    );
 
     // Display Redis status
     if (redisService) {
       const redisStats = redisService.getStats();
       const streamInfo = await redisService.getStreamInfo();
-      log.info({
-        redisConnected: redisStats.connected,
-        redisServer: redisStats.config.url,
-        redisDb: redisStats.config.db,
-        streamLength: streamInfo?.length ?? 0,
-        consumerGroups: streamInfo?.groups ?? 0,
-      }, 'Redis status');
+      log.info(
+        {
+          redisConnected: redisStats.connected,
+          redisServer: redisStats.config.url,
+          redisDb: redisStats.config.db,
+          streamLength: streamInfo?.length ?? 0,
+          consumerGroups: streamInfo?.groups ?? 0,
+        },
+        'Redis status'
+      );
     } else {
       log.info('Redis disabled (settlement publishing disabled)');
     }

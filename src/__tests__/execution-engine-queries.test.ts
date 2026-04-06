@@ -7,6 +7,7 @@
 import { ExecutionEngine } from '../core/execution-engine';
 import { createMatch } from './factories/match-factory';
 import { DEFAULT_LOAN_TOKEN, DEFAULT_MATURITY } from './factories/order-factory';
+import { generateMatchId, generateOrderId } from '../utils/helpers';
 
 describe('ExecutionEngine Queries', () => {
   let engine: ExecutionEngine;
@@ -258,6 +259,49 @@ describe('ExecutionEngine Queries', () => {
   describe('retryPublish', () => {
     it('should no-op for unknown matchId', () => {
       expect(() => engine.retryPublish('unknown-id')).not.toThrow();
+    });
+  });
+
+  describe('buffer cap (maxBufferSize)', () => {
+    const validRecordMatchParams = () => ({
+      marketId: generateMatchId(),
+      lendOrderId: generateOrderId(),
+      borrowOrderId: generateOrderId(),
+      lenderWallet: '0x1111111111111111111111111111111111111111',
+      borrowerWallet: '0x2222222222222222222222222222222222222222',
+      matchedAmount: '1000000',
+      rate: 500,
+      loanToken: DEFAULT_LOAN_TOKEN,
+      maturity: DEFAULT_MATURITY,
+      borrowerIsTaker: true,
+      makerFeeAmount: '1000',
+      takerFeeAmount: '2000',
+      lenderSettlementFeeAmount: '5000',
+      borrowerSettlementFeeAmount: '5000',
+    });
+
+    it('should throw when buffer is at maxBufferSize', () => {
+      const cappedEngine = new ExecutionEngine(undefined, undefined, [], 0, 2);
+
+      cappedEngine.restoreMatches([createMatch(), createMatch()]);
+
+      expect(() => cappedEngine.recordMatch(validRecordMatchParams())).toThrow(/Buffer full/);
+    });
+
+    it('should succeed when under maxBufferSize', () => {
+      const cappedEngine = new ExecutionEngine(undefined, undefined, [], 0, 5);
+
+      cappedEngine.restoreMatches([createMatch()]);
+
+      expect(() => cappedEngine.recordMatch(validRecordMatchParams())).not.toThrow();
+    });
+
+    it('should have no cap when maxBufferSize is 0', () => {
+      // Default engine has maxBufferSize = 0 (unlimited)
+      engine.restoreMatches(Array.from({ length: 100 }, () => createMatch()));
+
+      expect(engine.matchCount).toBe(100);
+      expect(() => engine.recordMatch(validRecordMatchParams())).not.toThrow();
     });
   });
 });

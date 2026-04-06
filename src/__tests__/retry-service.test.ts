@@ -20,6 +20,7 @@ const DEFAULT_CONFIG: BufferConfig = {
   warningThresholds: [1000, 5000, 10000],
   diskSpillThreshold: 5000,
   diskSpillDir: '/tmp/test-spill',
+  bufferMaxSize: 10000,
 };
 
 describe('RetryService', () => {

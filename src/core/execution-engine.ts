@@ -19,8 +19,8 @@ export class ExecutionEngine {
   private matches: Map<string, Match>;
 
   /** Index matches by order ID for quick lookups */
-  private matchesByLendOrder: Map<string, string[]>;
-  private matchesByBorrowOrder: Map<string, string[]>;
+  private matchesByLendOrder: Map<string, Set<string>>;
+  private matchesByBorrowOrder: Map<string, Set<string>>;
 
   /** Optional publisher for settlement matches */
   private settlementPublisher?: SettlementPublisher;
@@ -40,6 +40,9 @@ export class ExecutionEngine {
   /** Tracks the last warning threshold that was reported to avoid duplicate alerts */
   private lastReportedThreshold: number | null;
 
+  /** Maximum buffer size (0 = unlimited) */
+  private maxBufferSize: number;
+
   /**
    * Create a new ExecutionEngine instance
    *
@@ -47,12 +50,14 @@ export class ExecutionEngine {
    * @param bufferEventHandler - Optional handler for buffer events (retry, thresholds, disk spill)
    * @param warningThresholds - Buffer size thresholds that trigger warnings
    * @param diskSpillThreshold - Buffer size that triggers disk spill
+   * @param maxBufferSize - Hard cap on buffer size (0 = unlimited)
    */
   constructor(
     settlementPublisher?: SettlementPublisher,
     bufferEventHandler?: BufferEventHandler,
     warningThresholds: number[] = [],
-    diskSpillThreshold: number = 0
+    diskSpillThreshold: number = 0,
+    maxBufferSize: number = 0
   ) {
     this.matches = new Map();
     this.matchesByLendOrder = new Map();
@@ -63,6 +68,7 @@ export class ExecutionEngine {
     this.diskSpillThreshold = diskSpillThreshold;
     this.retryingMatchIds = new Set();
     this.lastReportedThreshold = null;
+    this.maxBufferSize = maxBufferSize;
   }
 
   /**
@@ -91,6 +97,13 @@ export class ExecutionEngine {
     lenderSettlementFeeAmount: string;
     borrowerSettlementFeeAmount: string;
   }): Match {
+    // Reject new matches when buffer is full to apply backpressure
+    if (this.maxBufferSize > 0 && this.matches.size >= this.maxBufferSize) {
+      throw new Error(
+        `Buffer full: ${this.matches.size} matches (max ${this.maxBufferSize}). Rejecting new match.`
+      );
+    }
+
     const match: Match = {
       matchId: generateMatchId(),
       marketId: params.marketId,
@@ -111,23 +124,26 @@ export class ExecutionEngine {
     };
 
     // Log match creation for observability and debugging
-    log.info({
-      matchId: match.matchId,
-      marketId: match.marketId,
-      lendOrderId: match.lendOrderId,
-      borrowOrderId: match.borrowOrderId,
-      lenderWallet: match.lenderWallet,
-      borrowerWallet: match.borrowerWallet,
-      matchedAmount: match.matchedAmount,
-      rate: match.rate,
-      loanToken: match.loanToken,
-      maturity: match.maturity,
-      borrowerIsTaker: match.borrowerIsTaker,
-      makerFeeAmount: match.makerFeeAmount,
-      takerFeeAmount: match.takerFeeAmount,
-      lenderSettlementFeeAmount: match.lenderSettlementFeeAmount,
-      borrowerSettlementFeeAmount: match.borrowerSettlementFeeAmount,
-    }, 'match created');
+    log.info(
+      {
+        matchId: match.matchId,
+        marketId: match.marketId,
+        lendOrderId: match.lendOrderId,
+        borrowOrderId: match.borrowOrderId,
+        lenderWallet: match.lenderWallet,
+        borrowerWallet: match.borrowerWallet,
+        matchedAmount: match.matchedAmount,
+        rate: match.rate,
+        loanToken: match.loanToken,
+        maturity: match.maturity,
+        borrowerIsTaker: match.borrowerIsTaker,
+        makerFeeAmount: match.makerFeeAmount,
+        takerFeeAmount: match.takerFeeAmount,
+        lenderSettlementFeeAmount: match.lenderSettlementFeeAmount,
+        borrowerSettlementFeeAmount: match.borrowerSettlementFeeAmount,
+      },
+      'match created'
+    );
 
     // Validate match against schema
     matchSchema.parse(match);
@@ -137,15 +153,15 @@ export class ExecutionEngine {
 
     // Index by lend order
     if (!this.matchesByLendOrder.has(params.lendOrderId)) {
-      this.matchesByLendOrder.set(params.lendOrderId, []);
+      this.matchesByLendOrder.set(params.lendOrderId, new Set());
     }
-    this.matchesByLendOrder.get(params.lendOrderId)!.push(match.matchId);
+    this.matchesByLendOrder.get(params.lendOrderId)!.add(match.matchId);
 
     // Index by borrow order
     if (!this.matchesByBorrowOrder.has(params.borrowOrderId)) {
-      this.matchesByBorrowOrder.set(params.borrowOrderId, []);
+      this.matchesByBorrowOrder.set(params.borrowOrderId, new Set());
     }
-    this.matchesByBorrowOrder.get(params.borrowOrderId)!.push(match.matchId);
+    this.matchesByBorrowOrder.get(params.borrowOrderId)!.add(match.matchId);
 
     // Check buffer thresholds after storing
     this.checkThresholds();
@@ -177,13 +193,19 @@ export class ExecutionEngine {
           this.bufferEventHandler?.onPublishSucceeded(match.matchId);
         } else {
           // Failed: keep in memory, notify handler for retry
-          log.warn({ matchId: match.matchId }, 'settlement publish returned null, keeping in memory');
+          log.warn(
+            { matchId: match.matchId },
+            'settlement publish returned null, keeping in memory'
+          );
           this.bufferEventHandler?.onPublishFailed(match);
         }
       })
       .catch((error) => {
         // Error: keep in memory, notify handler for retry
-        log.error({ matchId: match.matchId, err: error }, 'failed to publish settlement match, keeping in memory');
+        log.error(
+          { matchId: match.matchId, err: error },
+          'failed to publish settlement match, keeping in memory'
+        );
         this.bufferEventHandler?.onPublishFailed(match);
       });
   }
@@ -202,28 +224,20 @@ export class ExecutionEngine {
     // Remove from main storage
     this.matches.delete(matchId);
 
-    // Remove from lend order index
+    // Remove from lend order index (O(1) with Set)
     const lendMatchIds = this.matchesByLendOrder.get(match.lendOrderId);
     if (lendMatchIds) {
-      const index = lendMatchIds.indexOf(matchId);
-      if (index > -1) {
-        lendMatchIds.splice(index, 1);
-      }
-      // Clean up empty arrays
-      if (lendMatchIds.length === 0) {
+      lendMatchIds.delete(matchId);
+      if (lendMatchIds.size === 0) {
         this.matchesByLendOrder.delete(match.lendOrderId);
       }
     }
 
-    // Remove from borrow order index
+    // Remove from borrow order index (O(1) with Set)
     const borrowMatchIds = this.matchesByBorrowOrder.get(match.borrowOrderId);
     if (borrowMatchIds) {
-      const index = borrowMatchIds.indexOf(matchId);
-      if (index > -1) {
-        borrowMatchIds.splice(index, 1);
-      }
-      // Clean up empty arrays
-      if (borrowMatchIds.length === 0) {
+      borrowMatchIds.delete(matchId);
+      if (borrowMatchIds.size === 0) {
         this.matchesByBorrowOrder.delete(match.borrowOrderId);
       }
     }
@@ -306,14 +320,14 @@ export class ExecutionEngine {
       this.matches.set(match.matchId, match);
 
       if (!this.matchesByLendOrder.has(match.lendOrderId)) {
-        this.matchesByLendOrder.set(match.lendOrderId, []);
+        this.matchesByLendOrder.set(match.lendOrderId, new Set());
       }
-      this.matchesByLendOrder.get(match.lendOrderId)!.push(match.matchId);
+      this.matchesByLendOrder.get(match.lendOrderId)!.add(match.matchId);
 
       if (!this.matchesByBorrowOrder.has(match.borrowOrderId)) {
-        this.matchesByBorrowOrder.set(match.borrowOrderId, []);
+        this.matchesByBorrowOrder.set(match.borrowOrderId, new Set());
       }
-      this.matchesByBorrowOrder.get(match.borrowOrderId)!.push(match.matchId);
+      this.matchesByBorrowOrder.get(match.borrowOrderId)!.add(match.matchId);
     }
   }
 
@@ -376,9 +390,9 @@ export class ExecutionEngine {
    * @returns Array of matches
    */
   getMatchesForOrder(orderId: string): Match[] {
-    const lendMatchIds = this.matchesByLendOrder.get(orderId) || [];
-    const borrowMatchIds = this.matchesByBorrowOrder.get(orderId) || [];
-    const allMatchIds = [...lendMatchIds, ...borrowMatchIds];
+    const lendMatchIds = this.matchesByLendOrder.get(orderId);
+    const borrowMatchIds = this.matchesByBorrowOrder.get(orderId);
+    const allMatchIds = [...(lendMatchIds ?? []), ...(borrowMatchIds ?? [])];
 
     return allMatchIds
       .map((id) => this.matches.get(id))
@@ -392,8 +406,9 @@ export class ExecutionEngine {
    * @returns Array of matches
    */
   getMatchesForLendOrder(lendOrderId: string): Match[] {
-    const matchIds = this.matchesByLendOrder.get(lendOrderId) || [];
-    return matchIds
+    const matchIds = this.matchesByLendOrder.get(lendOrderId);
+    if (!matchIds) return [];
+    return [...matchIds]
       .map((id) => this.matches.get(id))
       .filter((match): match is Match => match !== undefined);
   }
@@ -405,8 +420,9 @@ export class ExecutionEngine {
    * @returns Array of matches
    */
   getMatchesForBorrowOrder(borrowOrderId: string): Match[] {
-    const matchIds = this.matchesByBorrowOrder.get(borrowOrderId) || [];
-    return matchIds
+    const matchIds = this.matchesByBorrowOrder.get(borrowOrderId);
+    if (!matchIds) return [];
+    return [...matchIds]
       .map((id) => this.matches.get(id))
       .filter((match): match is Match => match !== undefined);
   }
@@ -563,15 +579,15 @@ export class ExecutionEngine {
 
       // Rebuild lend order index
       if (!this.matchesByLendOrder.has(match.lendOrderId)) {
-        this.matchesByLendOrder.set(match.lendOrderId, []);
+        this.matchesByLendOrder.set(match.lendOrderId, new Set());
       }
-      this.matchesByLendOrder.get(match.lendOrderId)!.push(match.matchId);
+      this.matchesByLendOrder.get(match.lendOrderId)!.add(match.matchId);
 
       // Rebuild borrow order index
       if (!this.matchesByBorrowOrder.has(match.borrowOrderId)) {
-        this.matchesByBorrowOrder.set(match.borrowOrderId, []);
+        this.matchesByBorrowOrder.set(match.borrowOrderId, new Set());
       }
-      this.matchesByBorrowOrder.get(match.borrowOrderId)!.push(match.matchId);
+      this.matchesByBorrowOrder.get(match.borrowOrderId)!.add(match.matchId);
     }
   }
 }

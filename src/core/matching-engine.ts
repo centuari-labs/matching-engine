@@ -37,20 +37,23 @@ export class MatchingEngine {
    * @param bufferEventHandler - Optional handler for buffer events (retry, thresholds, disk spill)
    * @param warningThresholds - Buffer size thresholds that trigger warnings
    * @param diskSpillThreshold - Buffer size that triggers disk spill
+   * @param maxBufferSize - Hard cap on buffer size (0 = unlimited)
    */
   constructor(
     settlementPublisher?: SettlementPublisher,
     snapshotService?: SnapshotService,
     bufferEventHandler?: BufferEventHandler,
     warningThresholds: number[] = [],
-    diskSpillThreshold: number = 0
+    diskSpillThreshold: number = 0,
+    maxBufferSize: number = 0
   ) {
     this.orderBook = new OrderBook();
     this.executionEngine = new ExecutionEngine(
       settlementPublisher,
       bufferEventHandler,
       warningThresholds,
-      diskSpillThreshold
+      diskSpillThreshold,
+      maxBufferSize
     );
     this.snapshotService = snapshotService ?? null;
   }
@@ -475,7 +478,13 @@ export class MatchingEngine {
       // Restore execution engine
       this.executionEngine.restoreMatches(snapshotData.matches);
 
-      log.info({ orderCount: snapshotData.metadata.orderCount, matchCount: snapshotData.metadata.matchCount }, 'state restored from snapshot');
+      log.info(
+        {
+          orderCount: snapshotData.metadata.orderCount,
+          matchCount: snapshotData.metadata.matchCount,
+        },
+        'state restored from snapshot'
+      );
       return true;
     } catch (error) {
       log.error({ err: error }, 'failed to restore from snapshot');
