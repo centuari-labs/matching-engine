@@ -68,8 +68,8 @@ jobs:
       - name: Flush Redis (clean state)
         run: docker exec ci-redis redis-cli FLUSHALL
 
-      - name: Unit tests
-        run: pnpm run test
+      - name: Unit tests (exclude integration tests requiring Postgres)
+        run: pnpm exec jest --silent --testPathIgnorePatterns=integration
 
   build-and-deploy:
     needs: [detect-env, test]
