@@ -1,0 +1,93 @@
+name: Integration Tests (matching-engine)
+
+# Integration tests yang butuh Postgres + Redis + NATS running di runner VPS.
+# DIPISAH dari deploy.yml supaya deploy pipeline tetap cepat.
+#
+# Trigger:
+#   - Manual via "Run workflow" button di GitHub UI
+#   - Weekly schedule (setiap Senin 02:00 UTC)
+#
+# Prasyarat di runner VPS (sekali setup):
+#   - ci-redis container (port 127.0.0.1:6379) — sudah ada
+#   - ci-nats container (port 127.0.0.1:4222) — sudah ada
+#   - ci-postgres container (port 127.0.0.1:5432) dengan schema centuari sudah ter-apply
+#
+# Setup ci-postgres:
+#   docker run -d \
+#     --name ci-postgres \
+#     --restart unless-stopped \
+#     -p 127.0.0.1:5432:5432 \
+#     -e POSTGRES_USER=postgres \
+#     -e POSTGRES_PASSWORD=password \
+#     -e POSTGRES_DB=centuari \
+#     -v ci-postgres-data:/var/lib/postgresql/data \
+#     postgres:16-alpine
+#
+# Apply schema (dari backend-v2 migrations, sekali setup):
+#   curl -fsSL https://raw.githubusercontent.com/pressly/goose/master/install.sh | sh
+#   git clone https://github.com/centuari-labs/backend-v2.git /tmp/backend-v2
+#   ~/bin/goose -dir /tmp/backend-v2/src/core/database/migrations \
+#     postgres "postgres://postgres:password@127.0.0.1:5432/centuari?sslmode=disable" up
+#   rm -rf /tmp/backend-v2
+
+on:
+  workflow_dispatch:
+  schedule:
+    # Setiap Senin 02:00 UTC (09:00 WIB)
+    - cron: '0 2 * * 1'
+
+concurrency:
+  group: integration-test-matching-engine
+  cancel-in-progress: false
+
+jobs:
+  integration:
+    runs-on: [self-hosted, centuari-runner]
+    timeout-minutes: 30
+    env:
+      REDIS_URL: redis://127.0.0.1:6379
+      NATS_URL: nats://127.0.0.1:4222
+      DB_URL: postgresql://postgres:password@127.0.0.1:5432/centuari
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10.29.2
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'pnpm'
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Verify Postgres connection
+        run: |
+          docker exec ci-postgres pg_isready -U postgres -d centuari
+          docker exec ci-postgres psql -U postgres -d centuari -c "SELECT count(*) FROM information_schema.tables WHERE table_schema='public';"
+
+      - name: Flush Redis (clean state)
+        run: docker exec ci-redis redis-cli FLUSHALL
+
+      - name: Truncate Postgres test data (clean state)
+        run: |
+          docker exec ci-postgres psql -U postgres -d centuari -c "
+            DO \$\$
+            DECLARE r RECORD;
+            BEGIN
+              FOR r IN (SELECT tablename FROM pg_tables WHERE schemaname='public') LOOP
+                EXECUTE 'TRUNCATE TABLE ' || quote_ident(r.tablename) || ' RESTART IDENTITY CASCADE';
+              END LOOP;
+            END \$\$;
+          "
+
+      - name: Run all tests (unit + integration)
+        run: pnpm run test
+
+      - name: Cleanup
+        if: always()
+        run: docker exec ci-redis redis-cli FLUSHALL || true
