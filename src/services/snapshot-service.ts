@@ -5,6 +5,9 @@ import type { ExecutionEngine } from '../core/execution-engine';
 import type { SnapshotData, SnapshotMetadata } from '../types/snapshot';
 import { snapshotDataSchema, snapshotMetadataSchema } from '../types/snapshot';
 import type { RedisService } from './redis-service';
+import { createLogger } from '../utils/logger';
+
+const log = createLogger('snapshot-service');
 
 /**
  * Snapshot service for persisting and restoring matching engine state
@@ -121,7 +124,7 @@ export class SnapshotService {
         }
       } catch (error) {
         // Log but don't fail if backup rotation fails
-        console.warn('Failed to rotate backup snapshot:', error);
+        log.warn({ err: error }, 'failed to rotate backup snapshot');
       }
 
       // Atomic rename: temp -> latest
@@ -141,16 +144,14 @@ export class SnapshotService {
       if (this.redisEnabled && this.redisService?.isServiceConnected()) {
         this.saveToRedis(snapshotData, metadata).catch((error) => {
           // Silent failure - Redis is only secondary backup
-          console.warn('Failed to save snapshot to Redis (non-critical):', error);
+          log.warn({ err: error }, 'failed to save snapshot to Redis (non-critical)');
         });
       }
 
-      console.log(
-        `Snapshot saved: ${snapshotData.metadata.orderCount} orders, ${snapshotData.metadata.matchCount} matches`
-      );
+      log.info({ orderCount: snapshotData.metadata.orderCount, matchCount: snapshotData.metadata.matchCount }, 'snapshot saved');
     } catch (error) {
       // Log error but don't throw - snapshot failures shouldn't block operations
-      console.error('Failed to save snapshot:', error);
+      log.error({ err: error }, 'failed to save snapshot');
       throw error; // Re-throw for caller to handle if needed
     }
   }
@@ -206,9 +207,7 @@ export class SnapshotService {
 
       // Validate with Zod
       const validated = snapshotDataSchema.parse(snapshotData);
-      console.log(
-        `Snapshot loaded from filesystem: ${validated.metadata.orderCount} orders, ${validated.metadata.matchCount} matches`
-      );
+      log.info({ orderCount: validated.metadata.orderCount, matchCount: validated.metadata.matchCount, source: 'filesystem' }, 'snapshot loaded');
       return validated;
     } catch (error) {
       // Filesystem failed, try Redis fallback if enabled
@@ -216,21 +215,19 @@ export class SnapshotService {
         try {
           const snapshotData = await this.loadFromRedis();
           if (snapshotData) {
-            console.log(
-              `Snapshot loaded from Redis fallback: ${snapshotData.metadata.orderCount} orders, ${snapshotData.metadata.matchCount} matches`
-            );
+            log.info({ orderCount: snapshotData.metadata.orderCount, matchCount: snapshotData.metadata.matchCount, source: 'redis' }, 'snapshot loaded');
             return snapshotData;
           }
         } catch (redisError) {
-          console.warn('Failed to load snapshot from Redis fallback:', redisError);
+          log.warn({ err: redisError }, 'failed to load snapshot from Redis fallback');
         }
       }
 
       // No snapshot found or all sources failed
       if ((error as NodeJS.ErrnoException).code === 'ENOENT') {
-        console.log('No snapshot found (first startup)');
+        log.info('no snapshot found, first startup');
       } else {
-        console.warn('Failed to load snapshot:', error);
+        log.warn({ err: error }, 'failed to load snapshot');
       }
       return null;
     }
@@ -297,7 +294,7 @@ export class SnapshotService {
       if ((error as NodeJS.ErrnoException).code === 'ENOENT') {
         return null; // No metadata file (first startup)
       }
-      console.warn('Failed to load snapshot metadata:', error);
+      log.warn({ err: error }, 'failed to load snapshot metadata');
       return null;
     }
   }

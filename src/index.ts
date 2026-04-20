@@ -43,6 +43,7 @@ export { matchSchema } from './types/matches';
 
 export type {
   CancelOrderMessage,
+  CancelledRemainderMessage,
   MatchCreatedMessage,
   OrderStatusMessage,
   OrderBookSnapshotMessage,
@@ -52,6 +53,7 @@ export type {
 
 export {
   cancelOrderMessageSchema,
+  cancelledRemainderMessageSchema,
   matchCreatedMessageSchema,
   orderStatusMessageSchema,
   orderBookSnapshotMessageSchema,
@@ -61,6 +63,11 @@ export {
   createMatchCreatedMessage,
   createOrderStatusMessage,
 } from './types/messages';
+
+// Buffer types
+export type { BufferStats, BufferEventHandler } from './types/buffer';
+export { loadBufferConfig } from './config/buffer-config';
+export type { BufferConfig } from './config/buffer-config';
 
 // Utility exports
 export {

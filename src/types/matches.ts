@@ -10,6 +10,7 @@ import type { OrderStatus } from './orders';
  */
 export const matchSchema = z.object({
   matchId: z.string().uuid('Match ID must be a valid UUID'),
+  marketId: z.string().uuid('Market ID must be a valid UUID'),
   lendOrderId: z.string().uuid('Lend order ID must be a valid UUID'), //@note : should change into order market id
   borrowOrderId: z.string().uuid('Borrow order ID must be a valid UUID'), //@note : should change into order market id
   lenderWallet: ethereumAddressSchema, //@note : later change into account id
@@ -113,6 +114,8 @@ export interface MatchResult {
   } | null;
   /** Array of maker orders affected by the matching */
   affectedMakerOrders: AffectedOrder[];
+  /** Taker's remaining settlement fee pool after all matches in this submission */
+  takerRemainingSettlementFeeAmount?: string;
 }
 
 /**

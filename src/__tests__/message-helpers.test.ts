@@ -24,6 +24,8 @@ describe('Message Helpers', () => {
       expect(message.orderId).toBe(affected.orderId);
       expect(message.status).toBe(OrderStatus.Filled);
       expect(message.remainingAmount).toBe('0');
+      expect(message.filledQuantity).toBe('1000000');
+      expect(message.filledSettlementFeeAmount).toBe('1000');
       expect(typeof message.timestamp).toBe('number');
       expect(message.timestamp).toBeGreaterThan(0);
     });
@@ -75,6 +77,8 @@ describe('Message Helpers', () => {
       const message = createOrderStatusMessage(affected);
 
       expect(message.status).toBe('PARTIALLY_FILLED');
+      expect(message.filledQuantity).toBe('300000');
+      expect(message.filledSettlementFeeAmount).toBe('300');
     });
 
     it('should preserve remainingAmount as string', () => {
@@ -116,6 +120,7 @@ describe('Message Helpers', () => {
       const orderId = '123e4567-e89b-12d3-a456-426614174000';
       const mockMatch = {
         matchId: '223e4567-e89b-12d3-a456-426614174001',
+        marketId: '423e4567-e89b-12d3-a456-426614174003',
         lendOrderId: orderId,
         borrowOrderId: '323e4567-e89b-12d3-a456-426614174002',
         lenderWallet: '0x1111111111111111111111111111111111111111',
@@ -158,8 +163,8 @@ describe('Message Helpers', () => {
       const message = createMatchCreatedMessage(orderId, result);
 
       expect(message.remainingOrder).not.toBeNull();
-      expect(message.remainingOrder.orderId).toBe(orderId);
-      expect(message.remainingOrder.remainingAmount).toBe('500000');
+      expect(message.remainingOrder!.orderId).toBe(orderId);
+      expect(message.remainingOrder!.remainingAmount).toBe('500000');
     });
   });
 

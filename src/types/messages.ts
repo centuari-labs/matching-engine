@@ -6,8 +6,9 @@
  */
 
 import { z } from 'zod';
+import { matchSchema } from './matches';
 import type { MatchResult } from './matches';
-import { ethereumAddressSchema } from './orders';
+import { ethereumAddressSchema, OrderSide, OrderType } from './orders';
 
 /**
  * Schema for order cancellation requests
@@ -29,6 +30,61 @@ export const cancelOrderMessageSchema = z.object({
   timestamp: z.number().int().positive(),
 });
 
+const digitStringSchema = z
+  .string()
+  .regex(/^\d+$/, 'Amount must be a positive integer string')
+  .optional();
+
+export const updateOrderMessageSchema = z
+  .object({
+    orderId: z.string().uuid(),
+    walletAddress: ethereumAddressSchema,
+    amount: digitStringSchema,
+    quantity: digitStringSchema,
+    originalAmount: digitStringSchema,
+    rate: z.number().int().positive().optional(),
+    settlementFee: digitStringSchema,
+    settlementFeeAmount: digitStringSchema,
+    timestamp: z
+      .number()
+      .int()
+      .positive()
+      .default(() => Date.now()),
+  })
+  .refine(
+    (obj) =>
+      obj.amount ||
+      obj.quantity ||
+      obj.originalAmount ||
+      obj.rate ||
+      obj.settlementFee ||
+      obj.settlementFeeAmount,
+    {
+      message:
+        'At least one update field (amount, quantity, originalAmount, rate, settlementFee, or settlementFeeAmount) must be provided',
+    }
+  );
+
+/**
+ * Type for order update messages
+ */
+export type UpdateOrderMessage = z.infer<typeof updateOrderMessageSchema>;
+
+/**
+ * Zod schema for the OrderUpdatedMessage published to `orders.updated` topic.
+ */
+export const orderUpdatedMessageSchema = z.object({
+  orderId: z.string().uuid(),
+  originalAmount: z.string(),
+  remainingAmount: z.string(),
+  rate: z.number().int().positive(),
+  settlementFeeAmount: z.string(),
+  remainingSettlementFeeAmount: z.string(),
+  timestamp: z.number().int().positive(),
+});
+
+export type OrderUpdatedMessage = z.infer<typeof orderUpdatedMessageSchema>;
+
 /**
  * Type for order cancellation messages
  */
@@ -48,12 +104,18 @@ export const matchCreatedMessageSchema = z.object({
   /**
    * Array of matches created from this order
    */
-  matches: z.array(z.any()), // Using any here since Match type is complex
+  matches: z.array(matchSchema),
 
   /**
    * Remaining order if partially filled, null if fully filled
    */
-  remainingOrder: z.any().nullable(),
+  remainingOrder: z
+    .object({
+      orderId: z.string().uuid(),
+      remainingAmount: z.string().regex(/^\d+$/, 'Amount must be a positive integer string'),
+      status: z.string(),
+    })
+    .nullable(),
 
   /**
    * Timestamp when matches were created
@@ -69,11 +131,9 @@ export type MatchCreatedMessage = z.infer<typeof matchCreatedMessageSchema>;
 /**
  * Schema for order status update notifications
  *
- * This topic is used by downstream services (including DB Writer) to
- * persist order state in the database. To support this, the schema
- * includes additional optional fields that allow consumers to compute
- * filled quantities and fees without having to look up the original
- * order payload.
+ * Published by the matching engine and consumed by the DB Writer to
+ * persist order state in the database. Filled amounts are always
+ * computed at the source so consumers can use them directly.
  */
 export const orderStatusMessageSchema = z.object({
   /**
@@ -92,32 +152,19 @@ export const orderStatusMessageSchema = z.object({
   remainingAmount: z.string(),
 
   /**
-   * Total order quantity (original notional amount).
-   *
-   * Used by DB Writer to compute filled_quantity.
+   * Total filled quantity so far (originalAmount - remainingAmount)
    */
-  quantity: z.string().optional(),
+  filledQuantity: z.string(),
 
   /**
-   * Total filled quantity so far.
-   *
-   * If omitted, consumers can derive it from quantity - remainingAmount
-   * when quantity is present.
+   * Total filled settlement fee so far
    */
-  filledQuantity: z.string().optional(),
+  filledSettlementFeeAmount: z.string(),
 
   /**
-   * Total settlement fee amount for this order assuming it is fully filled.
+   * Reason why the order was cancelled (only present when status is CANCELLED)
    */
-  settlementFeeAmount: z.string().optional(),
-
-  /**
-   * Total filled settlement fee so far.
-   *
-   * If omitted, consumers can derive it from settlementFeeAmount and any
-   * remaining settlement-fee pool they track.
-   */
-  filledSettlementFeeAmount: z.string().optional(),
+  cancelReason: z.enum(['USER_CANCELLED', 'IOC']).optional(),
 
   /**
    * Timestamp of the status update
@@ -131,18 +178,67 @@ export const orderStatusMessageSchema = z.object({
 export type OrderStatusMessage = z.infer<typeof orderStatusMessageSchema>;
 
 /**
+ * Schema for cancelled remainder orders.
+ *
+ * Published when a market order (IOC) is partially filled and the unmatched
+ * remainder needs to be persisted as a separate CANCELLED order row so users
+ * can see it in their transaction history.
+ */
+export const cancelledRemainderMessageSchema = z.object({
+  /** New UUID for the cancelled remainder order */
+  orderId: z.string().uuid(),
+  /** ID of the original order that was partially filled */
+  originalOrderId: z.string().uuid(),
+  /** Wallet address of the order owner */
+  accountWallet: ethereumAddressSchema,
+  /** Asset UUID */
+  assetId: z.string().uuid(),
+  /** Order side */
+  side: z.nativeEnum(OrderSide),
+  /** Order type */
+  type: z.nativeEnum(OrderType),
+  /** Rate (0 for market orders) */
+  rate: z.number(),
+  /** Unmatched quantity */
+  quantity: z.string().regex(/^\d+$/, 'Quantity must be a positive integer string'),
+  /** Remaining settlement fee for the unmatched portion */
+  settlementFee: z.string().regex(/^\d+$/, 'Settlement fee must be a positive integer string'),
+  /** Market IDs the order participated in */
+  marketIds: z.array(z.string().uuid()).min(1),
+  /** Reason for cancellation */
+  cancelReason: z.enum(['USER_CANCELLED', 'IOC']).optional(),
+  /** Timestamp */
+  timestamp: z.number().int().positive(),
+});
+
+/**
+ * Type for cancelled remainder messages
+ */
+export type CancelledRemainderMessage = z.infer<typeof cancelledRemainderMessageSchema>;
+
+/**
+ * Schema for individual order entries in an order book snapshot
+ */
+export const orderBookEntrySchema = z.object({
+  orderId: z.string().uuid(),
+  rate: z.number().int().min(0).max(10000).optional(),
+  amount: z.string().regex(/^\d+$/, 'Amount must be a positive integer string'),
+  timestamp: z.number().int().positive(),
+});
+
+/**
  * Schema for order book snapshot responses
  */
 export const orderBookSnapshotMessageSchema = z.object({
   /**
    * Lend orders grouped by token and maturity
    */
-  lendOrders: z.record(z.string(), z.record(z.string(), z.array(z.any()))),
+  lendOrders: z.record(z.string(), z.record(z.string(), z.array(orderBookEntrySchema))),
 
   /**
    * Borrow orders grouped by token and maturity
    */
-  borrowOrders: z.record(z.string(), z.record(z.string(), z.array(z.any()))),
+  borrowOrders: z.record(z.string(), z.record(z.string(), z.array(orderBookEntrySchema))),
 
   /**
    * Timestamp of the snapshot
@@ -158,9 +254,7 @@ export const orderBookSnapshotMessageSchema = z.object({
 /**
  * Type for order book snapshot messages
  */
-export type OrderBookSnapshotMessage = z.infer<
-  typeof orderBookSnapshotMessageSchema
->;
+export type OrderBookSnapshotMessage = z.infer<typeof orderBookSnapshotMessageSchema>;
 
 /**
  * Schema for error notifications
@@ -194,7 +288,7 @@ export const errorMessageSchema = z.object({
   /**
    * Optional additional error details
    */
-  details: z.record(z.any()).optional(),
+  details: z.record(z.string(), z.unknown()).optional(),
 });
 
 /**
@@ -214,6 +308,7 @@ export const ERROR_CODES = {
   INTERNAL_ERROR: 'INTERNAL_ERROR',
   NATS_CONNECTION_ERROR: 'NATS_CONNECTION_ERROR',
   MESSAGE_PARSE_ERROR: 'MESSAGE_PARSE_ERROR',
+  INVALID_ORDER_STATUS: 'INVALID_ORDER_STATUS',
 } as const;
 
 /**
@@ -258,7 +353,10 @@ export function createErrorMessage(
  * @param result - Match result from the matching engine
  * @returns Formatted match created message
  */
-export function createMatchCreatedMessage(orderId: string, result: MatchResult): MatchCreatedMessage {
+export function createMatchCreatedMessage(
+  orderId: string,
+  result: MatchResult
+): MatchCreatedMessage {
   return {
     orderId,
     matches: result.matches,
@@ -286,6 +384,8 @@ export interface OrderStatusSource {
   settlementFeeAmount: string;
   /** Remaining settlement fee pool (may be lazily initialized) */
   remainingSettlementFeeAmount?: string;
+  /** Reason for cancellation (only when status is CANCELLED) */
+  cancelReason?: 'USER_CANCELLED' | 'IOC';
 }
 
 /**
@@ -302,27 +402,26 @@ export function createOrderStatusMessage(source: OrderStatusSource): OrderStatus
     originalAmount,
     settlementFeeAmount,
     remainingSettlementFeeAmount,
+    cancelReason,
   } = source;
 
   const filledQuantity =
     originalAmount !== undefined
       ? (BigInt(originalAmount) - BigInt(remainingAmount)).toString()
-      : undefined;
+      : '0';
 
   const filledSettlementFeeAmount =
     settlementFeeAmount !== undefined && remainingSettlementFeeAmount !== undefined
       ? (BigInt(settlementFeeAmount) - BigInt(remainingSettlementFeeAmount)).toString()
-      : undefined;
+      : '0';
 
   return {
     orderId,
     status: status as OrderStatusMessage['status'],
     remainingAmount,
-    quantity: originalAmount,
     filledQuantity,
-    settlementFeeAmount,
     filledSettlementFeeAmount,
+    ...(cancelReason ? { cancelReason } : {}),
     timestamp: Date.now(),
   };
 }
-
