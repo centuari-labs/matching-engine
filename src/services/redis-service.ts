@@ -229,6 +229,10 @@ export class RedisService implements SettlementPublisher {
       match.lenderSettlementFeeAmount,
       'borrowerSettlementFeeAmount',
       match.borrowerSettlementFeeAmount,
+      // Redis hash fields are flat strings; collateral list is JSON-encoded.
+      // Settlement engine (P3) decodes this back into MatchData.collateralAssets.
+      'borrowerCollateralAssets',
+      JSON.stringify(match.borrowerCollateralAssets),
     ];
   }
 

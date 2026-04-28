@@ -131,12 +131,26 @@ export const lendLimitOrderSchema = baseOrderSchema.extend({
 });
 
 /**
+ * Collateral asset list — addresses the borrower has explicitly opted to flag
+ * as collateral when this order settles. Empty array means no flag mutation.
+ *
+ * Wired through to settlement-engine in P3, which encodes it into
+ * `Settlement.MatchData.collateralAssets` for the on-chain `Centuari.settleMatch`
+ * call (per smart-contract-revamp/docs/collateral-loophole-fix-plan.md, P1b-explicit
+ * shipped 2026-04-17).
+ */
+const borrowCollateralAssetsSchema = z
+  .array(ethereumAddressSchema)
+  .default([]);
+
+/**
  * Borrow Market Order schema
  */
 export const borrowMarketOrderSchema = baseOrderSchema.extend({
   side: z.literal(OrderSide.Borrow),
   type: z.literal(OrderType.Market),
-  rate: z.undefined().optional()
+  rate: z.undefined().optional(),
+  collateralAssets: borrowCollateralAssetsSchema,
 });
 
 /**
@@ -150,7 +164,8 @@ export const borrowLimitOrderSchema = baseOrderSchema.extend({
     .number()
     .int('Rate must be an integer')
     .min(0, 'Rate must be non-negative')
-    .max(10000, 'Rate must not exceed 10000 basis points (100%)')
+    .max(10000, 'Rate must not exceed 10000 basis points (100%)'),
+  collateralAssets: borrowCollateralAssetsSchema,
 });
 
 /**

@@ -126,6 +126,7 @@ export function createBorrowLimitOrder(
     side: OrderSide.Borrow,
     type: OrderType.Limit,
     rate: 500,
+    collateralAssets: [],
     ...overrides,
   };
 
@@ -176,6 +177,7 @@ export function createBorrowMarketOrder(
     ...base,
     side: OrderSide.Borrow,
     type: OrderType.Market,
+    collateralAssets: [],
     ...overrides,
   };
 

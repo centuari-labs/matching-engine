@@ -33,6 +33,7 @@ export function createMatch(overrides: Partial<Match> = {}): Match {
     takerFeeAmount: calculateTakerFee(matchedAmount),
     lenderSettlementFeeAmount: '5000',
     borrowerSettlementFeeAmount: '5000',
+    borrowerCollateralAssets: [],
   };
 
   const merged: Match = {

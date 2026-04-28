@@ -278,6 +278,7 @@ describe('ExecutionEngine Queries', () => {
       takerFeeAmount: '2000',
       lenderSettlementFeeAmount: '5000',
       borrowerSettlementFeeAmount: '5000',
+      borrowerCollateralAssets: [],
     });
 
     it('should throw when buffer is at maxBufferSize', () => {

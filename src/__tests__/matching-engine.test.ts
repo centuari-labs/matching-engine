@@ -359,6 +359,7 @@ describe('MatchingEngine', () => {
         originalAmount: '1000000',
         remainingAmount: '1000000',
         settlementFeeAmount: '10000',
+      collateralAssets: [],
       };
 
       const result = engine.submitOrder(borrowMarket);
@@ -385,6 +386,7 @@ describe('MatchingEngine', () => {
         remainingAmount: '500000',
         settlementFeeAmount: '10000',
         rate: 600,
+      collateralAssets: [],
       };
 
       engine.submitOrder(borrowOrder);
@@ -448,6 +450,7 @@ describe('MatchingEngine', () => {
         originalAmount: '1000000',
         remainingAmount: '1000000',
         settlementFeeAmount: '10000',
+      collateralAssets: [],
       };
 
       const result = engine.submitOrder(borrowMarket);
@@ -495,6 +498,7 @@ describe('MatchingEngine', () => {
         remainingAmount: '300000',
         settlementFeeAmount: '10000',
         rate: 600,
+      collateralAssets: [],
       };
 
       const result = engine.submitOrder(borrowOrder);
@@ -545,6 +549,7 @@ describe('MatchingEngine', () => {
         remainingAmount: '300000',
         settlementFeeAmount: '10000',
         rate: 600,
+      collateralAssets: [],
       };
 
       const result1 = engine.submitOrder(borrowOrder1);
@@ -566,6 +571,7 @@ describe('MatchingEngine', () => {
         remainingAmount: '400000',
         settlementFeeAmount: '10000',
         rate: 600,
+      collateralAssets: [],
       };
 
       const result2 = engine.submitOrder(borrowOrder2);
@@ -586,7 +592,8 @@ describe('MatchingEngine', () => {
         originalAmount: '300000',
         remainingAmount: '300000',
         settlementFeeAmount: '10000',
-        rate: 600
+        rate: 600,
+      collateralAssets: [],
       };
 
       const result3 = engine.submitOrder(borrowOrder3);
@@ -633,6 +640,7 @@ describe('MatchingEngine', () => {
         remainingAmount: '500000',
         settlementFeeAmount: '10000',
         rate: 600,
+      collateralAssets: [],
       };
 
       engine.submitOrder(borrowOrder1);
@@ -652,7 +660,8 @@ describe('MatchingEngine', () => {
         originalAmount: '500000',
         remainingAmount: '500000',
         settlementFeeAmount: '10000',
-        rate: 600
+        rate: 600,
+      collateralAssets: [],
       };
 
       engine.submitOrder(borrowOrder2);
@@ -696,6 +705,7 @@ describe('MatchingEngine', () => {
         remainingAmount: '300000',
         settlementFeeAmount: '10000',
         rate: 600,
+      collateralAssets: [],
       };
 
       engine.submitOrder(borrowOrder);
@@ -741,6 +751,7 @@ describe('MatchingEngine', () => {
         remainingAmount: '1000000',
         settlementFeeAmount: '10000',
         rate: 600,
+      collateralAssets: [],
       };
 
       engine.submitOrder(borrowOrder);
@@ -825,6 +836,7 @@ describe('MatchingEngine', () => {
         remainingAmount: '300000',
         settlementFeeAmount: '10000',
         rate: 600,
+      collateralAssets: [],
       };
 
       engine.submitOrder(borrowOrder);
@@ -868,6 +880,7 @@ describe('MatchingEngine', () => {
         remainingAmount: '1000000',
         settlementFeeAmount: '10000',
         rate: 600,
+      collateralAssets: [],
       };
 
       engine.submitOrder(borrowOrder);
@@ -979,6 +992,7 @@ describe('MatchingEngine', () => {
         remainingAmount: amount,
         settlementFeeAmount: '10000',
         rate: 600,
+      collateralAssets: [],
       };
 
       engine.submitOrder(lendOrder);
@@ -1025,6 +1039,7 @@ describe('MatchingEngine', () => {
         remainingAmount: '1000',
         settlementFeeAmount: '10000',
         rate: 600,
+      collateralAssets: [],
       };
 
       engine.submitOrder(lendOrder);
@@ -1073,6 +1088,7 @@ describe('MatchingEngine', () => {
         remainingAmount: '200000',
         settlementFeeAmount: '10000',
         rate: 600,
+      collateralAssets: [],
       };
 
       const borrowOrder2: BorrowLimitOrder = {
@@ -1089,6 +1105,7 @@ describe('MatchingEngine', () => {
         remainingAmount: '300000',
         settlementFeeAmount: '10000',
         rate: 600,
+      collateralAssets: [],
       };
 
       const borrowOrder3: BorrowLimitOrder = {
@@ -1105,6 +1122,7 @@ describe('MatchingEngine', () => {
         remainingAmount: '500000',
         settlementFeeAmount: '10000',
         rate: 600,
+      collateralAssets: [],
       };
 
       engine.submitOrder(borrowOrder1);
@@ -1174,6 +1192,7 @@ describe('MatchingEngine', () => {
         remainingAmount: '1000000',
         settlementFeeAmount: '10000',
         rate: 600,
+      collateralAssets: [],
       };
 
       const result = engine.submitOrder(borrowOrder);
@@ -1226,7 +1245,8 @@ describe('MatchingEngine', () => {
         originalAmount: '1000000',
         remainingAmount: '1000000',
         settlementFeeAmount: '10000',
-        rate: 600 // Higher than lend rate - would normally match
+        rate: 600, // Higher than lend rate - would normally match
+        collateralAssets: [],
       };
 
       // Submit lend order first
@@ -1261,6 +1281,7 @@ describe('MatchingEngine', () => {
         remainingAmount: '1000000',
         settlementFeeAmount: '10000',
         rate: 600,
+      collateralAssets: [],
       };
 
       // Create lend order from the same wallet
@@ -1312,6 +1333,7 @@ describe('MatchingEngine', () => {
         remainingAmount: '1000000',
         settlementFeeAmount: '10000',
         rate: 600,
+      collateralAssets: [],
       };
 
       engine.submitOrder(borrowOrder);
@@ -1380,6 +1402,7 @@ describe('MatchingEngine', () => {
         originalAmount: '1000000',
         remainingAmount: '1000000',
         settlementFeeAmount: '10000',
+      collateralAssets: [],
       };
 
       const result = engine.submitOrder(borrowMarket);
@@ -1432,6 +1455,7 @@ describe('MatchingEngine', () => {
         remainingAmount: '500000',
         settlementFeeAmount: '10000',
         rate: 600,
+      collateralAssets: [],
       };
 
       const result1 = engine.submitOrder(borrowOrderSameWallet);
@@ -1451,7 +1475,8 @@ describe('MatchingEngine', () => {
         originalAmount: '500000',
         remainingAmount: '500000',
         settlementFeeAmount: '10000',
-        rate: 600
+        rate: 600,
+        collateralAssets: [],
       };
 
       const result2 = engine.submitOrder(borrowOrderDiffWallet);
@@ -1504,7 +1529,8 @@ describe('MatchingEngine', () => {
         originalAmount: '1000000',
         remainingAmount: '1000000',
         settlementFeeAmount: '10000',
-        rate: 600
+        rate: 600,
+        collateralAssets: [],
       };
 
       const result = engine.submitOrder(borrowOrder);
@@ -1515,6 +1541,129 @@ describe('MatchingEngine', () => {
       // Both orders should remain in the book
       expect(engine.getOrderStatus(lendOrder.orderId)).toBe(OrderStatus.Open);
       expect(engine.getOrderStatus(borrowOrder.orderId)).toBe(OrderStatus.Open);
+    });
+  });
+
+  describe('Borrower collateralAssets propagation (P2)', () => {
+    const usdc = '0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa';
+    const btc = '0xbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb';
+
+    it('rides borrowerCollateralAssets onto the match when borrow is the taker', () => {
+      const lendOrder = createLendLimitOrder({
+        walletAddress: walletAddress1,
+        loanToken,
+        assetId,
+        markets: marketsFromMaturities([maturity]),
+        rate: 500,
+      });
+      const borrowOrder = createBorrowLimitOrder({
+        walletAddress: walletAddress2,
+        loanToken,
+        assetId,
+        markets: marketsFromMaturities([maturity]),
+        timestamp: Date.now() + 1,
+        rate: 600,
+        collateralAssets: [usdc, btc],
+      });
+
+      engine.submitOrder(lendOrder);
+      const result = engine.submitOrder(borrowOrder);
+
+      expect(result.matches).toHaveLength(1);
+      expect(result.matches[0].borrowerCollateralAssets).toEqual([usdc, btc]);
+    });
+
+    it('rides borrowerCollateralAssets onto the match when borrow is the maker', () => {
+      const borrowOrder = createBorrowLimitOrder({
+        walletAddress: walletAddress2,
+        loanToken,
+        assetId,
+        markets: marketsFromMaturities([maturity]),
+        rate: 700,
+        collateralAssets: [usdc],
+      });
+      const lendOrder = createLendLimitOrder({
+        walletAddress: walletAddress1,
+        loanToken,
+        assetId,
+        markets: marketsFromMaturities([maturity]),
+        timestamp: Date.now() + 1,
+        rate: 500,
+      });
+
+      engine.submitOrder(borrowOrder);
+      const result = engine.submitOrder(lendOrder);
+
+      expect(result.matches).toHaveLength(1);
+      expect(result.matches[0].borrowerCollateralAssets).toEqual([usdc]);
+    });
+
+    it('propagates the same collateralAssets onto every fill of a partial-fill borrow', () => {
+      // Two small lend orders that together fill one larger borrow order.
+      const lendOrder1 = createLendLimitOrder({
+        walletAddress: walletAddress1,
+        loanToken,
+        assetId,
+        markets: marketsFromMaturities([maturity]),
+        originalAmount: '500000',
+        remainingAmount: '500000',
+        rate: 500,
+      });
+      const lendOrder2 = createLendLimitOrder({
+        walletAddress: walletAddress1,
+        loanToken,
+        assetId,
+        markets: marketsFromMaturities([maturity]),
+        timestamp: Date.now() + 1,
+        originalAmount: '500000',
+        remainingAmount: '500000',
+        rate: 550,
+      });
+      const borrowOrder = createBorrowLimitOrder({
+        walletAddress: walletAddress2,
+        loanToken,
+        assetId,
+        markets: marketsFromMaturities([maturity]),
+        timestamp: Date.now() + 2,
+        originalAmount: '1000000',
+        remainingAmount: '1000000',
+        rate: 600,
+        collateralAssets: [usdc, btc],
+      });
+
+      engine.submitOrder(lendOrder1);
+      engine.submitOrder(lendOrder2);
+      const result = engine.submitOrder(borrowOrder);
+
+      expect(result.matches).toHaveLength(2);
+      for (const m of result.matches) {
+        expect(m.borrowerCollateralAssets).toEqual([usdc, btc]);
+      }
+    });
+
+    it('defaults to [] when borrow order omits collateralAssets', () => {
+      const lendOrder = createLendLimitOrder({
+        walletAddress: walletAddress1,
+        loanToken,
+        assetId,
+        markets: marketsFromMaturities([maturity]),
+        rate: 500,
+      });
+      // Factory defaults collateralAssets to [] when omitted.
+      const borrowOrder = createBorrowLimitOrder({
+        walletAddress: walletAddress2,
+        loanToken,
+        assetId,
+        markets: marketsFromMaturities([maturity]),
+        timestamp: Date.now() + 1,
+        rate: 600,
+      });
+
+      engine.submitOrder(lendOrder);
+      const result = engine.submitOrder(borrowOrder);
+
+      expect(result.matches).toHaveLength(1);
+      expect(result.matches[0].borrowerCollateralAssets).toEqual([]);
     });
   });
 });

@@ -96,6 +96,7 @@ export class ExecutionEngine {
     takerFeeAmount: string;
     lenderSettlementFeeAmount: string;
     borrowerSettlementFeeAmount: string;
+    borrowerCollateralAssets: string[];
   }): Match {
     // Reject new matches when buffer is full to apply backpressure
     if (this.maxBufferSize > 0 && this.matches.size >= this.maxBufferSize) {
@@ -121,6 +122,7 @@ export class ExecutionEngine {
       takerFeeAmount: params.takerFeeAmount,
       lenderSettlementFeeAmount: params.lenderSettlementFeeAmount,
       borrowerSettlementFeeAmount: params.borrowerSettlementFeeAmount,
+      borrowerCollateralAssets: params.borrowerCollateralAssets,
     };
 
     // Log match creation for observability and debugging

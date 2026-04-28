@@ -59,6 +59,15 @@ export const matchSchema = z.object({
   borrowerSettlementFeeAmount: z
     .string()
     .regex(/^\d+$/, 'Borrower settlement fee amount must be a positive integer string'),
+  /**
+   * Asset addresses the borrower opted to flag as collateral when submitting
+   * the borrow order. Forwarded verbatim from the borrow-order schema; the
+   * settlement engine (P3) encodes this into `Settlement.MatchData.collateralAssets`
+   * for the on-chain `Centuari.settleMatch` call (P1b-explicit, 2026-04-17).
+   *
+   * Empty array (default) means no flag mutation at settlement.
+   */
+  borrowerCollateralAssets: z.array(ethereumAddressSchema).default([]),
 });
 
 /**

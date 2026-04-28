@@ -326,4 +326,46 @@ describe('Snapshot Integration', () => {
       expect(metadata).toBeNull();
     });
   });
+
+  describe('Borrower collateralAssets snapshot round-trip (P2)', () => {
+    it('persists and restores collateralAssets on a borrow order in the book', async () => {
+      const snapshotService = new SnapshotService(testSnapshotDir, null, false);
+      const engine1 = new MatchingEngine(undefined, snapshotService);
+
+      const usdc = '0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa';
+      const btc = '0xbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb';
+
+      const borrowOrder = createBorrowLimitOrder({
+        walletAddress: '0x2222222222222222222222222222222222222222',
+        loanToken: DEFAULT_LOAN_TOKEN,
+        markets: marketsFromMaturities([DEFAULT_MATURITY]),
+        rate: 500, // No matching lend order — stays in book
+        collateralAssets: [usdc, btc],
+      });
+
+      engine1.submitOrder(borrowOrder);
+      await engine1.saveSnapshot();
+
+      // Round-trip through disk into a fresh engine
+      const engine2 = new MatchingEngine(
+        undefined,
+        new SnapshotService(testSnapshotDir, null, false),
+      );
+      const restored = await engine2.restoreFromSnapshot();
+      expect(restored).toBe(true);
+      expect(engine2.hasOrder(borrowOrder.orderId)).toBe(true);
+
+      // Match against the restored borrow to confirm the field still rides through.
+      const lendOrder = createLendLimitOrder({
+        walletAddress: '0x1111111111111111111111111111111111111111',
+        loanToken: DEFAULT_LOAN_TOKEN,
+        markets: marketsFromMaturities([DEFAULT_MATURITY]),
+        timestamp: Date.now() + 100,
+        rate: 400,
+      });
+      const result = engine2.submitOrder(lendOrder);
+      expect(result.matches).toHaveLength(1);
+      expect(result.matches[0].borrowerCollateralAssets).toEqual([usdc, btc]);
+    });
+  });
 });

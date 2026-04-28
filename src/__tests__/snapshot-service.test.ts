@@ -134,6 +134,7 @@ describe('SnapshotService', () => {
         takerFeeAmount: '2000',
         lenderSettlementFeeAmount: '5000',
         borrowerSettlementFeeAmount: '5000',
+        borrowerCollateralAssets: [],
       });
 
       await snapshotService.saveSnapshot(orderBook, executionEngine);
@@ -277,6 +278,7 @@ describe('SnapshotService', () => {
         takerFeeAmount: '2000',
         lenderSettlementFeeAmount: '5000',
         borrowerSettlementFeeAmount: '5000',
+        borrowerCollateralAssets: [],
       });
 
       await snapshotService.saveSnapshot(orderBook, executionEngine);
@@ -403,6 +405,7 @@ describe('SnapshotService', () => {
         takerFeeAmount: '2000',
         lenderSettlementFeeAmount: '5000',
         borrowerSettlementFeeAmount: '5000',
+        borrowerCollateralAssets: [],
       });
 
       await snapshotService.saveSnapshot(orderBook, executionEngine);

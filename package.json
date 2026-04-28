@@ -5,8 +5,8 @@
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "scripts": {
-    "build": "tsc",
-    "dev": "tsc --watch",
+    "build": "tsc -p tsconfig.build.json",
+    "dev": "tsc -p tsconfig.build.json --watch",
     "start": "npm run start:matching-engine & npm run start:db-writer",
     "start:matching-engine": "ts-node src/services/main.ts",
     "start:db-writer": "ts-node src/services/db-writer-main.ts",

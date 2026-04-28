@@ -37,6 +37,18 @@ function fieldsToMatch(fields: string[]): Record<string, unknown> {
     takerFeeAmount: obj.takerFeeAmount ?? '0',
     lenderSettlementFeeAmount: obj.lenderSettlementFeeAmount ?? '0',
     borrowerSettlementFeeAmount: obj.borrowerSettlementFeeAmount ?? '0',
+    borrowerCollateralAssets: obj.borrowerCollateralAssets
+      ? (() => {
+          try {
+            const parsed = JSON.parse(obj.borrowerCollateralAssets);
+            return Array.isArray(parsed)
+              ? parsed.filter((v: unknown): v is string => typeof v === 'string')
+              : [];
+          } catch {
+            return [];
+          }
+        })()
+      : [],
   };
 }
 
@@ -77,6 +89,8 @@ function matchToFields(match: ReturnType<typeof createMatch>): string[] {
     match.lenderSettlementFeeAmount,
     'borrowerSettlementFeeAmount',
     match.borrowerSettlementFeeAmount,
+    'borrowerCollateralAssets',
+    JSON.stringify(match.borrowerCollateralAssets),
   ];
 }
 
