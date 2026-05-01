@@ -132,7 +132,7 @@ jobs:
             ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} \
             "cd ~/centuari && \
              ${{ env.COMPOSE_CMD }} pull matching-engine${{ env.ENV_SUFFIX }} matching-engine-db-writer${{ env.ENV_SUFFIX }} && \
-             ${{ env.COMPOSE_CMD }} up -d --no-deps matching-engine${{ env.ENV_SUFFIX }} matching-engine-db-writer${{ env.ENV_SUFFIX }} && \
+             ${{ env.COMPOSE_CMD }} up -d --no-deps --force-recreate matching-engine${{ env.ENV_SUFFIX }} matching-engine-db-writer${{ env.ENV_SUFFIX }} && \
              docker image prune -f"
 
       - name: Cleanup local images
