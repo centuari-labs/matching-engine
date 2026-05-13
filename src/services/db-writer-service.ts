@@ -13,6 +13,7 @@ import {
 } from '../types/messages';
 import { matchSchema, type Match } from '../types/matches';
 import type { DbClient } from '../types/db';
+import { truncatePayload } from '../utils/log-sanitize';
 
 export interface DbWriterOptions {
   /**
@@ -160,7 +161,11 @@ export class DbWriterService {
     try {
       parsed = JSON.parse(text);
     } catch (error) {
-      console.error('DB Writer: failed to parse order status JSON', error, text);
+      console.error(
+        'DB Writer: failed to parse order status JSON',
+        error instanceof Error ? error.message : String(error),
+        truncatePayload(text)
+      );
       return;
     }
 
@@ -168,7 +173,11 @@ export class DbWriterService {
     try {
       message = orderStatusMessageSchema.parse(parsed);
     } catch (error) {
-      console.error('DB Writer: invalid order status message', error, parsed);
+      console.error(
+        'DB Writer: invalid order status message',
+        error instanceof Error ? error.message : String(error),
+        truncatePayload(parsed)
+      );
       return;
     }
 
@@ -216,7 +225,11 @@ export class DbWriterService {
     try {
       parsed = JSON.parse(text);
     } catch (error) {
-      console.error('DB Writer: failed to parse cancelled remainder JSON', error, text);
+      console.error(
+        'DB Writer: failed to parse cancelled remainder JSON',
+        error instanceof Error ? error.message : String(error),
+        truncatePayload(text)
+      );
       return;
     }
 
@@ -224,7 +237,11 @@ export class DbWriterService {
     try {
       message = cancelledRemainderMessageSchema.parse(parsed);
     } catch (error) {
-      console.error('DB Writer: invalid cancelled remainder message', error, parsed);
+      console.error(
+        'DB Writer: invalid cancelled remainder message',
+        error instanceof Error ? error.message : String(error),
+        truncatePayload(parsed)
+      );
       return;
     }
 
@@ -343,7 +360,11 @@ export class DbWriterService {
     try {
       validated = matchSchema.parse(match);
     } catch (error) {
-      console.error('DB Writer: invalid match entry from Redis', error, match);
+      console.error(
+        'DB Writer: invalid match entry from Redis',
+        error instanceof Error ? error.message : String(error),
+        truncatePayload(match)
+      );
       // Acknowledge the bad entry so it does not block the consumer group.
       await this.redis.xack(
         REDIS_STREAMS.SETTLEMENT_MATCHES,
