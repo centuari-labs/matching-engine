@@ -29,12 +29,19 @@ export enum OrderType {
 /**
  * Ethereum address validation schema
  *
- * Validates Ethereum addresses in the standard format (0x followed by 40 hexadecimal characters).
- * This schema is used across the project for validating wallet addresses, token addresses, and collateral token addresses.
+ * Validates Ethereum addresses in the standard format (0x followed by
+ * 40 hexadecimal characters), then normalizes to lowercase so that
+ * case-variant inputs ("0xABC..." vs "0xabc...") compare equal in
+ * downstream matching, indexing, and self-trade prevention.
+ *
+ * Audit reference: M-6 (case-sensitivity bug — same wallet in
+ * mixed case could match against itself or be treated as two
+ * distinct counterparties).
  */
 export const ethereumAddressSchema = z
   .string()
-  .regex(/^0x[a-fA-F0-9]{40}$/, 'Invalid Ethereum address format');
+  .regex(/^0x[a-fA-F0-9]{40}$/, 'Invalid Ethereum address format')
+  .transform((s) => s.toLowerCase());
 
 /**
  * Schema for a single market slot: a market UUID and its corresponding maturity timestamp.
