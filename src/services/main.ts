@@ -10,6 +10,7 @@ import { NatsService } from './nats-service';
 import { RedisService } from './redis-service';
 import { SnapshotService } from './snapshot-service';
 import { PostgresDbClient } from './db/postgres-db-client';
+import { loadSnapshotDir } from '../config/snapshot-config';
 import * as dotenv from 'dotenv';
 
 // Load environment variables from .env file
@@ -120,7 +121,9 @@ async function main(): Promise<void> {
 
     // Initialize snapshot service (if enabled)
     const snapshotEnabled = process.env.SNAPSHOT_ENABLED !== 'false';
-    const snapshotDir = process.env.SNAPSHOT_DIR || './snapshots';
+    // M-15: validate SNAPSHOT_DIR at startup (fail-fast). Throws on
+    // missing/dangerous/traversal paths before any service initializes.
+    const snapshotDir = loadSnapshotDir();
     const snapshotRedisEnabled = process.env.SNAPSHOT_REDIS_ENABLED === 'true';
 
     if (snapshotEnabled) {

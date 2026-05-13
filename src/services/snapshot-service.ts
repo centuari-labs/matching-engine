@@ -35,19 +35,52 @@ export class SnapshotService {
   }
 
   /**
-   * Ensure the snapshot directory exists
+   * Ensure the snapshot directory exists with secure permissions.
+   *
+   * M-15: snapshots contain wallet addresses + order data + match
+   * history. The directory must be readable only by the owner.
+   *
+   * - mkdir with mode 0o700 (umask-masked, so chmod is authoritative)
+   * - chmod 0o700 belt-and-suspenders
+   * - realpath check to detect symlink-bypass (operator may have
+   *   pointed SNAPSHOT_DIR at a symlink into a dangerous location)
    *
    * @throws {Error} If directory creation fails
    */
   private async ensureDirectory(): Promise<void> {
     try {
-      await fs.mkdir(this.snapshotDir, { recursive: true });
+      await fs.mkdir(this.snapshotDir, { recursive: true, mode: 0o700 });
     } catch (error) {
       throw new Error(
         `Failed to create snapshot directory ${this.snapshotDir}: ${
           error instanceof Error ? error.message : 'Unknown error'
         }`
       );
+    }
+
+    try {
+      await fs.chmod(this.snapshotDir, 0o700);
+    } catch (error) {
+      // Non-fatal on platforms without POSIX permissions (Windows CI).
+      console.warn(
+        `[SnapshotService] chmod 0o700 failed for ${this.snapshotDir}:`,
+        error instanceof Error ? error.message : error
+      );
+    }
+
+    // Detect symlink bypass — operator could have pointed SNAPSHOT_DIR
+    // at a symlink. We don't refuse to operate, but we log so it's
+    // visible in startup logs.
+    try {
+      const realPath = await fs.realpath(this.snapshotDir);
+      if (realPath !== this.snapshotDir) {
+        console.warn(
+          `[SnapshotService] ${this.snapshotDir} resolves to ${realPath} (symlink). ` +
+            'Verify this is intentional.'
+        );
+      }
+    } catch {
+      // Non-fatal; realpath can fail on freshly-created dirs in some FS configs.
     }
   }
 
@@ -112,8 +145,9 @@ export class SnapshotService {
       // Get file paths
       const filePaths = this.getFilePaths();
 
-      // Atomic write: write to temp file first, then rename
-      await fs.writeFile(filePaths.temp, jsonData, 'utf-8');
+      // Atomic write: write to temp file first, then rename.
+      // mode: 0o600 — owner read/write only; snapshots contain PII.
+      await fs.writeFile(filePaths.temp, jsonData, { encoding: 'utf-8', mode: 0o600 });
 
       // Rotate backup: move current latest to backup
       try {
@@ -140,7 +174,11 @@ export class SnapshotService {
         matchCount: snapshotData.metadata.matchCount,
         filePath: filePaths.latest,
       };
-      await fs.writeFile(filePaths.metadata, JSON.stringify(metadata, null, 2), 'utf-8');
+      await fs.writeFile(
+        filePaths.metadata,
+        JSON.stringify(metadata, null, 2),
+        { encoding: 'utf-8', mode: 0o600 }
+      );
 
       // Optionally save to Redis (non-blocking, silent failures)
       if (this.redisEnabled && this.redisService?.isServiceConnected()) {
