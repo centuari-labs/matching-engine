@@ -1,7 +1,7 @@
 import type { Match } from '../types/matches';
 import { matchSchema } from '../types/matches';
 import type { SettlementPublisher } from '../types/settlement';
-import { generateMatchId } from '../utils/helpers';
+import { deriveMatchId, MATCH_ID_NAMESPACE } from './match-id';
 
 /**
  * ExecutionEngine handles recording and managing match results
@@ -50,6 +50,10 @@ export class ExecutionEngine {
     lenderWallet: string;
     borrowerWallet: string;
     matchedAmount: string;
+    /** Lend order's remaining amount AFTER this match deducts. Used to derive the deterministic matchId. */
+    lendRemainingAfter: string;
+    /** Borrow order's remaining amount AFTER this match deducts. Used to derive the deterministic matchId. */
+    borrowRemainingAfter: string;
     rate: number;
     loanToken: string;
     maturity: number;
@@ -58,9 +62,30 @@ export class ExecutionEngine {
     takerFeeAmount: string;
     lenderSettlementFeeAmount: string;
     borrowerSettlementFeeAmount: string;
-  }): Match {
+  }): Match | null {
+    // Step 1: Derive deterministic matchId from match state.
+    // Same inputs always produce the same id, so crash-resume + replay
+    // emits a duplicate that downstream layers (Postgres ON CONFLICT,
+    // Settlement.isSettled) correctly dedupe.
+    const matchId = deriveMatchId({
+      lendOrderId: params.lendOrderId,
+      borrowOrderId: params.borrowOrderId,
+      matchedAmount: params.matchedAmount,
+      lendRemainingAfter: params.lendRemainingAfter,
+      borrowRemainingAfter: params.borrowRemainingAfter,
+    });
+
+    // Step 2: In-memory dedup BEFORE any side effects (log, parse, set).
+    // Returns null so the caller can skip downstream effects (push to
+    // matches array, affectedMakerOrders, updateOrderAmount).
+    if (this.matches.has(matchId)) {
+      // eslint-disable-next-line no-console
+      console.warn(`[ExecutionEngine] Duplicate match rejected: ${matchId}`);
+      return null;
+    }
+
     const match: Match = {
-      matchId: generateMatchId(),
+      matchId,
       marketId: params.marketId,
       lendOrderId: params.lendOrderId,
       borrowOrderId: params.borrowOrderId,
@@ -78,7 +103,9 @@ export class ExecutionEngine {
       borrowerSettlementFeeAmount: params.borrowerSettlementFeeAmount,
     };
 
-    // Log match creation for observability and debugging
+    // Step 3: Log creation with remaining-after values so operators can
+    // reproduce matchId from logs alone (include first 8 chars of the
+    // namespace for verification).
     // eslint-disable-next-line no-console
     console.log('[MatchingEngine] Match created', {
       matchId: match.matchId,
@@ -88,6 +115,8 @@ export class ExecutionEngine {
       lenderWallet: match.lenderWallet,
       borrowerWallet: match.borrowerWallet,
       matchedAmount: match.matchedAmount,
+      lendRemainingAfter: params.lendRemainingAfter,
+      borrowRemainingAfter: params.borrowRemainingAfter,
       rate: match.rate,
       loanToken: match.loanToken,
       maturity: match.maturity,
@@ -96,27 +125,27 @@ export class ExecutionEngine {
       takerFeeAmount: match.takerFeeAmount,
       lenderSettlementFeeAmount: match.lenderSettlementFeeAmount,
       borrowerSettlementFeeAmount: match.borrowerSettlementFeeAmount,
+      namespacePrefix: MATCH_ID_NAMESPACE.substring(0, 8),
     });
 
-    // Validate match against schema
+    // Step 4: Validate match against schema
     matchSchema.parse(match);
 
-    // Store match in memory (temporary buffer)
+    // Step 5: Store match in memory (temporary buffer)
     this.matches.set(match.matchId, match);
 
-    // Index by lend order
+    // Step 6: Index by lend + borrow order
     if (!this.matchesByLendOrder.has(params.lendOrderId)) {
       this.matchesByLendOrder.set(params.lendOrderId, []);
     }
     this.matchesByLendOrder.get(params.lendOrderId)!.push(match.matchId);
 
-    // Index by borrow order
     if (!this.matchesByBorrowOrder.has(params.borrowOrderId)) {
       this.matchesByBorrowOrder.set(params.borrowOrderId, []);
     }
     this.matchesByBorrowOrder.get(params.borrowOrderId)!.push(match.matchId);
 
-    // Publish to settlement publisher (async, non-blocking)
+    // Step 7: Publish to settlement publisher (async, non-blocking)
     if (this.settlementPublisher) {
       this.publishAndCleanup(match);
     }

@@ -216,6 +216,15 @@ export class MatchingEngine {
           matchAmount
         );
 
+        // Pre-compute remaining-after for deterministic matchId.
+        // Must be done BEFORE recordMatch so the id derivation captures
+        // the exact post-match state.
+        const lendRemainingAfter = subtractBigNumbers(remainingAmount, matchAmount);
+        const borrowRemainingAmount = subtractBigNumbers(
+          borrowOrder.remainingAmount,
+          matchAmount
+        );
+
         // Create match at borrow order's rate
         const match = this.executionEngine.recordMatch({
           marketId: market.marketId,
@@ -224,6 +233,8 @@ export class MatchingEngine {
           lenderWallet: order.walletAddress,
           borrowerWallet: borrowOrder.walletAddress,
           matchedAmount: matchAmount,
+          lendRemainingAfter,
+          borrowRemainingAfter: borrowRemainingAmount,
           rate: borrowLimitOrder.rate,
           loanToken: order.loanToken,
           maturity,
@@ -234,14 +245,14 @@ export class MatchingEngine {
           borrowerSettlementFeeAmount,
         });
 
+        // Skip downstream effects on duplicate (deterministic matchId
+        // re-derivation across restarts).
+        if (!match) continue;
+
         matches.push(match);
 
-        // Update remaining amounts
-        remainingAmount = subtractBigNumbers(remainingAmount, matchAmount);
-        const borrowRemainingAmount = subtractBigNumbers(
-          borrowOrder.remainingAmount,
-          matchAmount
-        );
+        // Apply the remaining-amount updates we computed above.
+        remainingAmount = lendRemainingAfter;
 
         // Update borrow order in order book and track affected order
         if (isZero(borrowRemainingAmount)) {
@@ -340,6 +351,13 @@ export class MatchingEngine {
           matchAmount
         );
 
+        // Pre-compute remaining-after for deterministic matchId.
+        const lendRemainingAfter = subtractBigNumbers(remainingAmount, matchAmount);
+        const borrowRemainingAmount = subtractBigNumbers(
+          borrowOrder.remainingAmount,
+          matchAmount
+        );
+
         const match = this.executionEngine.recordMatch({
           marketId: market.marketId,
           lendOrderId: order.orderId,
@@ -347,6 +365,8 @@ export class MatchingEngine {
           lenderWallet: order.walletAddress,
           borrowerWallet: borrowOrder.walletAddress,
           matchedAmount: matchAmount,
+          lendRemainingAfter,
+          borrowRemainingAfter: borrowRemainingAmount,
           rate: executionRate,
           loanToken: order.loanToken,
           maturity,
@@ -357,14 +377,12 @@ export class MatchingEngine {
           borrowerSettlementFeeAmount,
         });
 
+        if (!match) continue;
+
         matches.push(match);
 
-        // Update remaining amounts
-        remainingAmount = subtractBigNumbers(remainingAmount, matchAmount);
-        const borrowRemainingAmount = subtractBigNumbers(
-          borrowOrder.remainingAmount,
-          matchAmount
-        );
+        // Apply the precomputed remaining amount for the lend side.
+        remainingAmount = lendRemainingAfter;
 
         // Update borrow order in order book and track affected order
         if (isZero(borrowRemainingAmount)) {
@@ -461,6 +479,10 @@ export class MatchingEngine {
           matchAmount
         );
 
+        // Pre-compute remaining-after for deterministic matchId.
+        const borrowRemainingAfter = subtractBigNumbers(remainingAmount, matchAmount);
+        const lendRemainingAmount = subtractBigNumbers(lendOrder.remainingAmount, matchAmount);
+
         // Create match at lend order's rate
         const match = this.executionEngine.recordMatch({
           marketId: market.marketId,
@@ -469,6 +491,8 @@ export class MatchingEngine {
           lenderWallet: lendOrder.walletAddress,
           borrowerWallet: order.walletAddress,
           matchedAmount: matchAmount,
+          lendRemainingAfter: lendRemainingAmount,
+          borrowRemainingAfter,
           rate: lendLimitOrder.rate,
           loanToken: order.loanToken,
           maturity,
@@ -479,11 +503,12 @@ export class MatchingEngine {
           borrowerSettlementFeeAmount,
         });
 
+        if (!match) continue;
+
         matches.push(match);
 
-        // Update remaining amounts
-        remainingAmount = subtractBigNumbers(remainingAmount, matchAmount);
-        const lendRemainingAmount = subtractBigNumbers(lendOrder.remainingAmount, matchAmount);
+        // Apply the precomputed remaining amount for the borrow side.
+        remainingAmount = borrowRemainingAfter;
 
         // Update lend order in order book and track affected order
         if (isZero(lendRemainingAmount)) {
@@ -582,6 +607,10 @@ export class MatchingEngine {
           matchAmount
         );
 
+        // Pre-compute remaining-after for deterministic matchId.
+        const borrowRemainingAfter = subtractBigNumbers(remainingAmount, matchAmount);
+        const lendRemainingAmount = subtractBigNumbers(lendOrder.remainingAmount, matchAmount);
+
         const match = this.executionEngine.recordMatch({
           marketId: market.marketId,
           lendOrderId: lendOrder.orderId,
@@ -589,6 +618,8 @@ export class MatchingEngine {
           lenderWallet: lendOrder.walletAddress,
           borrowerWallet: order.walletAddress,
           matchedAmount: matchAmount,
+          lendRemainingAfter: lendRemainingAmount,
+          borrowRemainingAfter,
           rate: executionRate,
           loanToken: order.loanToken,
           maturity,
@@ -599,11 +630,12 @@ export class MatchingEngine {
           borrowerSettlementFeeAmount,
         });
 
+        if (!match) continue;
+
         matches.push(match);
 
-        // Update remaining amounts
-        remainingAmount = subtractBigNumbers(remainingAmount, matchAmount);
-        const lendRemainingAmount = subtractBigNumbers(lendOrder.remainingAmount, matchAmount);
+        // Apply the precomputed remaining amount for the borrow side.
+        remainingAmount = borrowRemainingAfter;
 
         // Update lend order in order book and track affected order
         if (isZero(lendRemainingAmount)) {

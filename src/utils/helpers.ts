@@ -12,7 +12,17 @@ export function generateOrderId(): string {
 }
 
 /**
- * Generate a unique match ID
+ * Generate a random UUID v4 string.
+ *
+ * @deprecated Do NOT use this for actual matchIds in production code.
+ * Production matches MUST use {@link import('../core/match-id').deriveMatchId}
+ * so a re-derived match on crash-resume produces an identical ID that
+ * downstream layers (Postgres `ON CONFLICT`, Settlement `isSettled`) can
+ * dedupe.
+ *
+ * This function is retained for tests that need an arbitrary UUID
+ * (e.g., generating a fresh `marketId` for fixture data) and for the
+ * public API export. Audit reference: M-2.
  *
  * @returns A UUID v4 string
  */
