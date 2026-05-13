@@ -77,7 +77,11 @@ export class SnapshotService {
    * @param executionEngine - ExecutionEngine instance to extract matches from
    * @returns Promise that resolves when snapshot is saved
    */
-  async saveSnapshot(orderBook: OrderBook, executionEngine: ExecutionEngine): Promise<void> {
+  async saveSnapshot(
+    orderBook: OrderBook,
+    executionEngine: ExecutionEngine,
+    submittedOrderIds: string[] = []
+  ): Promise<void> {
     try {
       // Ensure directory exists
       await this.ensureDirectory();
@@ -88,10 +92,11 @@ export class SnapshotService {
 
       // Create snapshot data
       const snapshotData: SnapshotData = {
-        version: '1.0.0',
+        version: '1.1.0',
         timestamp: Date.now(),
         orders,
         matches,
+        submittedOrderIds,
         metadata: {
           orderCount: orders.length,
           matchCount: matches.length,

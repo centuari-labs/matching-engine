@@ -3,13 +3,19 @@ import { orderSchema } from './orders';
 import { matchSchema } from './matches';
 
 /**
- * Snapshot data schema containing serialized orders and matches
+ * Snapshot data schema containing serialized orders, matches, and dedup state.
+ *
+ * Version history:
+ * - 1.0.0 — initial: orders + matches
+ * - 1.1.0 — adds `submittedOrderIds` for M-1 Layer A dedup persistence
  */
 export const snapshotDataSchema = z.object({
   /**
-   * Snapshot version for compatibility checking
+   * Snapshot version for compatibility checking. The enum guards against
+   * silent acceptance of future formats; bump and add a value when the
+   * schema gains/loses required fields.
    */
-  version: z.string().default('1.0.0'),
+  version: z.enum(['1.0.0', '1.1.0']).default('1.1.0'),
   /**
    * Timestamp when snapshot was created (milliseconds since epoch)
    */
@@ -22,6 +28,13 @@ export const snapshotDataSchema = z.object({
    * Array of unpublished matches in the execution engine
    */
   matches: z.array(matchSchema),
+  /**
+   * Order IDs submitted to the engine within the dedup window.
+   *
+   * Added in v1.1.0. Loading a v1.0.0 snapshot will leave this empty;
+   * the matching engine will hydrate it via DB sync on startup.
+   */
+  submittedOrderIds: z.array(z.string()).default([]),
   /**
    * Metadata about the snapshot
    */

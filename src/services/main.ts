@@ -164,10 +164,13 @@ async function main(): Promise<void> {
       console.log('Syncing order book with database...');
       const dbClient = new PostgresDbClient();
       try {
-        const activeOrders = await dbClient.getActiveOrders();
-        const syncResult = matchingEngine.syncFromDatabase(activeOrders);
+        const [activeOrders, recentOrderIds] = await Promise.all([
+          dbClient.getActiveOrders(),
+          dbClient.getRecentOrderIds({ sinceDays: 7 }),
+        ]);
+        const syncResult = matchingEngine.syncFromDatabase(activeOrders, recentOrderIds);
         console.log(
-          `✓ DB sync complete: ${syncResult.added} orders added, ${syncResult.skipped} already in memory`
+          `✓ DB sync complete: ${syncResult.added} orders added, ${syncResult.skipped} already in memory, ${syncResult.dedupHydrated} ids in dedup set`
         );
       } catch (error) {
         console.warn(

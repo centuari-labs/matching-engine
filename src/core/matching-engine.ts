@@ -28,6 +28,27 @@ export class MatchingEngine {
   private executionEngine: ExecutionEngine;
   private snapshotService: SnapshotService | null;
 
+  /**
+   * Tracks orderIds that have been submitted to this engine.
+   *
+   * Used to reject duplicate `submitOrder` calls (NATS at-least-once
+   * redelivery, backend-v2 retries, attacker replay). Without this set
+   * the matching loop would re-execute against a partially-filled book on
+   * replay and produce unauthorized fills — the duplicate-guard inside
+   * `OrderBook.addOrder` fires too late to prevent that.
+   *
+   * Hydrated on startup via `syncFromDatabase(orders, recentOrderIds)`
+   * with a bounded window (7 days) so a restart doesn't leak the dedup
+   * state. Entries are never removed on fill/cancel — once an orderId is
+   * seen, it must stay seen until the redelivery window has expired
+   * (DB-level `unique(id)` on `orders` is the long-term backstop).
+   *
+   * Known limitation: this set is unbounded between restarts. At very
+   * high order volume the Set can grow without limit; P1 follow-up will
+   * add LRU eviction or rely fully on the DB layer for cold tier.
+   */
+  private submittedOrderIds: Set<string> = new Set();
+
   /** Serializes snapshot saves to avoid concurrent writes racing on the same files. */
   private saveSnapshotQueue: Promise<void> = Promise.resolve();
 
@@ -84,6 +105,21 @@ export class MatchingEngine {
    * @returns Match result containing matches, remaining order info, and affected maker orders
    */
   submitOrder(order: Order): MatchResult {
+    // M-1 Layer A: reject duplicate submission BEFORE the matching loop runs.
+    // Without this guard, a NATS redelivery of a previously-submitted order
+    // would re-execute matching against the now-partially-filled book and
+    // produce unauthorized fills. The `addOrder` guard inside OrderBook is
+    // a defense-in-depth backstop but fires too late on its own.
+    if (this.submittedOrderIds.has(order.orderId)) {
+      console.warn(`[MatchingEngine] Duplicate submitOrder rejected: ${order.orderId}`);
+      return {
+        matches: [],
+        remainingOrder: null,
+        affectedMakerOrders: [],
+      };
+    }
+    this.submittedOrderIds.add(order.orderId);
+
     const matches: Match[] = [];
     const affectedMakerOrders: AffectedOrder[] = [];
 
@@ -756,7 +792,11 @@ export class MatchingEngine {
 
     await previous;
     try {
-      await this.snapshotService.saveSnapshot(this.orderBook, this.executionEngine);
+      await this.snapshotService.saveSnapshot(
+        this.orderBook,
+        this.executionEngine,
+        Array.from(this.submittedOrderIds)
+      );
     } catch (error) {
       // Log but don't throw - snapshot failures shouldn't block operations
       console.error('Failed to save snapshot:', error);
@@ -807,8 +847,17 @@ export class MatchingEngine {
       // Restore execution engine
       this.executionEngine.restoreMatches(snapshotData.matches);
 
+      // Restore M-1 Layer A dedup set (v1.1.0+; v1.0.0 snapshots have an
+      // empty array per the schema default — DB sync will hydrate instead).
+      this.submittedOrderIds = new Set(snapshotData.submittedOrderIds);
+      if (snapshotData.version === '1.0.0') {
+        console.warn(
+          '[MatchingEngine] Loaded v1.0.0 snapshot; submittedOrderIds will be hydrated from DB.'
+        );
+      }
+
       console.log(
-        `State restored from snapshot: ${snapshotData.metadata.orderCount} orders, ${snapshotData.metadata.matchCount} matches`
+        `State restored from snapshot: ${snapshotData.metadata.orderCount} orders, ${snapshotData.metadata.matchCount} matches, ${this.submittedOrderIds.size} dedup ids`
       );
       return true;
     } catch (error) {
@@ -824,12 +873,20 @@ export class MatchingEngine {
    * in-memory order book. This is additive only — it does not remove orders
    * that are in memory but not in the database.
    *
+   * Also hydrates the `submittedOrderIds` Set from `recentOrderIds` so the
+   * M-1 Layer A duplicate-submit guard survives a restart. Pass IDs of all
+   * orders (any status) within the redelivery window (~7 days recommended).
+   *
    * Should be called on startup after snapshot restore to ensure consistency.
    *
-   * @param dbOrders - Active orders loaded from the database
-   * @returns Counts of added and skipped orders
+   * @param dbOrders - Active orders loaded from the database (status IN OPEN, PARTIALLY_FILLED)
+   * @param recentOrderIds - All orderIds within the redelivery window for dedup hydration
+   * @returns Counts of added and skipped orders, plus hydrated dedup set size
    */
-  syncFromDatabase(dbOrders: Order[]): { added: number; skipped: number } {
+  syncFromDatabase(
+    dbOrders: Order[],
+    recentOrderIds: string[] = []
+  ): { added: number; skipped: number; dedupHydrated: number } {
     let added = 0;
     let skipped = 0;
 
@@ -844,7 +901,32 @@ export class MatchingEngine {
       }
     }
 
-    return { added, skipped };
+    // M-1 Layer A: hydrate submittedOrderIds with all orderIds in the
+    // redelivery window. Includes FILLED and CANCELLED orders so a
+    // post-completion replay is also rejected.
+    for (const id of recentOrderIds) {
+      this.submittedOrderIds.add(id);
+    }
+
+    return { added, skipped, dedupHydrated: this.submittedOrderIds.size };
+  }
+
+  /**
+   * Direct access to submittedOrderIds for snapshot persistence.
+   *
+   * @returns Array of all submitted order IDs currently tracked.
+   */
+  getSubmittedOrderIds(): string[] {
+    return Array.from(this.submittedOrderIds);
+  }
+
+  /**
+   * Restore submittedOrderIds from a snapshot.
+   *
+   * @param ids - Array of order IDs to restore into the dedup set.
+   */
+  restoreSubmittedOrderIds(ids: string[]): void {
+    this.submittedOrderIds = new Set(ids);
   }
 }
 

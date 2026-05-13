@@ -216,7 +216,7 @@ describe('SnapshotService', () => {
       expect(metadata!.orderCount).toBe(1);
       expect(metadata!.matchCount).toBe(0);
       expect(metadata!.timestamp).toBeGreaterThan(0);
-      expect(metadata!.version).toBe('1.0.0');
+      expect(metadata!.version).toBe('1.1.0');
     });
   });
 

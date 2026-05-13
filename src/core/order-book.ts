@@ -35,11 +35,27 @@ export class OrderBook {
   }
 
   /**
-   * Add an order to the order book
+   * Add an order to the order book.
+   *
+   * Idempotent: if an order with the same `orderId` already exists in the
+   * index, the call is a no-op and returns `null`. This guards against
+   * duplicate NATS redelivery corrupting the tree (without the guard, the
+   * same order ends up as two distinct tree nodes — the comparator keys on
+   * rate+timestamp, not orderId — and `removeOrder` can only delete one).
+   *
+   * Safe for the two legitimate "re-add with same orderId" paths:
+   * - `updateOrderAmount` calls `removeOrder` first (clears the index).
+   * - `restoreFromOrders` calls `clear()` first.
    *
    * @param order - The order to add
+   * @returns The inserted order, or `null` if the orderId was already present.
    */
-  addOrder(order: Order): void {
+  addOrder(order: Order): Order | null {
+    if (this.orderIndex.has(order.orderId)) {
+      console.warn(`[OrderBook] Duplicate order rejected: ${order.orderId}`);
+      return null;
+    }
+
     // Store order metadata for quick lookups
     this.orderIndex.set(order.orderId, {
       orderId: order.orderId,
@@ -73,6 +89,8 @@ export class OrderBook {
       // Insert order into tree
       tokenMap.set(maturity, tree.insert(order, null));
     }
+
+    return order;
   }
 
   /**
