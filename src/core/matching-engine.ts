@@ -89,6 +89,13 @@ export class MatchingEngine {
       (order as any).remainingSettlementFeeAmount ?? order.settlementFeeAmount;
 
     const proRata = calculateProRataSettlementFee(totalFee, matchedAmount, originalAmount);
+
+    // M-12 invariant: the clamp at minBigNumber makes total fee
+    // collection mathematically impossible to exceed `totalFee`.
+    // Pro-rata rounds UP for each match, but the residual pool
+    // (`currentRemaining`) shrinks monotonically and the clamp on the
+    // final fill absorbs the rounding overage. Pinned by tests in
+    // src/__tests__/settlement-fee-invariant.test.ts.
     const actualFee = minBigNumber(proRata, currentRemaining);
 
     const remainingAfter = subtractBigNumbers(currentRemaining, actualFee);
