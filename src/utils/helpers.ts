@@ -71,6 +71,11 @@ export function calculateMatchRate(lendRate?: number, borrowRate?: number): numb
   return 0;
 }
 
+/** Market orders get highest priority (lowest rate value) in lend book */
+const MARKET_ORDER_LEND_RATE = Number.MAX_SAFE_INTEGER;
+/** Market orders get highest priority (highest rate value) in borrow book */
+const MARKET_ORDER_BORROW_RATE = Number.MIN_SAFE_INTEGER;
+
 /**
  * Create a comparator function for Red-Black Tree ordering
  * Lend orders: sort by rate ascending (lowest first), then timestamp ascending
@@ -84,8 +89,8 @@ export function createOrderComparator(side: OrderSide): (a: Order, b: Order) => 
     // Lend orders: lowest rate first (ascending)
     return (a: Order, b: Order): number => {
       // Handle market orders (no rate) - they should come last
-      const aRate = 'rate' in a && a.rate !== undefined ? a.rate : Number.MAX_SAFE_INTEGER;
-      const bRate = 'rate' in b && b.rate !== undefined ? b.rate : Number.MAX_SAFE_INTEGER;
+      const aRate = 'rate' in a && a.rate !== undefined ? a.rate : MARKET_ORDER_LEND_RATE;
+      const bRate = 'rate' in b && b.rate !== undefined ? b.rate : MARKET_ORDER_LEND_RATE;
 
       if (aRate !== bRate) {
         return aRate - bRate; // Ascending
@@ -97,8 +102,8 @@ export function createOrderComparator(side: OrderSide): (a: Order, b: Order) => 
     // Borrow orders: highest rate first (descending)
     return (a: Order, b: Order): number => {
       // Handle market orders (no rate) - they should come last
-      const aRate = 'rate' in a && a.rate !== undefined ? a.rate : Number.MIN_SAFE_INTEGER;
-      const bRate = 'rate' in b && b.rate !== undefined ? b.rate : Number.MIN_SAFE_INTEGER;
+      const aRate = 'rate' in a && a.rate !== undefined ? a.rate : MARKET_ORDER_BORROW_RATE;
+      const bRate = 'rate' in b && b.rate !== undefined ? b.rate : MARKET_ORDER_BORROW_RATE;
 
       if (aRate !== bRate) {
         return bRate - aRate; // Descending

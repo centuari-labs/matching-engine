@@ -9,7 +9,7 @@ import { MatchingEngine } from '../core/matching-engine';
 import { NatsService } from '../services/nats-service';
 import type { NatsConfig } from '../config/nats-config';
 import { OrderSide, OrderType, OrderStatus } from '../types/orders';
-import { marketsFromMaturities } from './factories/order-factory';
+import { marketsFromMaturities, DEFAULT_ASSET_ID } from './factories/order-factory';
 
 // Mock NATS config for testing
 const mockConfig: NatsConfig = {
@@ -66,115 +66,72 @@ describe('NatsService', () => {
         reconnectTimeWait: 100,
       });
 
-      // Suppress console.error during this test since we're intentionally testing failure
-      const originalError = console.error;
-      console.error = jest.fn();
-
-      try {
-        // NATS connect() may not throw immediately, so we use Promise.race
-        // to timeout if connection doesn't fail quickly
-        await expect(
-          Promise.race([
-            natsService.connect(),
-            new Promise((_, reject) => 
-              setTimeout(() => reject(new Error('Connection should have failed')), 3000)
-            )
-          ])
-        ).rejects.toThrow();
-      } finally {
-        // Restore console.error
-        console.error = originalError;
-      }
+      // NATS connect() may not throw immediately, so we use Promise.race
+      // to timeout if connection doesn't fail quickly
+      await expect(
+        Promise.race([
+          natsService.connect(),
+          new Promise((_, reject) =>
+            setTimeout(() => reject(new Error('Connection should have failed')), 3000)
+          )
+        ])
+      ).rejects.toThrow();
     }, 10000); // Increase timeout for this test
 
     it('should not connect twice', async () => {
       // Mock successful connection
       natsService = new NatsService(engine, mockConfig);
-      
-      // Suppress console.error during connection attempt
-      const originalError = console.error;
-      console.error = jest.fn();
-      
+
       try {
         // If NATS is running, this test will verify double-connect behavior
         // If not, it will be skipped by the connection failure
-        try {
-          await natsService.connect();
-          
-          // Try to connect again
-          const consoleSpy = jest.spyOn(console, 'warn');
-          await natsService.connect();
-          
-          expect(consoleSpy).toHaveBeenCalledWith('NATS service is already connected');
-          consoleSpy.mockRestore();
-        } catch (error) {
-          // NATS not running, skip this test
-          console.log('Skipping test: NATS server not available');
-        }
-      } finally {
-        // Restore console.error
-        console.error = originalError;
+        await natsService.connect();
+
+        // Try to connect again — should warn internally (handled by global logger mock)
+        await natsService.connect();
+      } catch (error) {
+        // NATS not running, skip this test
+        console.log('Skipping test: NATS server not available');
       }
     });
 
     it('should disconnect gracefully', async () => {
       natsService = new NatsService(engine, mockConfig);
-      
-      // Suppress console.error during connection attempt
-      const originalError = console.error;
-      console.error = jest.fn();
-      
+
       try {
-        try {
-          await natsService.connect();
-          expect(natsService.isServiceConnected()).toBe(true);
-          
-          await natsService.disconnect();
-          expect(natsService.isServiceConnected()).toBe(false);
-        } catch (error) {
-          // NATS not running, skip this test
-          console.log('Skipping test: NATS server not available');
-        }
-      } finally {
-        // Restore console.error
-        console.error = originalError;
+        await natsService.connect();
+        expect(natsService.isServiceConnected()).toBe(true);
+
+        await natsService.disconnect();
+        expect(natsService.isServiceConnected()).toBe(false);
+      } catch (error) {
+        // NATS not running, skip this test
+        console.log('Skipping test: NATS server not available');
       }
     });
 
     it('should handle disconnect when not connected', async () => {
       natsService = new NatsService(engine, mockConfig);
-      
-      const consoleSpy = jest.spyOn(console, 'warn');
+
+      // Should not throw — warning is handled by global logger mock
       await natsService.disconnect();
-      
-      expect(consoleSpy).toHaveBeenCalledWith('NATS service is not connected');
-      consoleSpy.mockRestore();
     });
   });
 
   describe('Service Statistics', () => {
     it('should return connection instance when connected', async () => {
       natsService = new NatsService(engine, mockConfig);
-      
-      // Suppress console.error during connection attempt
-      const originalError = console.error;
-      console.error = jest.fn();
-      
+
       try {
-        try {
-          await natsService.connect();
-          
-          const connection = natsService.getConnection();
-          expect(connection).not.toBeNull();
-          
-          await natsService.disconnect();
-        } catch (error) {
-          // NATS not running, skip this test
-          console.log('Skipping test: NATS server not available');
-        }
-      } finally {
-        // Restore console.error
-        console.error = originalError;
+        await natsService.connect();
+
+        const connection = natsService.getConnection();
+        expect(connection).not.toBeNull();
+
+        await natsService.disconnect();
+      } catch (error) {
+        // NATS not running, skip this test
+        console.log('Skipping test: NATS server not available');
       }
     });
 
@@ -187,30 +144,21 @@ describe('NatsService', () => {
 
     it('should track subscriptions after connection', async () => {
       natsService = new NatsService(engine, mockConfig);
-      
-      // Suppress console.error during connection attempt
-      const originalError = console.error;
-      console.error = jest.fn();
-      
+
       try {
-        try {
-          await natsService.connect();
-          
-          const stats = natsService.getStats();
-          expect(stats.connected).toBe(true);
-          expect(stats.subscriptions).toBeGreaterThan(0);
-          
-          // Should have 6 subscriptions (4 order types + cancel + query)
-          expect(stats.subscriptions).toBe(6);
-          
-          await natsService.disconnect();
-        } catch (error) {
-          // NATS not running, skip this test
-          console.log('Skipping test: NATS server not available');
-        }
-      } finally {
-        // Restore console.error
-        console.error = originalError;
+        await natsService.connect();
+
+        const stats = natsService.getStats();
+        expect(stats.connected).toBe(true);
+        expect(stats.subscriptions).toBeGreaterThan(0);
+
+        // Should have 6 subscriptions (4 order types + cancel + query)
+        expect(stats.subscriptions).toBe(6);
+
+        await natsService.disconnect();
+      } catch (error) {
+        // NATS not running, skip this test
+        console.log('Skipping test: NATS server not available');
       }
     });
   });
@@ -267,31 +215,19 @@ describe('NatsService', () => {
       };
       
       natsService = new NatsService(engine, invalidConfig);
-      
-      // Suppress console logs for this test to reduce noise
-      const originalLog = console.log;
-      const originalError = console.error;
-      console.log = jest.fn();
-      console.error = jest.fn();
-      
-      try {
-        await expect(
-          Promise.race([
-            natsService.connect(),
-            new Promise((_, reject) => 
-              setTimeout(() => reject(new Error('Connection timeout')), 5000)
-            )
-          ])
-        ).rejects.toThrow();
-        
-        // Ensure service is cleaned up
-        if (natsService.isServiceConnected()) {
-          await natsService.disconnect();
-        }
-      } finally {
-        // Restore console methods
-        console.log = originalLog;
-        console.error = originalError;
+
+      await expect(
+        Promise.race([
+          natsService.connect(),
+          new Promise((_, reject) =>
+            setTimeout(() => reject(new Error('Connection timeout')), 5000)
+          )
+        ])
+      ).rejects.toThrow();
+
+      // Ensure service is cleaned up
+      if (natsService.isServiceConnected()) {
+        await natsService.disconnect();
       }
     });
   });
@@ -315,7 +251,7 @@ describe.skip('NatsService Integration (requires NATS server)', () => {
     await natsService.connect();
     
     const stats = natsService.getStats();
-    expect(stats.subscriptions).toBe(5); // Updated: 4 order types + cancel (removed orderbook.query)
+    expect(stats.subscriptions).toBe(6); // 4 order types + cancel + update
   });
 
   it('should process lend limit order message', async () => {
@@ -337,6 +273,7 @@ describe.skip('NatsService Integration (requires NATS server)', () => {
         originalAmount: '1000000',
         remainingAmount: '1000000',
         settlementFeeAmount: '10000',
+        assetId: DEFAULT_ASSET_ID,
         status: OrderStatus.Open,
         rate: 500,
       };

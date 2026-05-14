@@ -1,7 +1,11 @@
 import type { Match } from '../types/matches';
 import { matchSchema } from '../types/matches';
 import type { SettlementPublisher } from '../types/settlement';
+import type { BufferStats, BufferEventHandler } from '../types/buffer';
+import { createLogger } from '../utils/logger';
 import { deriveMatchId, MATCH_ID_NAMESPACE } from './match-id';
+
+const log = createLogger('execution-engine');
 
 /**
  * ExecutionEngine handles recording and managing match results
@@ -15,22 +19,56 @@ export class ExecutionEngine {
   private matches: Map<string, Match>;
 
   /** Index matches by order ID for quick lookups */
-  private matchesByLendOrder: Map<string, string[]>;
-  private matchesByBorrowOrder: Map<string, string[]>;
+  private matchesByLendOrder: Map<string, Set<string>>;
+  private matchesByBorrowOrder: Map<string, Set<string>>;
 
   /** Optional publisher for settlement matches */
   private settlementPublisher?: SettlementPublisher;
+
+  /** Optional handler for buffer lifecycle events (retry, threshold, disk spill) */
+  private bufferEventHandler?: BufferEventHandler;
+
+  /** Warning thresholds for buffer size monitoring (sorted ascending) */
+  private warningThresholds: number[];
+
+  /** Disk spill threshold */
+  private diskSpillThreshold: number;
+
+  /** Tracks which matchIds are currently in an active retry cycle */
+  private retryingMatchIds: Set<string>;
+
+  /** Tracks the last warning threshold that was reported to avoid duplicate alerts */
+  private lastReportedThreshold: number | null;
+
+  /** Maximum buffer size (0 = unlimited) */
+  private maxBufferSize: number;
 
   /**
    * Create a new ExecutionEngine instance
    *
    * @param settlementPublisher - Optional publisher for settlement matches
+   * @param bufferEventHandler - Optional handler for buffer events (retry, thresholds, disk spill)
+   * @param warningThresholds - Buffer size thresholds that trigger warnings
+   * @param diskSpillThreshold - Buffer size that triggers disk spill
+   * @param maxBufferSize - Hard cap on buffer size (0 = unlimited)
    */
-  constructor(settlementPublisher?: SettlementPublisher) {
+  constructor(
+    settlementPublisher?: SettlementPublisher,
+    bufferEventHandler?: BufferEventHandler,
+    warningThresholds: number[] = [],
+    diskSpillThreshold: number = 0,
+    maxBufferSize: number = 0
+  ) {
     this.matches = new Map();
     this.matchesByLendOrder = new Map();
     this.matchesByBorrowOrder = new Map();
     this.settlementPublisher = settlementPublisher;
+    this.bufferEventHandler = bufferEventHandler;
+    this.warningThresholds = [...warningThresholds].sort((a, b) => a - b);
+    this.diskSpillThreshold = diskSpillThreshold;
+    this.retryingMatchIds = new Set();
+    this.lastReportedThreshold = null;
+    this.maxBufferSize = maxBufferSize;
   }
 
   /**
@@ -63,8 +101,8 @@ export class ExecutionEngine {
     lenderSettlementFeeAmount: string;
     borrowerSettlementFeeAmount: string;
   }): Match | null {
-    // Step 1: Derive deterministic matchId from match state.
-    // Same inputs always produce the same id, so crash-resume + replay
+    // Step 1 (M-2): derive deterministic matchId from match state.
+    // Same inputs always produce the same id, so a crash-resume + replay
     // emits a duplicate that downstream layers (Postgres ON CONFLICT,
     // Settlement.isSettled) correctly dedupe.
     const matchId = deriveMatchId({
@@ -75,13 +113,27 @@ export class ExecutionEngine {
       borrowRemainingAfter: params.borrowRemainingAfter,
     });
 
-    // Step 2: In-memory dedup BEFORE any side effects (log, parse, set).
-    // Returns null so the caller can skip downstream effects (push to
-    // matches array, affectedMakerOrders, updateOrderAmount).
+    // Step 2 (M-2): in-memory dedup BEFORE any side effects (log, parse, set).
+    // Returns null so the caller skips downstream effects (push to matches
+    // array, affectedMakerOrders, updateOrderAmount). Dedup runs before the
+    // buffer-full check so retries of an already-buffered match don't trip
+    // backpressure they were never counted against.
+    //
+    // Logged via console.warn (not the structured logger) so it stays
+    // grep-compatible with M-2 test expectations and matches the
+    // OrderBook / MatchingEngine duplicate-rejection format. Migrating
+    // all three sites to structured logging is a P3 follow-up.
     if (this.matches.has(matchId)) {
       // eslint-disable-next-line no-console
       console.warn(`[ExecutionEngine] Duplicate match rejected: ${matchId}`);
       return null;
+    }
+
+    // Step 3: reject new matches when buffer is full to apply backpressure.
+    if (this.maxBufferSize > 0 && this.matches.size >= this.maxBufferSize) {
+      throw new Error(
+        `Buffer full: ${this.matches.size} matches (max ${this.maxBufferSize}). Rejecting new match.`
+      );
     }
 
     const match: Match = {
@@ -103,30 +155,32 @@ export class ExecutionEngine {
       borrowerSettlementFeeAmount: params.borrowerSettlementFeeAmount,
     };
 
-    // Step 3: Log creation with remaining-after values so operators can
-    // reproduce matchId from logs alone (include first 8 chars of the
-    // namespace for verification).
-    // eslint-disable-next-line no-console
-    console.log('[MatchingEngine] Match created', {
-      matchId: match.matchId,
-      marketId: match.marketId,
-      lendOrderId: match.lendOrderId,
-      borrowOrderId: match.borrowOrderId,
-      lenderWallet: match.lenderWallet,
-      borrowerWallet: match.borrowerWallet,
-      matchedAmount: match.matchedAmount,
-      lendRemainingAfter: params.lendRemainingAfter,
-      borrowRemainingAfter: params.borrowRemainingAfter,
-      rate: match.rate,
-      loanToken: match.loanToken,
-      maturity: match.maturity,
-      borrowerIsTaker: match.borrowerIsTaker,
-      makerFeeAmount: match.makerFeeAmount,
-      takerFeeAmount: match.takerFeeAmount,
-      lenderSettlementFeeAmount: match.lenderSettlementFeeAmount,
-      borrowerSettlementFeeAmount: match.borrowerSettlementFeeAmount,
-      namespacePrefix: MATCH_ID_NAMESPACE.substring(0, 8),
-    });
+    // Log match creation. M-2: include lendRemainingAfter / borrowRemainingAfter
+    // and the first 8 chars of MATCH_ID_NAMESPACE so operators can reproduce
+    // the matchId from logs alone.
+    log.info(
+      {
+        matchId: match.matchId,
+        marketId: match.marketId,
+        lendOrderId: match.lendOrderId,
+        borrowOrderId: match.borrowOrderId,
+        lenderWallet: match.lenderWallet,
+        borrowerWallet: match.borrowerWallet,
+        matchedAmount: match.matchedAmount,
+        lendRemainingAfter: params.lendRemainingAfter,
+        borrowRemainingAfter: params.borrowRemainingAfter,
+        rate: match.rate,
+        loanToken: match.loanToken,
+        maturity: match.maturity,
+        borrowerIsTaker: match.borrowerIsTaker,
+        makerFeeAmount: match.makerFeeAmount,
+        takerFeeAmount: match.takerFeeAmount,
+        lenderSettlementFeeAmount: match.lenderSettlementFeeAmount,
+        borrowerSettlementFeeAmount: match.borrowerSettlementFeeAmount,
+        namespacePrefix: MATCH_ID_NAMESPACE.substring(0, 8),
+      },
+      'match created'
+    );
 
     // Step 4: Validate match against schema
     matchSchema.parse(match);
@@ -136,14 +190,17 @@ export class ExecutionEngine {
 
     // Step 6: Index by lend + borrow order
     if (!this.matchesByLendOrder.has(params.lendOrderId)) {
-      this.matchesByLendOrder.set(params.lendOrderId, []);
+      this.matchesByLendOrder.set(params.lendOrderId, new Set());
     }
-    this.matchesByLendOrder.get(params.lendOrderId)!.push(match.matchId);
+    this.matchesByLendOrder.get(params.lendOrderId)!.add(match.matchId);
 
     if (!this.matchesByBorrowOrder.has(params.borrowOrderId)) {
-      this.matchesByBorrowOrder.set(params.borrowOrderId, []);
+      this.matchesByBorrowOrder.set(params.borrowOrderId, new Set());
     }
-    this.matchesByBorrowOrder.get(params.borrowOrderId)!.push(match.matchId);
+    this.matchesByBorrowOrder.get(params.borrowOrderId)!.add(match.matchId);
+
+    // Check buffer thresholds after storing
+    this.checkThresholds();
 
     // Step 7: Publish to settlement publisher (async, non-blocking)
     if (this.settlementPublisher) {
@@ -168,19 +225,24 @@ export class ExecutionEngine {
         if (messageId) {
           // Success: remove from memory (Redis is source of truth)
           this.removeMatch(match.matchId);
+          this.retryingMatchIds.delete(match.matchId);
+          this.bufferEventHandler?.onPublishSucceeded(match.matchId);
         } else {
-          // Failed: keep in memory as fallback
-          console.warn(
-            `Settlement publish returned null for match ${match.matchId}, keeping in memory`
+          // Failed: keep in memory, notify handler for retry
+          log.warn(
+            { matchId: match.matchId },
+            'settlement publish returned null, keeping in memory'
           );
+          this.bufferEventHandler?.onPublishFailed(match);
         }
       })
       .catch((error) => {
-        // Error: keep in memory as fallback
-        console.error(
-          `Failed to publish settlement match ${match.matchId}, keeping in memory:`,
-          error
+        // Error: keep in memory, notify handler for retry
+        log.error(
+          { matchId: match.matchId, err: error },
+          'failed to publish settlement match, keeping in memory'
         );
+        this.bufferEventHandler?.onPublishFailed(match);
       });
   }
 
@@ -198,30 +260,152 @@ export class ExecutionEngine {
     // Remove from main storage
     this.matches.delete(matchId);
 
-    // Remove from lend order index
+    // Remove from lend order index (O(1) with Set)
     const lendMatchIds = this.matchesByLendOrder.get(match.lendOrderId);
     if (lendMatchIds) {
-      const index = lendMatchIds.indexOf(matchId);
-      if (index > -1) {
-        lendMatchIds.splice(index, 1);
-      }
-      // Clean up empty arrays
-      if (lendMatchIds.length === 0) {
+      lendMatchIds.delete(matchId);
+      if (lendMatchIds.size === 0) {
         this.matchesByLendOrder.delete(match.lendOrderId);
       }
     }
 
-    // Remove from borrow order index
+    // Remove from borrow order index (O(1) with Set)
     const borrowMatchIds = this.matchesByBorrowOrder.get(match.borrowOrderId);
     if (borrowMatchIds) {
-      const index = borrowMatchIds.indexOf(matchId);
-      if (index > -1) {
-        borrowMatchIds.splice(index, 1);
-      }
-      // Clean up empty arrays
-      if (borrowMatchIds.length === 0) {
+      borrowMatchIds.delete(matchId);
+      if (borrowMatchIds.size === 0) {
         this.matchesByBorrowOrder.delete(match.borrowOrderId);
       }
+    }
+  }
+
+  /**
+   * Retry publishing a match that previously failed
+   *
+   * Called by the retry service when it's time to re-attempt publishing.
+   * No-ops if the match has already been published and removed.
+   *
+   * @param matchId - ID of the match to retry
+   */
+  retryPublish(matchId: string): void {
+    const match = this.matches.get(matchId);
+    if (!match || !this.settlementPublisher) return;
+    this.publishAndCleanup(match);
+  }
+
+  /**
+   * Mark a match as currently being retried
+   *
+   * @param matchId - ID of the match
+   */
+  markRetrying(matchId: string): void {
+    if (this.matches.has(matchId)) {
+      this.retryingMatchIds.add(matchId);
+    }
+  }
+
+  /**
+   * Unmark a match from the retrying set
+   *
+   * @param matchId - ID of the match
+   */
+  unmarkRetrying(matchId: string): void {
+    this.retryingMatchIds.delete(matchId);
+  }
+
+  /**
+   * Get buffer statistics for monitoring
+   *
+   * @returns Current buffer statistics
+   */
+  getBufferStats(): BufferStats {
+    const now = Date.now();
+    let oldestTimestamp = now;
+
+    for (const match of this.matches.values()) {
+      if (match.timestamp < oldestTimestamp) {
+        oldestTimestamp = match.timestamp;
+      }
+    }
+
+    const totalMatches = this.matches.size;
+
+    return {
+      totalMatches,
+      retryingCount: this.retryingMatchIds.size,
+      oldestMatchAge: totalMatches > 0 ? now - oldestTimestamp : 0,
+      thresholdBreached: this.getBreachedThreshold(totalMatches),
+    };
+  }
+
+  /**
+   * Merge matches into the buffer without clearing existing state
+   *
+   * Used to load disk-spilled matches on startup. Deduplicates by matchId.
+   *
+   * @param matches - Matches to merge
+   */
+  mergeMatches(matches: Match[]): void {
+    for (const match of matches) {
+      if (this.matches.has(match.matchId)) {
+        continue;
+      }
+
+      matchSchema.parse(match);
+
+      this.matches.set(match.matchId, match);
+
+      if (!this.matchesByLendOrder.has(match.lendOrderId)) {
+        this.matchesByLendOrder.set(match.lendOrderId, new Set());
+      }
+      this.matchesByLendOrder.get(match.lendOrderId)!.add(match.matchId);
+
+      if (!this.matchesByBorrowOrder.has(match.borrowOrderId)) {
+        this.matchesByBorrowOrder.set(match.borrowOrderId, new Set());
+      }
+      this.matchesByBorrowOrder.get(match.borrowOrderId)!.add(match.matchId);
+    }
+  }
+
+  /**
+   * Get the highest warning threshold breached by the current buffer size
+   *
+   * @param size - Current buffer size
+   * @returns Highest threshold breached, or null if none
+   */
+  private getBreachedThreshold(size: number): number | null {
+    let breached: number | null = null;
+    for (const threshold of this.warningThresholds) {
+      if (size >= threshold) {
+        breached = threshold;
+      }
+    }
+    return breached;
+  }
+
+  /**
+   * Check buffer thresholds and fire callbacks if new thresholds are crossed
+   */
+  private checkThresholds(): void {
+    if (!this.bufferEventHandler) return;
+
+    const size = this.matches.size;
+    const breached = this.getBreachedThreshold(size);
+
+    // Fire warning if a new (higher) threshold was crossed
+    if (breached !== null && breached !== this.lastReportedThreshold) {
+      this.lastReportedThreshold = breached;
+      this.bufferEventHandler.onThresholdBreached(size, breached);
+    }
+
+    // Reset tracking when buffer shrinks below all thresholds
+    if (breached === null && this.lastReportedThreshold !== null) {
+      this.lastReportedThreshold = null;
+    }
+
+    // Fire disk spill if threshold is set and exceeded
+    if (this.diskSpillThreshold > 0 && size >= this.diskSpillThreshold) {
+      this.bufferEventHandler.onDiskSpillNeeded(this.getAllMatches());
     }
   }
 
@@ -242,9 +426,9 @@ export class ExecutionEngine {
    * @returns Array of matches
    */
   getMatchesForOrder(orderId: string): Match[] {
-    const lendMatchIds = this.matchesByLendOrder.get(orderId) || [];
-    const borrowMatchIds = this.matchesByBorrowOrder.get(orderId) || [];
-    const allMatchIds = [...lendMatchIds, ...borrowMatchIds];
+    const lendMatchIds = this.matchesByLendOrder.get(orderId);
+    const borrowMatchIds = this.matchesByBorrowOrder.get(orderId);
+    const allMatchIds = [...(lendMatchIds ?? []), ...(borrowMatchIds ?? [])];
 
     return allMatchIds
       .map((id) => this.matches.get(id))
@@ -258,8 +442,9 @@ export class ExecutionEngine {
    * @returns Array of matches
    */
   getMatchesForLendOrder(lendOrderId: string): Match[] {
-    const matchIds = this.matchesByLendOrder.get(lendOrderId) || [];
-    return matchIds
+    const matchIds = this.matchesByLendOrder.get(lendOrderId);
+    if (!matchIds) return [];
+    return [...matchIds]
       .map((id) => this.matches.get(id))
       .filter((match): match is Match => match !== undefined);
   }
@@ -271,8 +456,9 @@ export class ExecutionEngine {
    * @returns Array of matches
    */
   getMatchesForBorrowOrder(borrowOrderId: string): Match[] {
-    const matchIds = this.matchesByBorrowOrder.get(borrowOrderId) || [];
-    return matchIds
+    const matchIds = this.matchesByBorrowOrder.get(borrowOrderId);
+    if (!matchIds) return [];
+    return [...matchIds]
       .map((id) => this.matches.get(id))
       .filter((match): match is Match => match !== undefined);
   }
@@ -429,16 +615,15 @@ export class ExecutionEngine {
 
       // Rebuild lend order index
       if (!this.matchesByLendOrder.has(match.lendOrderId)) {
-        this.matchesByLendOrder.set(match.lendOrderId, []);
+        this.matchesByLendOrder.set(match.lendOrderId, new Set());
       }
-      this.matchesByLendOrder.get(match.lendOrderId)!.push(match.matchId);
+      this.matchesByLendOrder.get(match.lendOrderId)!.add(match.matchId);
 
       // Rebuild borrow order index
       if (!this.matchesByBorrowOrder.has(match.borrowOrderId)) {
-        this.matchesByBorrowOrder.set(match.borrowOrderId, []);
+        this.matchesByBorrowOrder.set(match.borrowOrderId, new Set());
       }
-      this.matchesByBorrowOrder.get(match.borrowOrderId)!.push(match.matchId);
+      this.matchesByBorrowOrder.get(match.borrowOrderId)!.add(match.matchId);
     }
   }
 }
-

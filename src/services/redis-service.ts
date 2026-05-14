@@ -13,6 +13,9 @@ import {
   type RedisConfig,
 } from '../config/redis-config';
 import type { SettlementMatch, SettlementPublisher } from '../types/settlement';
+import { createLogger } from '../utils/logger';
+
+const log = createLogger('redis-service');
 
 /**
  * Redis Service class for managing connection and Stream operations
@@ -40,21 +43,19 @@ export class RedisService implements SettlementPublisher {
    */
   async connect(): Promise<void> {
     if (this.isConnected) {
-      console.warn('Redis service is already connected');
+      log.warn('redis service is already connected');
       return;
     }
 
     try {
-      console.log(`Connecting to Redis at ${this.config.url}...`);
+      log.info({ url: this.config.url }, 'connecting to Redis');
 
       // Parse URL and build options
       const options: RedisOptions = {
         maxRetriesPerRequest: this.config.maxReconnectAttempts,
         retryStrategy: (times: number) => {
           if (times > this.config.maxReconnectAttempts) {
-            console.error(
-              `Redis: Max reconnect attempts (${this.config.maxReconnectAttempts}) exceeded`
-            );
+            log.error({ maxAttempts: this.config.maxReconnectAttempts }, 'max reconnect attempts exceeded');
             return null; // Stop retrying
           }
           return this.config.reconnectTimeWait;
@@ -84,14 +85,14 @@ export class RedisService implements SettlementPublisher {
       await this.client.connect();
       this.isConnected = true;
 
-      console.log('✓ Connected to Redis');
+      log.info('connected to Redis');
 
       // Ensure stream and consumer group exist
       await this.ensureStreamSetup();
 
-      console.log('✓ Redis service initialized successfully');
+      log.info('redis service initialized');
     } catch (error) {
-      console.error('Failed to connect to Redis:', error);
+      log.error({ err: error }, 'failed to connect to Redis');
       throw new Error(
         `Redis connection failed: ${error instanceof Error ? error.message : 'Unknown error'}`
       );
@@ -107,21 +108,21 @@ export class RedisService implements SettlementPublisher {
     }
 
     this.client.on('error', (err) => {
-      console.error('Redis connection error:', err);
+      log.error({ err }, 'redis connection error');
     });
 
     this.client.on('close', () => {
       this.isConnected = false;
-      console.log('Redis connection closed');
+      log.info('redis connection closed');
     });
 
     this.client.on('reconnecting', () => {
-      console.log('Redis reconnecting...');
+      log.info('redis reconnecting');
     });
 
     this.client.on('ready', () => {
       this.isConnected = true;
-      console.log('Redis connection ready');
+      log.info('redis connection ready');
     });
   }
 
@@ -142,17 +143,13 @@ export class RedisService implements SettlementPublisher {
         '0',
         'MKSTREAM'
       );
-      console.log(
-        `✓ Created consumer group '${REDIS_CONSUMER_GROUPS.SETTLEMENT_ENGINE}' for stream '${REDIS_STREAMS.SETTLEMENT_MATCHES}'`
-      );
+      log.info({ group: REDIS_CONSUMER_GROUPS.SETTLEMENT_ENGINE, stream: REDIS_STREAMS.SETTLEMENT_MATCHES }, 'created consumer group');
     } catch (error) {
       // BUSYGROUP error means the group already exists, which is fine
       if (error instanceof Error && error.message.includes('BUSYGROUP')) {
-        console.log(
-          `✓ Consumer group '${REDIS_CONSUMER_GROUPS.SETTLEMENT_ENGINE}' already exists`
-        );
+        log.info({ group: REDIS_CONSUMER_GROUPS.SETTLEMENT_ENGINE }, 'consumer group already exists');
       } else {
-        console.warn('Warning: Could not create consumer group:', error);
+        log.warn({ err: error }, 'could not create consumer group');
       }
     }
   }
@@ -167,10 +164,7 @@ export class RedisService implements SettlementPublisher {
    */
   async publishSettlementMatch(match: SettlementMatch): Promise<string | null> {
     if (!this.client || !this.isConnected) {
-      console.warn(
-        'Redis not connected, skipping settlement match publish:',
-        match.matchId
-      );
+      log.warn({ matchId: match.matchId }, 'redis not connected, skipping settlement match publish');
       return null;
     }
 
@@ -185,13 +179,11 @@ export class RedisService implements SettlementPublisher {
         ...fields
       );
 
-      console.log(
-        `Published settlement match ${match.matchId} to Redis Stream (ID: ${messageId})`
-      );
+      log.debug({ matchId: match.matchId, messageId }, 'published settlement match to redis stream');
 
       return messageId;
     } catch (error) {
-      console.error('Failed to publish settlement match to Redis:', error);
+      log.error({ err: error }, 'failed to publish settlement match');
       // Non-blocking: don't throw, just return null
       return null;
     }
@@ -245,19 +237,19 @@ export class RedisService implements SettlementPublisher {
    */
   async disconnect(): Promise<void> {
     if (!this.isConnected || !this.client) {
-      console.warn('Redis service is not connected');
+      log.warn('redis service is not connected');
       return;
     }
 
-    console.log('Disconnecting from Redis...');
+    log.info('disconnecting from Redis');
 
     try {
       await this.client.quit();
       this.client = null;
       this.isConnected = false;
-      console.log('✓ Redis service disconnected');
+      log.info('redis service disconnected');
     } catch (error) {
-      console.error('Error during Redis disconnect:', error);
+      log.error({ err: error }, 'error during redis disconnect');
       throw error;
     }
   }

@@ -14,8 +14,12 @@ import {
   handleBorrowMarketOrder,
   handleBorrowLimitOrder,
   handleCancelOrder,
+  handleUpdateOrder,
   type HandlerContext,
 } from './message-handlers';
+import { createLogger } from '../utils/logger';
+
+const log = createLogger('nats-service');
 
 /**
  * NATS Service class for managing connections and subscriptions
@@ -45,12 +49,12 @@ export class NatsService {
    */
   async connect(): Promise<void> {
     if (this.isConnected) {
-      console.warn('NATS service is already connected');
+      log.warn('NATS service is already connected');
       return;
     }
 
     try {
-      console.log(`Connecting to NATS at ${this.config.url}...`);
+      log.info({ url: this.config.url }, 'connecting to NATS');
 
       // Build connection options
       const options: ConnectionOptions = {
@@ -72,7 +76,7 @@ export class NatsService {
       this.nc = await connect(options);
       this.isConnected = true;
 
-      console.log('✓ Connected to NATS');
+      log.info('connected to NATS');
 
       // Set up connection event handlers
       this.setupConnectionHandlers();
@@ -80,10 +84,12 @@ export class NatsService {
       // Set up subscriptions
       await this.setupSubscriptions();
 
-      console.log('✓ NATS service initialized successfully');
+      log.info('NATS service initialized');
     } catch (error) {
-      console.error('Failed to connect to NATS:', error);
-      throw new Error(`NATS connection failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      log.error({ err: error }, 'failed to connect to NATS');
+      throw new Error(
+        `NATS connection failed: ${error instanceof Error ? error.message : 'Unknown error'}`
+      );
     }
   }
 
@@ -99,9 +105,9 @@ export class NatsService {
     this.nc.closed().then((err) => {
       this.isConnected = false;
       if (err) {
-        console.error('NATS connection closed with error:', err);
+        log.error({ err }, 'NATS connection closed with error');
       } else {
-        console.log('NATS connection closed');
+        log.info('NATS connection closed');
       }
     });
 
@@ -126,31 +132,37 @@ export class NatsService {
     const lendMarketSub = this.nc.subscribe(NATS_TOPICS.ORDERS_LEND_MARKET);
     this.subscriptions.push(lendMarketSub);
     this.processSubscription(lendMarketSub, (data) => handleLendMarketOrder(ctx, data));
-    console.log(`✓ Subscribed to ${NATS_TOPICS.ORDERS_LEND_MARKET}`);
+    log.info({ topic: NATS_TOPICS.ORDERS_LEND_MARKET }, 'subscribed');
 
     // Subscribe to lend limit orders
     const lendLimitSub = this.nc.subscribe(NATS_TOPICS.ORDERS_LEND_LIMIT);
     this.subscriptions.push(lendLimitSub);
     this.processSubscription(lendLimitSub, (data) => handleLendLimitOrder(ctx, data));
-    console.log(`✓ Subscribed to ${NATS_TOPICS.ORDERS_LEND_LIMIT}`);
+    log.info({ topic: NATS_TOPICS.ORDERS_LEND_LIMIT }, 'subscribed');
 
     // Subscribe to borrow market orders
     const borrowMarketSub = this.nc.subscribe(NATS_TOPICS.ORDERS_BORROW_MARKET);
     this.subscriptions.push(borrowMarketSub);
     this.processSubscription(borrowMarketSub, (data) => handleBorrowMarketOrder(ctx, data));
-    console.log(`✓ Subscribed to ${NATS_TOPICS.ORDERS_BORROW_MARKET}`);
+    log.info({ topic: NATS_TOPICS.ORDERS_BORROW_MARKET }, 'subscribed');
 
     // Subscribe to borrow limit orders
     const borrowLimitSub = this.nc.subscribe(NATS_TOPICS.ORDERS_BORROW_LIMIT);
     this.subscriptions.push(borrowLimitSub);
     this.processSubscription(borrowLimitSub, (data) => handleBorrowLimitOrder(ctx, data));
-    console.log(`✓ Subscribed to ${NATS_TOPICS.ORDERS_BORROW_LIMIT}`);
+    log.info({ topic: NATS_TOPICS.ORDERS_BORROW_LIMIT }, 'subscribed');
 
     // Subscribe to cancel orders
     const cancelSub = this.nc.subscribe(NATS_TOPICS.ORDERS_CANCEL);
     this.subscriptions.push(cancelSub);
     this.processSubscription(cancelSub, (data) => handleCancelOrder(ctx, data));
-    console.log(`✓ Subscribed to ${NATS_TOPICS.ORDERS_CANCEL}`);
+    log.info({ topic: NATS_TOPICS.ORDERS_CANCEL }, 'subscribed');
+
+    // Subscribe to update orders
+    const updateSub = this.nc.subscribe(NATS_TOPICS.ORDERS_UPDATE);
+    this.subscriptions.push(updateSub);
+    this.processSubscription(updateSub, (data) => handleUpdateOrder(ctx, data));
+    log.info({ topic: NATS_TOPICS.ORDERS_UPDATE }, 'subscribed');
   }
 
   /**
@@ -169,11 +181,11 @@ export class NatsService {
         try {
           handler(msg.data);
         } catch (error) {
-          console.error('Error processing message:', error);
+          log.error({ err: error }, 'error processing message');
         }
       }
     })().catch((error) => {
-      console.error('Subscription processing error:', error);
+      log.error({ err: error }, 'subscription processing error');
     });
   }
 
@@ -182,11 +194,11 @@ export class NatsService {
    */
   async disconnect(): Promise<void> {
     if (!this.isConnected) {
-      console.warn('NATS service is not connected');
+      log.warn('NATS service is not connected');
       return;
     }
 
-    console.log('Disconnecting from NATS...');
+    log.info('disconnecting from NATS');
 
     try {
       // Unsubscribe from all topics
@@ -202,9 +214,9 @@ export class NatsService {
       }
 
       this.isConnected = false;
-      console.log('✓ NATS service disconnected');
+      log.info('NATS service disconnected');
     } catch (error) {
-      console.error('Error during NATS disconnect:', error);
+      log.error({ err: error }, 'error during NATS disconnect');
       throw error;
     }
   }
@@ -250,4 +262,3 @@ export class NatsService {
     };
   }
 }
-
