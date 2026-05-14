@@ -373,7 +373,10 @@ export class MatchingEngine {
     return true;
   }
 
-  updateOrder(orderId: string, walletAddress: string): Order | 'NOT_FOUND' | 'WALLET_MISMATCH' | 'INVALID_STATUS' {
+  updateOrder(
+    orderId: string,
+    walletAddress: string
+  ): Order | 'NOT_FOUND' | 'WALLET_MISMATCH' | 'INVALID_STATUS' {
     const order = this.orderBook.getOrder(orderId);
     if (!order) {
       return 'NOT_FOUND';

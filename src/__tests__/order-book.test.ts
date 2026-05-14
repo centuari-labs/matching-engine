@@ -179,7 +179,11 @@ describe('OrderBook', () => {
     it('should return empty array for unknown loanToken', () => {
       book.addOrder(createLendLimitOrder());
 
-      const orders = book.getBestOrders(OrderSide.Lend, '0x0000000000000000000000000000000000000000', maturity);
+      const orders = book.getBestOrders(
+        OrderSide.Lend,
+        '0x0000000000000000000000000000000000000000',
+        maturity
+      );
       expect(orders).toEqual([]);
     });
 
