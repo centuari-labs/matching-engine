@@ -12,6 +12,7 @@ import {
 } from '../types/messages';
 import { matchSchema, type Match } from '../types/matches';
 import type { DbClient } from '../types/db';
+import { truncatePayload } from '../utils/log-sanitize';
 import { createLogger } from '../utils/logger';
 
 const log = createLogger('db-writer-service');
@@ -213,7 +214,13 @@ export class DbWriterService {
     try {
       parsed = JSON.parse(text);
     } catch (error) {
-      log.error({ err: error, rawMessage: text }, 'failed to parse order status JSON');
+      // M-16: truncate payload before logging — full request bodies
+      // can contain wallet addresses + amounts; we want correlation
+      // (via sha256 prefix) without persisting the body.
+      log.error(
+        { err: error, payload: truncatePayload(text) },
+        'failed to parse order status JSON'
+      );
       return;
     }
 
@@ -221,7 +228,11 @@ export class DbWriterService {
     try {
       message = orderStatusMessageSchema.parse(parsed);
     } catch (error) {
-      log.error({ err: error }, 'invalid order status message');
+      // M-16: same truncation policy on Zod-failure path.
+      log.error(
+        { err: error, payload: truncatePayload(parsed) },
+        'invalid order status message'
+      );
       return;
     }
 
@@ -291,7 +302,11 @@ export class DbWriterService {
     try {
       parsed = JSON.parse(text);
     } catch (error) {
-      log.error({ err: error, rawMessage: text }, 'failed to parse cancelled remainder JSON');
+      // M-16: truncate payload before logging.
+      log.error(
+        { err: error, payload: truncatePayload(text) },
+        'failed to parse cancelled remainder JSON'
+      );
       return;
     }
 
@@ -299,7 +314,11 @@ export class DbWriterService {
     try {
       message = cancelledRemainderMessageSchema.parse(parsed);
     } catch (error) {
-      log.error({ err: error }, 'invalid cancelled remainder message');
+      // M-16: truncate payload before logging.
+      log.error(
+        { err: error, payload: truncatePayload(parsed) },
+        'invalid cancelled remainder message'
+      );
       return;
     }
 
@@ -411,7 +430,11 @@ export class DbWriterService {
     try {
       validated = matchSchema.parse(match);
     } catch (error) {
-      log.error({ err: error }, 'invalid match entry from Redis');
+      // M-16: truncate payload before logging.
+      log.error(
+        { err: error, payload: truncatePayload(match) },
+        'invalid match entry from Redis'
+      );
       // Acknowledge the bad entry so it does not block the consumer group.
       await this.redis.xack(REDIS_STREAMS.SETTLEMENT_MATCHES, this.options.redisConsumerGroup, id);
       return;

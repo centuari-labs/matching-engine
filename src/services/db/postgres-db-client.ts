@@ -9,7 +9,7 @@ import type {
 import type { DbConfig } from '../../config/db-config';
 import { loadDbConfig } from '../../config/db-config';
 import type { Order } from '../../types/orders';
-import { OrderSide, OrderType, OrderStatus } from '../../types/orders';
+import { OrderSide, OrderType, OrderStatus, orderSchema } from '../../types/orders';
 
 /**
  * Postgres implementation of the DbClient interface.
@@ -386,8 +386,13 @@ export class PostgresDbClient implements DbClient {
         `
       );
 
-      return result.rows.map((row): Order => {
-        const base = {
+      // M-6: route every row through orderSchema so addresses are
+      // normalized to lowercase via the schema transform. Invalid rows
+      // are dropped (with a warning) rather than poisoning the in-memory
+      // book. `satisfies Order` enforces the inferred type at compile
+      // time — no `as Order` cast.
+      return result.rows.flatMap((row): Order[] => {
+        const candidate = {
           orderId: row.order_id,
           walletAddress: row.wallet_address,
           loanToken: row.loan_token,
@@ -404,7 +409,15 @@ export class PostgresDbClient implements DbClient {
           rate: parseInt(row.rate, 10),
         };
 
-        return base as Order;
+        const parsed = orderSchema.safeParse(candidate);
+        if (!parsed.success) {
+          console.warn(
+            `[PostgresDbClient] dropping invalid order ${row.order_id} during sync:`,
+            parsed.error.flatten()
+          );
+          return [];
+        }
+        return [parsed.data satisfies Order];
       });
     } finally {
       client.release();

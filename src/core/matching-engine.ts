@@ -116,6 +116,12 @@ export class MatchingEngine {
       matchedAmount,
       order.originalAmount
     );
+    // M-12 invariant: the clamp at minBigNumber makes total fee
+    // collection mathematically impossible to exceed
+    // `order.settlementFeeAmount`. Pro-rata rounds UP for each match,
+    // but the residual pool (`currentRemaining`) shrinks monotonically
+    // and the clamp on the final fill absorbs the rounding overage.
+    // Pinned by tests in src/__tests__/settlement-fee-invariant.test.ts.
     const actualFee = minBigNumber(proRata, currentRemaining);
     const remainingAfter = subtractBigNumbers(currentRemaining, actualFee);
     return { actualFee, remainingAfter };

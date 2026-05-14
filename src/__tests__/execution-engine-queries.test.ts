@@ -22,7 +22,7 @@ describe('ExecutionEngine Queries', () => {
       expect(results).toEqual([]);
     });
 
-    it('should filter by loanToken', () => {
+    it('should filter by loanToken (case-insensitive per M-6)', () => {
       const tokenA = '0xAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA';
       const tokenB = '0xBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB';
 
@@ -31,9 +31,11 @@ describe('ExecutionEngine Queries', () => {
 
       engine.restoreMatches([matchA, matchB]);
 
+      // Query in mixed case; M-6 normalization lowercases on both
+      // storage (Zod schema) and query (getMatchesByCriteria).
       const results = engine.getMatchesByCriteria({ loanToken: tokenA });
       expect(results).toHaveLength(1);
-      expect(results[0].loanToken).toBe(tokenA);
+      expect(results[0].loanToken).toBe(tokenA.toLowerCase());
     });
 
     it('should filter by minRate and maxRate range', () => {

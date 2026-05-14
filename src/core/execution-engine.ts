@@ -489,7 +489,11 @@ export class ExecutionEngine {
     let results = this.getAllMatches();
 
     if (filter.loanToken) {
-      results = results.filter((m) => m.loanToken === filter.loanToken);
+      // M-6: stored loanTokens are normalized to lowercase by the Zod
+      // schema; the query side wasn't, so a mixed-case argument would
+      // miss its own matches. Lowercase the query as defense-in-depth.
+      const needle = filter.loanToken.toLowerCase();
+      results = results.filter((m) => m.loanToken === needle);
     }
 
     if (filter.maturity !== undefined) {
