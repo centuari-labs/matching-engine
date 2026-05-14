@@ -126,6 +126,8 @@ describe('SnapshotService', () => {
         lenderWallet: '0x1111111111111111111111111111111111111111',
         borrowerWallet: '0x2222222222222222222222222222222222222222',
         matchedAmount: '1000000',
+        lendRemainingAfter: '0',
+        borrowRemainingAfter: '0',
         rate: 500,
         loanToken: DEFAULT_LOAN_TOKEN,
         maturity: DEFAULT_MATURITY,
@@ -216,7 +218,7 @@ describe('SnapshotService', () => {
       expect(metadata!.orderCount).toBe(1);
       expect(metadata!.matchCount).toBe(0);
       expect(metadata!.timestamp).toBeGreaterThan(0);
-      expect(metadata!.version).toBe('1.0.0');
+      expect(metadata!.version).toBe('1.1.0');
     });
   });
 
@@ -269,6 +271,8 @@ describe('SnapshotService', () => {
         lenderWallet: '0x1111111111111111111111111111111111111111',
         borrowerWallet: '0x2222222222222222222222222222222222222222',
         matchedAmount: '1000000',
+        lendRemainingAfter: '0',
+        borrowRemainingAfter: '0',
         rate: 500,
         loanToken: DEFAULT_LOAN_TOKEN,
         maturity: DEFAULT_MATURITY,
@@ -395,6 +399,8 @@ describe('SnapshotService', () => {
         lenderWallet: '0x1111111111111111111111111111111111111111',
         borrowerWallet: '0x2222222222222222222222222222222222222222',
         matchedAmount: '1000000',
+        lendRemainingAfter: '0',
+        borrowRemainingAfter: '0',
         rate: 500,
         loanToken: DEFAULT_LOAN_TOKEN,
         maturity: DEFAULT_MATURITY,

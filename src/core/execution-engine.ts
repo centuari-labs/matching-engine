@@ -2,8 +2,8 @@ import type { Match } from '../types/matches';
 import { matchSchema } from '../types/matches';
 import type { SettlementPublisher } from '../types/settlement';
 import type { BufferStats, BufferEventHandler } from '../types/buffer';
-import { generateMatchId } from '../utils/helpers';
 import { createLogger } from '../utils/logger';
+import { deriveMatchId, MATCH_ID_NAMESPACE } from './match-id';
 
 const log = createLogger('execution-engine');
 
@@ -88,6 +88,10 @@ export class ExecutionEngine {
     lenderWallet: string;
     borrowerWallet: string;
     matchedAmount: string;
+    /** Lend order's remaining amount AFTER this match deducts. Used to derive the deterministic matchId. */
+    lendRemainingAfter: string;
+    /** Borrow order's remaining amount AFTER this match deducts. Used to derive the deterministic matchId. */
+    borrowRemainingAfter: string;
     rate: number;
     loanToken: string;
     maturity: number;
@@ -96,8 +100,36 @@ export class ExecutionEngine {
     takerFeeAmount: string;
     lenderSettlementFeeAmount: string;
     borrowerSettlementFeeAmount: string;
-  }): Match {
-    // Reject new matches when buffer is full to apply backpressure
+  }): Match | null {
+    // Step 1 (M-2): derive deterministic matchId from match state.
+    // Same inputs always produce the same id, so a crash-resume + replay
+    // emits a duplicate that downstream layers (Postgres ON CONFLICT,
+    // Settlement.isSettled) correctly dedupe.
+    const matchId = deriveMatchId({
+      lendOrderId: params.lendOrderId,
+      borrowOrderId: params.borrowOrderId,
+      matchedAmount: params.matchedAmount,
+      lendRemainingAfter: params.lendRemainingAfter,
+      borrowRemainingAfter: params.borrowRemainingAfter,
+    });
+
+    // Step 2 (M-2): in-memory dedup BEFORE any side effects (log, parse, set).
+    // Returns null so the caller skips downstream effects (push to matches
+    // array, affectedMakerOrders, updateOrderAmount). Dedup runs before the
+    // buffer-full check so retries of an already-buffered match don't trip
+    // backpressure they were never counted against.
+    //
+    // Logged via console.warn (not the structured logger) so it stays
+    // grep-compatible with M-2 test expectations and matches the
+    // OrderBook / MatchingEngine duplicate-rejection format. Migrating
+    // all three sites to structured logging is a P3 follow-up.
+    if (this.matches.has(matchId)) {
+      // eslint-disable-next-line no-console
+      console.warn(`[ExecutionEngine] Duplicate match rejected: ${matchId}`);
+      return null;
+    }
+
+    // Step 3: reject new matches when buffer is full to apply backpressure.
     if (this.maxBufferSize > 0 && this.matches.size >= this.maxBufferSize) {
       throw new Error(
         `Buffer full: ${this.matches.size} matches (max ${this.maxBufferSize}). Rejecting new match.`
@@ -105,7 +137,7 @@ export class ExecutionEngine {
     }
 
     const match: Match = {
-      matchId: generateMatchId(),
+      matchId,
       marketId: params.marketId,
       lendOrderId: params.lendOrderId,
       borrowOrderId: params.borrowOrderId,
@@ -123,7 +155,9 @@ export class ExecutionEngine {
       borrowerSettlementFeeAmount: params.borrowerSettlementFeeAmount,
     };
 
-    // Log match creation for observability and debugging
+    // Log match creation. M-2: include lendRemainingAfter / borrowRemainingAfter
+    // and the first 8 chars of MATCH_ID_NAMESPACE so operators can reproduce
+    // the matchId from logs alone.
     log.info(
       {
         matchId: match.matchId,
@@ -133,6 +167,8 @@ export class ExecutionEngine {
         lenderWallet: match.lenderWallet,
         borrowerWallet: match.borrowerWallet,
         matchedAmount: match.matchedAmount,
+        lendRemainingAfter: params.lendRemainingAfter,
+        borrowRemainingAfter: params.borrowRemainingAfter,
         rate: match.rate,
         loanToken: match.loanToken,
         maturity: match.maturity,
@@ -141,23 +177,23 @@ export class ExecutionEngine {
         takerFeeAmount: match.takerFeeAmount,
         lenderSettlementFeeAmount: match.lenderSettlementFeeAmount,
         borrowerSettlementFeeAmount: match.borrowerSettlementFeeAmount,
+        namespacePrefix: MATCH_ID_NAMESPACE.substring(0, 8),
       },
       'match created'
     );
 
-    // Validate match against schema
+    // Step 4: Validate match against schema
     matchSchema.parse(match);
 
-    // Store match in memory (temporary buffer)
+    // Step 5: Store match in memory (temporary buffer)
     this.matches.set(match.matchId, match);
 
-    // Index by lend order
+    // Step 6: Index by lend + borrow order
     if (!this.matchesByLendOrder.has(params.lendOrderId)) {
       this.matchesByLendOrder.set(params.lendOrderId, new Set());
     }
     this.matchesByLendOrder.get(params.lendOrderId)!.add(match.matchId);
 
-    // Index by borrow order
     if (!this.matchesByBorrowOrder.has(params.borrowOrderId)) {
       this.matchesByBorrowOrder.set(params.borrowOrderId, new Set());
     }
@@ -166,7 +202,7 @@ export class ExecutionEngine {
     // Check buffer thresholds after storing
     this.checkThresholds();
 
-    // Publish to settlement publisher (async, non-blocking)
+    // Step 7: Publish to settlement publisher (async, non-blocking)
     if (this.settlementPublisher) {
       this.publishAndCleanup(match);
     }

@@ -270,6 +270,8 @@ describe('ExecutionEngine Queries', () => {
       lenderWallet: '0x1111111111111111111111111111111111111111',
       borrowerWallet: '0x2222222222222222222222222222222222222222',
       matchedAmount: '1000000',
+      lendRemainingAfter: '0',
+      borrowRemainingAfter: '0',
       rate: 500,
       loanToken: DEFAULT_LOAN_TOKEN,
       maturity: DEFAULT_MATURITY,

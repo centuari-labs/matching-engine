@@ -96,25 +96,34 @@ describe('OrderBook', () => {
   });
 
   describe('Duplicate order IDs', () => {
-    it('should overwrite metadata when adding an order with the same ID twice', () => {
+    // M-1 audit fix: addOrder must REJECT duplicates, not overwrite them.
+    // Previously the second insert orphaned the original tree node while
+    // overwriting orderIndex, producing unauthorized fills on NATS replay.
+    it('should reject a duplicate addOrder and preserve the original entry', () => {
+      const warnSpy = jest.spyOn(console, 'warn').mockImplementation(() => undefined);
       const order = createLendLimitOrder({ rate: 300 });
-      book.addOrder(order);
+      const inserted = book.addOrder(order);
+      expect(inserted).not.toBeNull();
 
       const duplicate = createLendLimitOrder({
         orderId: order.orderId,
         rate: 700,
         timestamp: order.timestamp,
       });
-      book.addOrder(duplicate);
+      const rejected = book.addOrder(duplicate);
+      expect(rejected).toBeNull();
+      expect(warnSpy).toHaveBeenCalledWith(
+        expect.stringContaining(`Duplicate order rejected: ${order.orderId}`)
+      );
 
-      // orderIndex.set overwrites, so getOrder returns the second version
+      // Original entry preserved; tree has exactly one node.
       const retrieved = book.getOrder(order.orderId);
       expect(retrieved).not.toBeNull();
-      expect(retrieved!.rate).toBe(700);
+      expect(retrieved!.rate).toBe(300);
 
-      // However the tree now has two nodes — getBestOrders returns both
       const orders = book.getBestOrders(OrderSide.Lend, loanToken, maturity);
-      expect(orders.length).toBe(2);
+      expect(orders.length).toBe(1);
+      warnSpy.mockRestore();
     });
   });
 
@@ -170,7 +179,11 @@ describe('OrderBook', () => {
     it('should return empty array for unknown loanToken', () => {
       book.addOrder(createLendLimitOrder());
 
-      const orders = book.getBestOrders(OrderSide.Lend, '0x0000000000000000000000000000000000000000', maturity);
+      const orders = book.getBestOrders(
+        OrderSide.Lend,
+        '0x0000000000000000000000000000000000000000',
+        maturity
+      );
       expect(orders).toEqual([]);
     });
 

@@ -233,9 +233,22 @@ async function main(): Promise<void> {
       log.info('syncing order book with database');
       const dbClient = new PostgresDbClient();
       try {
-        const activeOrders = await dbClient.getActiveOrders();
-        const syncResult = matchingEngine.syncFromDatabase(activeOrders);
-        log.info({ added: syncResult.added, skipped: syncResult.skipped }, 'DB sync complete');
+        // M-1: load active orders + recent orderIds in parallel, then
+        // hydrate the matching engine's dedup set so a NATS replay of a
+        // previously-completed order is still rejected as duplicate.
+        const [activeOrders, recentOrderIds] = await Promise.all([
+          dbClient.getActiveOrders(),
+          dbClient.getRecentOrderIds({ sinceDays: 7 }),
+        ]);
+        const syncResult = matchingEngine.syncFromDatabase(activeOrders, recentOrderIds);
+        log.info(
+          {
+            added: syncResult.added,
+            skipped: syncResult.skipped,
+            dedupHydrated: syncResult.dedupHydrated,
+          },
+          'DB sync complete'
+        );
       } catch (error) {
         log.warn({ err: error }, 'DB sync failed, continuing with snapshot-only state');
       } finally {

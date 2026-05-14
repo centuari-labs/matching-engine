@@ -377,6 +377,12 @@ export class PostgresDbClient implements DbClient {
         GROUP BY o.id, a.user_wallet, t.token_address, o.asset_id,
                  o.side, o.type, o.rate, o.status, o.quantity,
                  o.filled_quantity, o.settlement_fee, o.created_at
+        -- Stable replay ordering: created_at is timestamptz (sub-second
+        -- precision); id ASC tiebreaks within identical created_at.
+        -- This is required for M-2 determinism — the matching loop must
+        -- produce identical (lendRemainingAfter, borrowRemainingAfter)
+        -- values across restarts or matchIds diverge.
+        ORDER BY o.created_at ASC, o.id ASC
         `
       );
 
@@ -400,6 +406,35 @@ export class PostgresDbClient implements DbClient {
 
         return base as Order;
       });
+    } finally {
+      client.release();
+    }
+  }
+
+  /**
+   * Load all orderIds from the database within a bounded recency window,
+   * regardless of status (OPEN, PARTIALLY_FILLED, FILLED, CANCELLED).
+   *
+   * Used to hydrate the matching engine's `submittedOrderIds` Set on
+   * startup, so a NATS redelivery of a previously-completed order is
+   * still rejected as duplicate. The window must be at least as long as
+   * the realistic NATS redelivery horizon (~7 days is generous).
+   *
+   * @param options.sinceDays - How many days back to load (default: 7)
+   * @returns Array of orderIds in arbitrary order
+   */
+  async getRecentOrderIds(options: { sinceDays?: number } = {}): Promise<string[]> {
+    const sinceDays = options.sinceDays ?? 7;
+    const client = await this.pool.connect();
+    try {
+      const result = await client.query<{ id: string }>(
+        `
+        SELECT id FROM orders
+        WHERE created_at > NOW() - ($1::int * INTERVAL '1 day')
+        `,
+        [sinceDays]
+      );
+      return result.rows.map((row) => row.id);
     } finally {
       client.release();
     }

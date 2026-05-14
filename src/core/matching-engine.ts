@@ -26,6 +26,27 @@ export class MatchingEngine {
   private executionEngine: ExecutionEngine;
   private snapshotService: SnapshotService | null;
 
+  /**
+   * M-1: tracks orderIds that have been submitted to this engine.
+   *
+   * Rejects duplicate `submitOrder` calls (NATS at-least-once redelivery,
+   * backend-v2 retries, attacker replay) BEFORE the matching loop runs.
+   * Without this set the loop would re-execute against a partially-filled
+   * book on replay and produce unauthorized fills — the duplicate-guard
+   * inside `OrderBook.addOrder` fires too late to prevent that.
+   *
+   * Hydrated on startup via `syncFromDatabase(orders, recentOrderIds)`
+   * with a bounded window (7 days) so a restart doesn't leak the dedup
+   * state. Entries are never removed on fill/cancel — once an orderId is
+   * seen, it must stay seen until the redelivery window expires
+   * (DB-level `unique(id)` on `orders` is the long-term backstop).
+   *
+   * Known limitation: this set is unbounded between restarts. At very
+   * high order volume the Set can grow without limit; P1 follow-up will
+   * add LRU eviction or rely fully on the DB layer for cold tier.
+   */
+  private submittedOrderIds: Set<string> = new Set();
+
   /** Serializes snapshot saves to avoid concurrent writes racing on the same files. */
   private saveSnapshotQueue: Promise<void> = Promise.resolve();
 
@@ -108,6 +129,26 @@ export class MatchingEngine {
    * @returns Match result containing matches, remaining order info, and affected maker orders
    */
   submitOrder(order: Order): MatchResult {
+    // M-1: idempotency guard — reject duplicate orderIds BEFORE the matching
+    // loop runs. Returns an empty MatchResult so downstream NATS handlers
+    // treat it as a no-op rather than emitting status updates.
+    //
+    // Logged via console.warn (not the structured logger) so it mirrors
+    // OrderBook.addOrder's existing rejection format and stays
+    // grep-compatible with M-1 test expectations. Migrating both sites to
+    // structured logging is a P3 follow-up.
+    if (this.submittedOrderIds.has(order.orderId)) {
+      // eslint-disable-next-line no-console
+      console.warn(`[MatchingEngine] Duplicate submitOrder rejected: ${order.orderId}`);
+      return {
+        matches: [],
+        remainingOrder: null,
+        affectedMakerOrders: [],
+        takerRemainingSettlementFeeAmount: order.settlementFeeAmount,
+      };
+    }
+    this.submittedOrderIds.add(order.orderId);
+
     const matches: Match[] = [];
     const affectedMakerOrders: AffectedOrder[] = [];
 
@@ -214,6 +255,15 @@ export class MatchingEngine {
 
         takerRemainingFee = takerFeeResult.remainingAfter;
 
+        // M-2: pre-compute remaining-after values BEFORE recordMatch so the
+        // deterministic matchId derivation captures the exact post-match
+        // state. lendRemainingAfter / borrowRemainingAfter are derived from
+        // the taker vs maker roles, not the side of `order`.
+        const takerRemainingAfter = subtractBigNumbers(remainingAmount, matchAmount);
+        const makerRemainingAfter = subtractBigNumbers(makerOrder.remainingAmount, matchAmount);
+        const lendRemainingAfter = takerIsLender ? takerRemainingAfter : makerRemainingAfter;
+        const borrowRemainingAfter = takerIsLender ? makerRemainingAfter : takerRemainingAfter;
+
         // Record the match — assign lender/borrower roles based on taker side
         const match = this.executionEngine.recordMatch({
           marketId: market.marketId,
@@ -222,6 +272,8 @@ export class MatchingEngine {
           lenderWallet: takerIsLender ? order.walletAddress : makerOrder.walletAddress,
           borrowerWallet: takerIsLender ? makerOrder.walletAddress : order.walletAddress,
           matchedAmount: matchAmount,
+          lendRemainingAfter,
+          borrowRemainingAfter,
           rate: makerRate,
           loanToken: order.loanToken,
           maturity: market.maturity,
@@ -236,11 +288,18 @@ export class MatchingEngine {
             : takerFeeResult.actualFee,
         });
 
+        // M-2: recordMatch returns null when the deterministic matchId
+        // already exists in the in-memory buffer (crash-resume + replay
+        // produced a duplicate). Skip all downstream effects — push to
+        // matches, removeOrder, updateOrderAmount, affectedMakerOrders —
+        // so the duplicate path is a true no-op.
+        if (!match) continue;
+
         matches.push(match);
 
-        // Update remaining amounts
-        remainingAmount = subtractBigNumbers(remainingAmount, matchAmount);
-        const makerRemainingAmount = subtractBigNumbers(makerOrder.remainingAmount, matchAmount);
+        // Apply the remaining-amount updates we computed above.
+        remainingAmount = takerRemainingAfter;
+        const makerRemainingAmount = makerRemainingAfter;
 
         // Update maker order in book and track as affected
         const makerStatus = isZero(makerRemainingAmount)
@@ -314,7 +373,10 @@ export class MatchingEngine {
     return true;
   }
 
-  updateOrder(orderId: string, walletAddress: string): Order | 'NOT_FOUND' | 'WALLET_MISMATCH' | 'INVALID_STATUS' {
+  updateOrder(
+    orderId: string,
+    walletAddress: string
+  ): Order | 'NOT_FOUND' | 'WALLET_MISMATCH' | 'INVALID_STATUS' {
     const order = this.orderBook.getOrder(orderId);
     if (!order) {
       return 'NOT_FOUND';
@@ -332,6 +394,14 @@ export class MatchingEngine {
 
     // Remove from order book
     this.orderBook.removeOrder(orderId);
+
+    // M-1 carve-out: legitimate user-initiated update is the ONE path that
+    // gets to clear the dedup entry. updateOrder has already validated the
+    // wallet match + order status, so the subsequent submitOrder with the
+    // same orderId is a sanctioned re-submit (new params), not a NATS
+    // replay. Without this, the re-submit would be silently dropped by the
+    // M-1 guard and the order would vanish from the book.
+    this.submittedOrderIds.delete(orderId);
 
     // Save snapshot after order deactivation (non-blocking)
     this.saveSnapshotAsync();
@@ -452,7 +522,15 @@ export class MatchingEngine {
 
     await previous;
     try {
-      await this.snapshotService.saveSnapshot(this.orderBook, this.executionEngine);
+      // M-1: persist submittedOrderIds alongside the order book + execution
+      // engine state so the dedup set survives planned restarts. A snapshot
+      // older than the 7-day redelivery window is fine because
+      // syncFromDatabase will re-hydrate from `getRecentOrderIds`.
+      await this.snapshotService.saveSnapshot(
+        this.orderBook,
+        this.executionEngine,
+        Array.from(this.submittedOrderIds)
+      );
     } catch (error) {
       // Log but don't throw - snapshot failures shouldn't block operations
       log.error({ err: error }, 'failed to save snapshot');
@@ -503,10 +581,20 @@ export class MatchingEngine {
       // Restore execution engine
       this.executionEngine.restoreMatches(snapshotData.matches);
 
+      // M-1: hydrate the duplicate-order dedup set from the snapshot.
+      // The schema defaults `submittedOrderIds` to `[]` for snapshots
+      // written before the M-1 fix, so old snapshots restore safely.
+      if (Array.isArray(snapshotData.submittedOrderIds)) {
+        for (const id of snapshotData.submittedOrderIds) {
+          this.submittedOrderIds.add(id);
+        }
+      }
+
       log.info(
         {
           orderCount: snapshotData.metadata.orderCount,
           matchCount: snapshotData.metadata.matchCount,
+          submittedOrderIdCount: this.submittedOrderIds.size,
         },
         'state restored from snapshot'
       );
@@ -526,14 +614,25 @@ export class MatchingEngine {
    *
    * Should be called on startup after snapshot restore to ensure consistency.
    *
+   * M-1: also accepts a list of recent orderIds (any status, bounded by a
+   * redelivery window — typically 7 days) and adds them to the dedup set
+   * so a NATS replay of a previously-completed order is still rejected.
+   *
    * @param dbOrders - Active orders loaded from the database
-   * @returns Counts of added and skipped orders
+   * @param recentOrderIds - All orderIds within the redelivery window (any status)
+   * @returns Counts of added orders, skipped orders, and hydrated dedup entries
    */
-  syncFromDatabase(dbOrders: Order[]): { added: number; skipped: number } {
+  syncFromDatabase(
+    dbOrders: Order[],
+    recentOrderIds: string[] = []
+  ): { added: number; skipped: number; dedupHydrated: number } {
     let added = 0;
     let skipped = 0;
 
     for (const order of dbOrders) {
+      // M-1: every active order is also a duplicate-replay risk.
+      this.submittedOrderIds.add(order.orderId);
+
       if (this.orderBook.getOrder(order.orderId)) {
         skipped++;
         continue;
@@ -544,6 +643,37 @@ export class MatchingEngine {
       }
     }
 
-    return { added, skipped };
+    // M-1: hydrate dedup from the full recency window so completed /
+    // cancelled orders also reject replays.
+    const beforeSize = this.submittedOrderIds.size;
+    for (const id of recentOrderIds) {
+      this.submittedOrderIds.add(id);
+    }
+    const dedupHydrated = this.submittedOrderIds.size - beforeSize + added;
+
+    return { added, skipped, dedupHydrated };
+  }
+
+  /**
+   * M-1 test helper — read the current dedup set as an array.
+   *
+   * Snapshot integration uses this to persist `submittedOrderIds`; tests use
+   * it to assert that an order has been tracked. Not part of the public hot
+   * path.
+   */
+  getSubmittedOrderIds(): string[] {
+    return Array.from(this.submittedOrderIds);
+  }
+
+  /**
+   * M-1 test helper — replace the dedup set wholesale.
+   *
+   * Snapshot restore + test setup use this to seed the dedup set from a
+   * previously-persisted list. Wholesale replacement is intentional —
+   * additive `add(...)` semantics live on the snapshot-restore path inside
+   * `restoreFromSnapshot`.
+   */
+  restoreSubmittedOrderIds(ids: string[]): void {
+    this.submittedOrderIds = new Set(ids);
   }
 }

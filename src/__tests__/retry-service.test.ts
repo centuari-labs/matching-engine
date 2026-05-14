@@ -83,6 +83,8 @@ describe('RetryService', () => {
         lenderWallet: match.lenderWallet,
         borrowerWallet: match.borrowerWallet,
         matchedAmount: match.matchedAmount,
+        lendRemainingAfter: '0',
+        borrowRemainingAfter: '0',
         rate: match.rate,
         loanToken: match.loanToken,
         maturity: match.maturity,

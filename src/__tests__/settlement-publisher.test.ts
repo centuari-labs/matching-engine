@@ -90,6 +90,10 @@ describe('SettlementPublisher Integration', () => {
         lenderWallet: walletAddress1,
         borrowerWallet: walletAddress2,
         matchedAmount,
+
+        lendRemainingAfter: '0',
+
+        borrowRemainingAfter: '0',
         rate: 500,
         loanToken,
         maturity,
@@ -104,7 +108,7 @@ describe('SettlementPublisher Integration', () => {
       await new Promise((resolve) => setTimeout(resolve, 10));
 
       expect(mockPublisher.publishedMatches).toHaveLength(1);
-      expect(mockPublisher.publishedMatches[0].matchId).toBe(match.matchId);
+      expect(mockPublisher.publishedMatches[0].matchId).toBe(match!.matchId);
     });
 
     it('should include all match fields in published message', async () => {
@@ -119,6 +123,10 @@ describe('SettlementPublisher Integration', () => {
         lenderWallet: walletAddress1,
         borrowerWallet: walletAddress2,
         matchedAmount,
+
+        lendRemainingAfter: '0',
+
+        borrowRemainingAfter: '0',
         rate: 750,
         loanToken,
         maturity,
@@ -154,6 +162,10 @@ describe('SettlementPublisher Integration', () => {
         lenderWallet: walletAddress1,
         borrowerWallet: walletAddress2,
         matchedAmount,
+
+        lendRemainingAfter: '0',
+
+        borrowRemainingAfter: '0',
         rate: 500,
         loanToken,
         maturity,
@@ -165,14 +177,14 @@ describe('SettlementPublisher Integration', () => {
       });
 
       // Match should be in memory immediately
-      expect(executionEngine.getMatch(match.matchId)).not.toBeNull();
+      expect(executionEngine.getMatch(match!.matchId)).not.toBeNull();
       expect(executionEngine.matchCount).toBe(1);
 
       // Wait for async publish and cleanup
       await new Promise((resolve) => setTimeout(resolve, 50));
 
       // Match should be removed from memory after successful publish
-      expect(executionEngine.getMatch(match.matchId)).toBeNull();
+      expect(executionEngine.getMatch(match!.matchId)).toBeNull();
       expect(executionEngine.matchCount).toBe(0);
     });
 
@@ -187,6 +199,10 @@ describe('SettlementPublisher Integration', () => {
         lenderWallet: walletAddress1,
         borrowerWallet: walletAddress2,
         matchedAmount,
+
+        lendRemainingAfter: '0',
+
+        borrowRemainingAfter: '0',
         rate: 500,
         loanToken,
         maturity,
@@ -201,7 +217,7 @@ describe('SettlementPublisher Integration', () => {
       await new Promise((resolve) => setTimeout(resolve, 50));
 
       // Match should remain in memory as fallback
-      expect(executionEngine.getMatch(match.matchId)).not.toBeNull();
+      expect(executionEngine.getMatch(match!.matchId)).not.toBeNull();
       expect(executionEngine.matchCount).toBe(1);
     });
 
@@ -216,6 +232,10 @@ describe('SettlementPublisher Integration', () => {
         lenderWallet: walletAddress1,
         borrowerWallet: walletAddress2,
         matchedAmount,
+
+        lendRemainingAfter: '0',
+
+        borrowRemainingAfter: '0',
         rate: 500,
         loanToken,
         maturity,
@@ -230,7 +250,7 @@ describe('SettlementPublisher Integration', () => {
       await new Promise((resolve) => setTimeout(resolve, 50));
 
       // Match should remain in memory as fallback
-      expect(executionEngine.getMatch(match.matchId)).not.toBeNull();
+      expect(executionEngine.getMatch(match!.matchId)).not.toBeNull();
       expect(executionEngine.matchCount).toBe(1);
     });
 
@@ -243,6 +263,8 @@ describe('SettlementPublisher Integration', () => {
         lenderWallet: walletAddress1,
         borrowerWallet: walletAddress2,
         matchedAmount: matchedAmount1,
+        lendRemainingAfter: '0',
+        borrowRemainingAfter: '0',
         rate: 500,
         loanToken,
         maturity,
@@ -261,6 +283,8 @@ describe('SettlementPublisher Integration', () => {
         lenderWallet: walletAddress1,
         borrowerWallet: walletAddress2,
         matchedAmount: matchedAmount2,
+        lendRemainingAfter: '0',
+        borrowRemainingAfter: '0',
         rate: 600,
         loanToken,
         maturity,
@@ -289,6 +313,10 @@ describe('SettlementPublisher Integration', () => {
         lenderWallet: walletAddress1,
         borrowerWallet: walletAddress2,
         matchedAmount,
+
+        lendRemainingAfter: '0',
+
+        borrowRemainingAfter: '0',
         rate: 500,
         loanToken,
         maturity,
@@ -328,6 +356,10 @@ describe('SettlementPublisher Integration', () => {
         lenderWallet: walletAddress1,
         borrowerWallet: walletAddress2,
         matchedAmount,
+
+        lendRemainingAfter: '0',
+
+        borrowRemainingAfter: '0',
         rate: 500,
         loanToken,
         maturity,
@@ -339,7 +371,7 @@ describe('SettlementPublisher Integration', () => {
       });
 
       expect(match).toBeDefined();
-      expect(match.matchId).toBeDefined();
+      expect(match!.matchId).toBeDefined();
     });
 
     it('should keep matches in memory when no publisher', async () => {
@@ -351,6 +383,10 @@ describe('SettlementPublisher Integration', () => {
         lenderWallet: walletAddress1,
         borrowerWallet: walletAddress2,
         matchedAmount,
+
+        lendRemainingAfter: '0',
+
+        borrowRemainingAfter: '0',
         rate: 500,
         loanToken,
         maturity,
@@ -364,7 +400,7 @@ describe('SettlementPublisher Integration', () => {
       await new Promise((resolve) => setTimeout(resolve, 50));
 
       // Match should remain in memory (no publisher to clean up)
-      expect(executionEngine.getMatch(match.matchId)).not.toBeNull();
+      expect(executionEngine.getMatch(match!.matchId)).not.toBeNull();
       expect(executionEngine.matchCount).toBe(1);
     });
   });
@@ -522,6 +558,8 @@ describe('SettlementPublisher Integration', () => {
           lenderWallet: walletAddress1,
           borrowerWallet: walletAddress2,
           matchedAmount,
+          lendRemainingAfter: '0',
+          borrowRemainingAfter: '0',
           rate: 500 + i,
           loanToken,
           maturity,
@@ -566,6 +604,8 @@ describe('SettlementPublisher Integration', () => {
           lenderWallet: walletAddress1,
           borrowerWallet: walletAddress2,
           matchedAmount,
+          lendRemainingAfter: '0',
+          borrowRemainingAfter: '0',
           rate: 500 + i,
           loanToken,
           maturity,
@@ -614,6 +654,8 @@ describe('SettlementPublisher Integration', () => {
         lenderWallet: walletAddress1,
         borrowerWallet: walletAddress2,
         matchedAmount,
+        lendRemainingAfter: '0',
+        borrowRemainingAfter: '0',
         rate: 500,
         loanToken,
         maturity,
@@ -626,7 +668,8 @@ describe('SettlementPublisher Integration', () => {
 
       await new Promise((resolve) => setTimeout(resolve, 50));
 
-      expect(mockHandler.onPublishSucceeded).toHaveBeenCalledWith(match.matchId);
+      expect(match).not.toBeNull();
+      expect(mockHandler.onPublishSucceeded).toHaveBeenCalledWith(match!.matchId);
       expect(mockHandler.onPublishFailed).not.toHaveBeenCalled();
     });
 
@@ -641,6 +684,8 @@ describe('SettlementPublisher Integration', () => {
         lenderWallet: walletAddress1,
         borrowerWallet: walletAddress2,
         matchedAmount,
+        lendRemainingAfter: '0',
+        borrowRemainingAfter: '0',
         rate: 500,
         loanToken,
         maturity,
@@ -668,6 +713,8 @@ describe('SettlementPublisher Integration', () => {
         lenderWallet: walletAddress1,
         borrowerWallet: walletAddress2,
         matchedAmount,
+        lendRemainingAfter: '0',
+        borrowRemainingAfter: '0',
         rate: 500,
         loanToken,
         maturity,
@@ -702,6 +749,8 @@ describe('SettlementPublisher Integration', () => {
         lenderWallet: walletAddress1,
         borrowerWallet: walletAddress2,
         matchedAmount,
+        lendRemainingAfter: '0',
+        borrowRemainingAfter: '0',
         rate: 500,
         loanToken,
         maturity,
@@ -721,6 +770,8 @@ describe('SettlementPublisher Integration', () => {
         lenderWallet: walletAddress1,
         borrowerWallet: walletAddress2,
         matchedAmount,
+        lendRemainingAfter: '0',
+        borrowRemainingAfter: '0',
         rate: 500,
         loanToken,
         maturity,
