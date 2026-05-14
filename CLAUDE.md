@@ -85,7 +85,7 @@ Backend reads `portfolio.locked_amount` for its available-balance formula but ne
 
 ### Known cancel race window (unfixed in Phase 1)
 
-For the cancel-during-match race window (a cancel arriving between engine-publishes-match and db-writer-flushes-`status=FILLED` is silently overwritten because [`updateOrderStatus` at postgres-db-client.ts:53-72](src/services/db/postgres-db-client.ts) has no `WHERE status = ?` guard) and the planned engine-coordinated-cancel fix, see [../smart-contract-revamp/docs/order-lock-lifecycle-followups.md](../smart-contract-revamp/docs/order-lock-lifecycle-followups.md).
+For the cancel-during-match race window (a cancel arriving between engine-publishes-match and db-writer-flushes-`status=FILLED` is silently overwritten because [`updateOrderStatus` at postgres-db-client.ts:53-72](src/services/db/postgres-db-client.ts) has no `WHERE status = ?` guard) and the planned engine-coordinated-cancel fix, see [../smart-contract-revamp/docs/hub-only-launch-plan.md](../smart-contract-revamp/docs/hub-only-launch-plan.md) Track C (deep reference in [archive/order-lock-lifecycle-followups.md](../smart-contract-revamp/docs/archive/order-lock-lifecycle-followups.md)).
 
 ## Code Standards
 
