@@ -18,6 +18,9 @@ import { loadRedisConfig, type RedisConfig } from '../config/redis-config';
 import { loadDbConfig } from '../config/db-config';
 import { DbWriterService } from './db-writer-service';
 import { PostgresDbClient } from './db/postgres-db-client';
+import { createLogger } from '../utils/logger';
+
+const log = createLogger('db-writer-main');
 
 // Load environment variables from .env file
 dotenv.config();
@@ -42,9 +45,9 @@ async function createNatsConnection(config: NatsConfig): Promise<NatsConnection>
     options.token = config.token;
   }
 
-  console.log(`DB Writer: connecting to NATS at ${config.url}...`);
+  log.info({ url: config.url }, 'connecting to NATS');
   const nc = await connect(options);
-  console.log('DB Writer: connected to NATS');
+  log.info('connected to NATS');
   return nc;
 }
 
@@ -53,9 +56,7 @@ function createRedisClient(config: RedisConfig): Redis {
     maxRetriesPerRequest: config.maxReconnectAttempts,
     retryStrategy: (times: number) => {
       if (times > config.maxReconnectAttempts) {
-        console.error(
-          `DB Writer Redis: max reconnect attempts (${config.maxReconnectAttempts}) exceeded`
-        );
+        log.error({ maxAttempts: config.maxReconnectAttempts }, 'max reconnect attempts exceeded');
         return null;
       }
       return config.reconnectTimeWait;
@@ -73,11 +74,11 @@ function createRedisClient(config: RedisConfig): Redis {
     options.tls = {};
   }
 
-  console.log(`DB Writer: connecting to Redis at ${config.url}...`);
+  log.info({ url: config.url }, 'connecting to Redis');
   const client = new Redis(config.url, options);
 
   client.on('error', (err) => {
-    console.error('DB Writer Redis error:', err);
+    log.error({ err }, 'redis error');
   });
 
   return client;
@@ -85,12 +86,12 @@ function createRedisClient(config: RedisConfig): Redis {
 
 async function handleShutdown(signal: string): Promise<void> {
   if (isShuttingDown) {
-    console.log('DB Writer: shutdown already in progress...');
+    log.info('shutdown already in progress');
     return;
   }
 
   isShuttingDown = true;
-  console.log(`\nDB Writer: ${signal} received, shutting down gracefully...`);
+  log.info({ signal }, 'shutting down gracefully');
 
   try {
     if (dbWriterService) {
@@ -107,10 +108,10 @@ async function handleShutdown(signal: string): Promise<void> {
       redisClient = null;
     }
 
-    console.log('DB Writer: shutdown complete');
+    log.info('shutdown complete');
     process.exit(0);
   } catch (error) {
-    console.error('DB Writer: error during shutdown', error);
+    log.error({ err: error }, 'error during shutdown');
     process.exit(1);
   }
 }
@@ -123,35 +124,29 @@ function setupSignalHandlers(): void {
     void handleShutdown('SIGTERM');
   });
   process.on('uncaughtException', (error) => {
-    console.error('DB Writer: uncaught exception', error);
+    log.error({ err: error }, 'uncaught exception');
     void handleShutdown('UNCAUGHT_EXCEPTION');
   });
   process.on('unhandledRejection', (reason) => {
-    console.error('DB Writer: unhandled rejection', reason);
+    log.error({ err: reason }, 'unhandled rejection');
     void handleShutdown('UNHANDLED_REJECTION');
   });
 }
 
 async function main(): Promise<void> {
-  console.log('=================================');
-  console.log('DB Writer Service Starting');
-  console.log('=================================\n');
+  log.info('db writer service starting');
 
   try {
     const natsConfig = loadNatsConfig();
     const redisConfig = loadRedisConfig();
     const dbConfig = loadDbConfig();
 
-    console.log('DB Writer Configuration:');
-    console.log(`  NATS URL: ${natsConfig.url}`);
-    console.log(`  Redis URL: ${redisConfig.url}`);
-    console.log(`  DB URL: ${dbConfig.url}`);
-    console.log('');
+    log.info({ natsUrl: natsConfig.url, redisUrl: redisConfig.url, dbUrl: dbConfig.url }, 'configuration');
 
     natsConnection = await createNatsConnection(natsConfig);
     redisClient = createRedisClient(redisConfig);
     await redisClient.connect();
-    console.log('DB Writer: connected to Redis');
+    log.info('connected to Redis');
 
     const dbClient = new PostgresDbClient(dbConfig);
     dbWriterService = new DbWriterService(natsConnection, redisClient, dbClient, {
@@ -159,12 +154,9 @@ async function main(): Promise<void> {
     });
     await dbWriterService.start();
 
-    console.log('\n=================================');
-    console.log('DB Writer Service is running');
-    console.log('Press Ctrl+C to stop');
-    console.log('=================================\n');
+    log.info('db writer service is running');
   } catch (error) {
-    console.error('DB Writer: failed to start service', error);
+    log.error({ err: error }, 'failed to start service');
     process.exit(1);
   }
 }

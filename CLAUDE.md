@@ -95,6 +95,12 @@ NATS message → Zod parse → Validate → Match against order book → Record 
 8. **IOC for market orders** — market orders are Immediate-or-Cancel. Unmatched remainder is cancelled, not placed in the book.
 9. **Atomic snapshots** — write to `.tmp` file, then rename. Never leave partial snapshots on disk.
 10. **Concurrency control in DB Writer** — limit concurrent DB operations via `maxConcurrency`. Don't overwhelm the database.
+11. **No `as any` casts** — Use proper type wrappers (e.g., `OrderWithSettlementTracking`) for runtime-added fields. If a field doesn't exist on the type, extend the type — never cast to `any`.
+12. **Single handler pattern** — NATS message handlers that differ only by schema/label must use a single generic handler function. No copy-paste of handler logic per order type.
+13. **Structured logging** — Use the logger interface (`src/utils/logger.ts`), not raw `console.log/warn/error`. Log with structured fields: `{ service, orderId?, matchId?, ... }`.
+14. **Memory buffer eviction** — Any in-memory buffer (matches, orders, caches) must have a max-age eviction policy and a max-size cap. Document the eviction strategy in comments.
+15. **No `z.any()` in Zod schemas** — All schema fields must be properly typed. Use schema references (`matchSchema`, `orderSchema`) instead of `z.any()`. If complex types cause circular imports, restructure the type hierarchy.
+16. **Named constants** — No magic numbers in business logic. Extract sentinel values, timeouts, batch sizes, and thresholds into named constants.
 
 ### Testing Rules
 
@@ -103,6 +109,7 @@ NATS message → Zod parse → Validate → Match against order book → Record 
 - One test file per feature: `price-time-priority.test.ts`, `partial-fills.test.ts`, `maker-taker-fee.test.ts`
 - Integration tests suffixed with `.integration.test.ts`
 - Mock NATS/Redis in unit tests — test core logic in isolation
+- Core data structures (`OrderBook`, `ExecutionEngine`) must have dedicated unit test files — not only indirect coverage through integration tests
 
 ### Error Handling
 

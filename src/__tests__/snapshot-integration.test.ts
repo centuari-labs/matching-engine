@@ -195,10 +195,6 @@ describe('Snapshot Integration', () => {
       // Verify order book structure (checks trees)
       const orderBook = engine2.getOrderBook(DEFAULT_LOAN_TOKEN, DEFAULT_MATURITY, 10);
       
-      // Debug: Log what we got
-      console.log('Lend orders:', orderBook.lendOrders.length);
-      console.log('Borrow orders:', orderBook.borrowOrders.length);
-      
       expect(orderBook.lendOrders.length).toBeGreaterThan(0);
       expect(orderBook.borrowOrders.length).toBeGreaterThan(0);
 

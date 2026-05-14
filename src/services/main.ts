@@ -9,9 +9,15 @@ import { MatchingEngine } from '../core/matching-engine';
 import { NatsService } from './nats-service';
 import { RedisService } from './redis-service';
 import { SnapshotService } from './snapshot-service';
+import { RetryService } from './retry-service';
+import { DiskPersistenceService } from './disk-persistence-service';
 import { PostgresDbClient } from './db/postgres-db-client';
 import { loadSnapshotDir } from '../config/snapshot-config';
+import { loadBufferConfig } from '../config/buffer-config';
+import { createLogger } from '../utils/logger';
 import * as dotenv from 'dotenv';
+
+const log = createLogger('main');
 
 // Load environment variables from .env file
 dotenv.config();
@@ -23,6 +29,8 @@ let natsService: NatsService | null = null;
 let redisService: RedisService | null = null;
 let matchingEngine: MatchingEngine | null = null;
 let snapshotService: SnapshotService | null = null;
+let retryService: RetryService | null = null;
+let diskPersistenceService: DiskPersistenceService | null = null;
 let snapshotTimer: NodeJS.Timeout | null = null;
 let isShuttingDown = false;
 
@@ -33,12 +41,12 @@ let isShuttingDown = false;
  */
 async function handleShutdown(signal: string): Promise<void> {
   if (isShuttingDown) {
-    console.log('Shutdown already in progress...');
+    log.info('shutdown already in progress');
     return;
   }
 
   isShuttingDown = true;
-  console.log(`\n${signal} received. Shutting down gracefully...`);
+  log.info({ signal }, 'shutting down gracefully');
 
   try {
     // Stop periodic snapshot timer
@@ -49,13 +57,30 @@ async function handleShutdown(signal: string): Promise<void> {
 
     // Save final snapshot before shutdown
     if (matchingEngine && snapshotService) {
-      console.log('Saving final snapshot before shutdown...');
+      log.info('saving final snapshot before shutdown');
       try {
         await matchingEngine.saveSnapshot();
-        console.log('✓ Final snapshot saved');
+        log.info('final snapshot saved');
       } catch (error) {
-        console.warn('Failed to save final snapshot:', error);
+        log.warn({ err: error }, 'failed to save final snapshot');
       }
+    }
+
+    // Flush unpublished matches to disk and shutdown retry service
+    if (matchingEngine && diskPersistenceService) {
+      try {
+        const unpublished = matchingEngine.getExecutionEngine().getUnpublishedMatches();
+        if (unpublished.length > 0) {
+          await diskPersistenceService.flush(unpublished);
+          log.info({ count: unpublished.length }, 'flushed unpublished matches to disk');
+        }
+      } catch (error) {
+        log.warn({ err: error }, 'failed to flush unpublished matches to disk');
+      }
+    }
+
+    if (retryService) {
+      retryService.shutdown();
     }
 
     // Disconnect from NATS
@@ -68,10 +93,10 @@ async function handleShutdown(signal: string): Promise<void> {
       await redisService.disconnect();
     }
 
-    console.log('✓ Service shutdown complete');
+    log.info('service shutdown complete');
     process.exit(0);
   } catch (error) {
-    console.error('Error during shutdown:', error);
+    log.error({ err: error }, 'error during shutdown');
     process.exit(1);
   }
 }
@@ -82,8 +107,8 @@ async function handleShutdown(signal: string): Promise<void> {
  * @param error - Uncaught error
  */
 function handleUncaughtError(error: Error): void {
-  console.error('Uncaught error:', error);
-  
+  log.error({ err: error }, 'uncaught error');
+
   // Attempt graceful shutdown
   handleShutdown('UNCAUGHT_ERROR').catch(() => {
     process.exit(1);
@@ -95,27 +120,26 @@ function handleUncaughtError(error: Error): void {
  */
 async function main(): Promise<void> {
   try {
-    console.log('=================================');
-    console.log('Matching Engine Service Starting');
-    console.log('=================================\n');
+    log.info('matching engine service starting');
 
     // Display configuration
-    console.log('Configuration:');
-    console.log(`  NATS URL: ${process.env.NATS_URL || 'nats://localhost:4222'}`);
-    console.log(`  Redis URL: ${process.env.REDIS_URL || 'redis://localhost:6379'}`);
-    console.log(`  Node Environment: ${process.env.NODE_ENV || 'development'}\n`);
+    log.info(
+      {
+        natsUrl: process.env.NATS_URL || 'nats://localhost:4222',
+        redisUrl: process.env.REDIS_URL || 'redis://localhost:6379',
+        nodeEnv: process.env.NODE_ENV || 'development',
+      },
+      'configuration'
+    );
 
     // Initialize Redis service first (optional - continues without it if connection fails)
     // Redis is used as the settlement publisher for the matching engine
-    console.log('Initializing Redis service...');
+    log.info('initializing Redis service');
     try {
       redisService = new RedisService();
       await redisService.connect();
-      console.log();
     } catch (redisError) {
-      console.warn('⚠ Redis connection failed, settlement publishing disabled');
-      console.warn(`  Error: ${redisError instanceof Error ? redisError.message : 'Unknown error'}`);
-      console.log();
+      log.warn({ err: redisError }, 'Redis connection failed, settlement publishing disabled');
       redisService = null;
     }
 
@@ -127,119 +151,165 @@ async function main(): Promise<void> {
     const snapshotRedisEnabled = process.env.SNAPSHOT_REDIS_ENABLED === 'true';
 
     if (snapshotEnabled) {
-      console.log('Initializing snapshot service...');
+      log.info('initializing snapshot service');
       snapshotService = new SnapshotService(
         snapshotDir,
         redisService ?? null,
         snapshotRedisEnabled
       );
-      console.log(`  Snapshot directory: ${snapshotDir}`);
-      console.log(`  Redis backup: ${snapshotRedisEnabled ? 'Enabled' : 'Disabled'}`);
-      console.log('✓ Snapshot service initialized\n');
+      log.info({ snapshotDir, redisBackup: snapshotRedisEnabled }, 'snapshot service initialized');
     } else {
-      console.log('Snapshot service: Disabled\n');
+      log.info('snapshot service disabled');
     }
 
+    // Initialize buffer management (retry + disk persistence)
+    log.info('initializing buffer management');
+    const bufferConfig = loadBufferConfig();
+    diskPersistenceService = new DiskPersistenceService(bufferConfig.diskSpillDir);
+    retryService = new RetryService(diskPersistenceService, bufferConfig);
+    log.info(
+      {
+        retryInitialDelayMs: bufferConfig.retryInitialDelayMs,
+        retryMaxDelayMs: bufferConfig.retryMaxDelayMs,
+        warningThresholds: bufferConfig.warningThresholds,
+        diskSpillThreshold: bufferConfig.diskSpillThreshold,
+        diskSpillDir: bufferConfig.diskSpillDir,
+        bufferMaxSize: bufferConfig.bufferMaxSize,
+      },
+      'buffer management initialized'
+    );
+
     // Initialize matching engine with optional settlement publisher (Redis) and snapshot service
-    console.log('Initializing matching engine...');
-    matchingEngine = new MatchingEngine(redisService ?? undefined, snapshotService ?? undefined);
-    console.log('✓ Matching engine initialized\n');
+    log.info('initializing matching engine');
+    matchingEngine = new MatchingEngine(
+      redisService ?? undefined,
+      snapshotService ?? undefined,
+      retryService,
+      bufferConfig.warningThresholds,
+      bufferConfig.diskSpillThreshold,
+      bufferConfig.bufferMaxSize
+    );
+    retryService.setExecutionEngine(matchingEngine.getExecutionEngine());
+    log.info('matching engine initialized');
 
     // Restore state from snapshot if available (unless reset requested)
     if (snapshotService) {
       const snapshotResetOnStartup = process.env.SNAPSHOT_RESET_ON_STARTUP === 'true';
       if (snapshotResetOnStartup) {
-        console.log('SNAPSHOT_RESET_ON_STARTUP=true: Starting with empty state (skipping restore)\n');
+        log.info('SNAPSHOT_RESET_ON_STARTUP=true, starting with empty state');
       } else {
-        console.log('Attempting to restore state from snapshot...');
+        log.info('attempting to restore state from snapshot');
         const restored = await matchingEngine.restoreFromSnapshot();
         if (restored) {
-          console.log('✓ State restored from snapshot\n');
+          log.info('state restored from snapshot');
         } else {
-          console.log('  No snapshot found or restore failed, starting with empty state\n');
+          log.info('no snapshot found or restore failed, starting with empty state');
         }
+      }
+    }
+
+    // Restore disk-spilled matches if any exist from a previous crash
+    if (diskPersistenceService && matchingEngine) {
+      try {
+        const hasSpill = await diskPersistenceService.exists();
+        if (hasSpill) {
+          log.info('loading disk-spilled unpublished matches');
+          const spilledMatches = await diskPersistenceService.load();
+          if (spilledMatches.length > 0) {
+            matchingEngine.getExecutionEngine().mergeMatches(spilledMatches);
+            log.info({ count: spilledMatches.length }, 'merged matches from disk spill');
+            // Retry publishing all recovered matches
+            for (const match of spilledMatches) {
+              matchingEngine.getExecutionEngine().retryPublish(match.matchId);
+            }
+            log.info('queued recovered matches for publishing');
+          }
+        }
+      } catch (error) {
+        log.warn({ err: error }, 'failed to load disk-spilled matches');
       }
     }
 
     // Sync order book with database to ensure all active orders are in memory
     const dbSyncEnabled = process.env.DB_SYNC_ON_STARTUP !== 'false';
     if (dbSyncEnabled && process.env.DB_URL) {
-      console.log('Syncing order book with database...');
+      log.info('syncing order book with database');
       const dbClient = new PostgresDbClient();
       try {
+        // M-1: load active orders + recent orderIds in parallel, then
+        // hydrate the matching engine's dedup set so a NATS replay of a
+        // previously-completed order is still rejected as duplicate.
         const [activeOrders, recentOrderIds] = await Promise.all([
           dbClient.getActiveOrders(),
           dbClient.getRecentOrderIds({ sinceDays: 7 }),
         ]);
         const syncResult = matchingEngine.syncFromDatabase(activeOrders, recentOrderIds);
-        console.log(
-          `✓ DB sync complete: ${syncResult.added} orders added, ${syncResult.skipped} already in memory, ${syncResult.dedupHydrated} ids in dedup set`
+        log.info(
+          {
+            added: syncResult.added,
+            skipped: syncResult.skipped,
+            dedupHydrated: syncResult.dedupHydrated,
+          },
+          'DB sync complete'
         );
       } catch (error) {
-        console.warn(
-          '⚠ DB sync failed, continuing with snapshot-only state:',
-          error instanceof Error ? error.message : 'Unknown error'
-        );
+        log.warn({ err: error }, 'DB sync failed, continuing with snapshot-only state');
       } finally {
         await dbClient.close();
       }
-      console.log();
     }
 
     // Initialize NATS service
-    console.log('Initializing NATS service...');
+    log.info('initializing NATS service');
     natsService = new NatsService(matchingEngine);
     await natsService.connect();
-    console.log();
 
     // Display service statistics
     const natsStats = natsService.getStats();
-    console.log('Service Status:');
-    console.log(`  NATS Connected: ${natsStats.connected}`);
-    console.log(`  Active Subscriptions: ${natsStats.subscriptions}`);
-    console.log(`  NATS Server: ${natsStats.config.url}`);
-    console.log(`  NATS Authentication: ${natsStats.config.hasAuth ? 'Enabled' : 'Disabled'}`);
+    log.info(
+      {
+        natsConnected: natsStats.connected,
+        subscriptions: natsStats.subscriptions,
+        natsServer: natsStats.config.url,
+        natsAuth: natsStats.config.hasAuth,
+      },
+      'NATS status'
+    );
 
     // Display Redis status
     if (redisService) {
       const redisStats = redisService.getStats();
-      console.log(`  Redis Connected: ${redisStats.connected}`);
-      console.log(`  Redis Server: ${redisStats.config.url}`);
-      console.log(`  Redis Database: ${redisStats.config.db}`);
-
-      // Get stream info
       const streamInfo = await redisService.getStreamInfo();
-      if (streamInfo) {
-        console.log(`  Settlement Stream Length: ${streamInfo.length}`);
-        console.log(`  Consumer Groups: ${streamInfo.groups}`);
-      }
+      log.info(
+        {
+          redisConnected: redisStats.connected,
+          redisServer: redisStats.config.url,
+          redisDb: redisStats.config.db,
+          streamLength: streamInfo?.length ?? 0,
+          consumerGroups: streamInfo?.groups ?? 0,
+        },
+        'Redis status'
+      );
     } else {
-      console.log('  Redis: Disabled (settlement publishing disabled)');
+      log.info('Redis disabled (settlement publishing disabled)');
     }
 
     // Start periodic snapshot timer if enabled
     if (snapshotService && matchingEngine) {
-      const snapshotIntervalSeconds = parseInt(
-        process.env.SNAPSHOT_INTERVAL_SECONDS || '30',
-        10
-      );
+      const snapshotIntervalSeconds = parseInt(process.env.SNAPSHOT_INTERVAL_SECONDS || '30', 10);
       if (snapshotIntervalSeconds > 0) {
         snapshotTimer = setInterval(() => {
           matchingEngine!.saveSnapshot().catch((error) => {
-            console.warn('Periodic snapshot failed:', error);
+            log.warn({ err: error }, 'periodic snapshot failed');
           });
         }, snapshotIntervalSeconds * 1000);
-        console.log(`  Periodic snapshots: Every ${snapshotIntervalSeconds} seconds`);
+        log.info({ intervalSeconds: snapshotIntervalSeconds }, 'periodic snapshots enabled');
       }
     }
 
-    console.log();
-    console.log('=================================');
-    console.log('Service is ready to process orders');
-    console.log('Press Ctrl+C to stop');
-    console.log('=================================\n');
+    log.info('service is ready to process orders');
   } catch (error) {
-    console.error('Failed to start service:', error);
+    log.error({ err: error }, 'failed to start service');
     process.exit(1);
   }
 }
@@ -255,7 +325,7 @@ function setupSignalHandlers(): void {
   // Handle uncaught errors
   process.on('uncaughtException', handleUncaughtError);
   process.on('unhandledRejection', (reason: unknown) => {
-    console.error('Unhandled promise rejection:', reason);
+    log.error({ err: reason }, 'unhandled promise rejection');
     handleUncaughtError(new Error(String(reason)));
   });
 }
@@ -269,7 +339,7 @@ function startService(): void {
 
   // Start main service
   main().catch((error) => {
-    console.error('Fatal error during service startup:', error);
+    log.error({ err: error }, 'fatal error during service startup');
     process.exit(1);
   });
 }
@@ -281,4 +351,3 @@ if (require.main === module) {
 
 // Export for testing
 export { main, handleShutdown, startService };
-

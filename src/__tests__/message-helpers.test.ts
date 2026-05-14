@@ -163,8 +163,8 @@ describe('Message Helpers', () => {
       const message = createMatchCreatedMessage(orderId, result);
 
       expect(message.remainingOrder).not.toBeNull();
-      expect(message.remainingOrder.orderId).toBe(orderId);
-      expect(message.remainingOrder.remainingAmount).toBe('500000');
+      expect(message.remainingOrder!.orderId).toBe(orderId);
+      expect(message.remainingOrder!.remainingAmount).toBe('500000');
     });
   });
 

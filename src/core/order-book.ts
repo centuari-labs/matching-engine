@@ -136,13 +136,18 @@ export class OrderBook {
   }
 
   /**
-   * Update an order's remaining amount
+   * Update an order's remaining amount and optionally its remaining settlement fee.
    *
    * @param orderId - The ID of the order to update
    * @param newRemainingAmount - The new remaining amount
+   * @param remainingSettlementFeeAmount - Optional updated remaining settlement fee
    * @returns True if updated successfully
    */
-  updateOrderAmount(orderId: string, newRemainingAmount: string): boolean {
+  updateOrderAmount(
+    orderId: string,
+    newRemainingAmount: string,
+    remainingSettlementFeeAmount?: string
+  ): boolean {
     const metadata = this.orderIndex.get(orderId);
     if (!metadata) {
       return false;
@@ -156,6 +161,7 @@ export class OrderBook {
       ...metadata.order,
       remainingAmount: newRemainingAmount,
       status: isZero(newRemainingAmount) ? OrderStatus.Filled : OrderStatus.PartiallyFilled,
+      ...(remainingSettlementFeeAmount !== undefined && { remainingSettlementFeeAmount }),
     };
 
     // Re-add if not fully filled

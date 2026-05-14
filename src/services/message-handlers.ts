@@ -15,16 +15,29 @@ import {
 } from '../types/orders';
 import {
   cancelOrderMessageSchema,
+  updateOrderMessageSchema,
   createErrorMessage,
   createOrderStatusMessage,
   ERROR_CODES,
   type ErrorMessage,
   type CancelledRemainderMessage,
+  type ErrorCode,
 } from '../types/messages';
 import type { Match, MatchResult } from '../types/matches';
 import { OrderSide, OrderStatus, OrderType } from '../types/orders';
 import { NATS_TOPICS } from '../config/nats-config';
-import { addBigNumbers, subtractBigNumbers, isZero, generateOrderId } from '../utils/helpers';
+import type { Order } from '../types/orders';
+import { isLimitOrder } from '../types/orders';
+import {
+  addBigNumbers,
+  subtractBigNumbers,
+  isZero,
+  generateOrderId,
+  calculateProRataSettlementFee,
+} from '../utils/helpers';
+import { createLogger } from '../utils/logger';
+
+const log = createLogger('message-handlers');
 
 /**
  * Handler context containing dependencies
@@ -73,7 +86,7 @@ function publishError(ctx: HandlerContext, error: ErrorMessage): void {
     const message = JSON.stringify(error);
     ctx.nc.publish(NATS_TOPICS.ERRORS, message);
   } catch (err) {
-    console.error('Failed to publish error message:', err);
+    log.error({ err }, 'failed to publish error message');
   }
 }
 
@@ -141,7 +154,7 @@ function publishOrderStatusUpdates(
         settlementFeeAmount: originalOrder.settlementFeeAmount,
         remainingSettlementFeeAmount: isFull
           ? '0'
-          : originalOrder.remainingSettlementFeeAmount ?? '0',
+          : (originalOrder.remainingSettlementFeeAmount ?? '0'),
       });
       ctx.nc.publish(NATS_TOPICS.ORDERS_STATUS, JSON.stringify(takerStatusMessage));
 
@@ -153,8 +166,7 @@ function publishOrderStatusUpdates(
         originalOrder.side &&
         originalOrder.marketIds
       ) {
-        const remainingSettlementFee =
-          originalOrder.remainingSettlementFeeAmount ?? '0';
+        const remainingSettlementFee = originalOrder.remainingSettlementFeeAmount ?? '0';
 
         const cancelledRemainder: CancelledRemainderMessage = {
           orderId: generateOrderId(),
@@ -170,10 +182,7 @@ function publishOrderStatusUpdates(
           cancelReason: 'IOC',
           timestamp: Date.now(),
         };
-        ctx.nc.publish(
-          NATS_TOPICS.ORDERS_CANCELLED_REMAINDER,
-          JSON.stringify(cancelledRemainder)
-        );
+        ctx.nc.publish(NATS_TOPICS.ORDERS_CANCELLED_REMAINDER, JSON.stringify(cancelledRemainder));
       }
     } else if (originalOrder) {
       // Market order with no matches — cancel it so DB Writer updates the row
@@ -195,7 +204,7 @@ function publishOrderStatusUpdates(
       ctx.nc.publish(NATS_TOPICS.ORDERS_STATUS, JSON.stringify(statusMessage));
     }
   } catch (err) {
-    console.error('Failed to publish order status updates:', err);
+    log.error({ err, orderId }, 'failed to publish order status updates');
     publishError(
       ctx,
       createErrorMessage(
@@ -236,33 +245,31 @@ function publishMatchCreatedEvents(
       ctx.nc.publish(NATS_TOPICS.MATCHES_CREATED, JSON.stringify(tradeEvent));
     }
   } catch (err) {
-    console.error('Failed to publish match created events:', err);
+    log.error({ err }, 'failed to publish match created events');
   }
 }
 
 /**
- * Handle lend market order messages
- *
- * @param ctx - Handler context
- * @param data - Raw message data
+ * Generic order handler — all order types share the same processing pipeline.
+ * Only the Zod schema (for validation) and the log label differ.
  */
-export function handleLendMarketOrder(ctx: HandlerContext, data: Uint8Array): void {
+function handleOrder<T extends Order>(
+  ctx: HandlerContext,
+  data: Uint8Array,
+  schema: { parse: (data: unknown) => T },
+  label: string
+): void {
   try {
-    // Parse and validate the order
-    const order = parseMessage(data, lendMarketOrderSchema);
-    // Initialize remaining settlement fee pool for internal tracking
-    (order as any).remainingSettlementFeeAmount = order.settlementFeeAmount;
+    const order = parseMessage(data, schema);
 
-    console.log(`Processing lend market order: ${order.orderId}`);
+    log.debug({ orderId: order.orderId, type: label }, 'processing order');
 
-    // Submit to matching engine
     const result = ctx.engine.submitOrder(order);
 
-    // Publish order status updates for taker and affected maker orders
     publishOrderStatusUpdates(ctx, order.orderId, result, {
       originalAmount: order.originalAmount,
       settlementFeeAmount: order.settlementFeeAmount,
-      remainingSettlementFeeAmount: (order as any).remainingSettlementFeeAmount,
+      remainingSettlementFeeAmount: result.takerRemainingSettlementFeeAmount,
       walletAddress: order.walletAddress,
       assetId: order.assetId,
       side: order.side,
@@ -270,171 +277,32 @@ export function handleLendMarketOrder(ctx: HandlerContext, data: Uint8Array): vo
       marketIds: order.markets.map((m) => m.marketId),
     });
 
-    // Publish recent-trade events for each match
     if (result.matches.length > 0) {
       publishMatchCreatedEvents(ctx, order.assetId, order.side, result.matches);
     }
 
-    console.log(
-      `Lend market order ${order.orderId} processed: ${result.matches.length} matches`
+    log.debug(
+      { orderId: order.orderId, matchCount: result.matches.length, type: label },
+      'order processed'
     );
   } catch (error) {
-    console.error('Error handling lend market order:', error);
-    const errorMsg =
-      error instanceof Error ? error.message : 'Unknown error';
-    publishError(
-      ctx,
-      createErrorMessage(ERROR_CODES.INVALID_ORDER, errorMsg)
-    );
+    log.error({ err: error, type: label }, 'error handling order');
+    const errorMsg = error instanceof Error ? error.message : 'Unknown error';
+    publishError(ctx, createErrorMessage(ERROR_CODES.INVALID_ORDER, errorMsg));
   }
 }
 
-/**
- * Handle lend limit order messages
- *
- * @param ctx - Handler context
- * @param data - Raw message data
- */
-export function handleLendLimitOrder(ctx: HandlerContext, data: Uint8Array): void {
-  try {
-    // Parse and validate the order
-    const order = parseMessage(data, lendLimitOrderSchema);
-    // Initialize remaining settlement fee pool for internal tracking
-    (order as any).remainingSettlementFeeAmount = order.settlementFeeAmount;
+export const handleLendMarketOrder = (ctx: HandlerContext, data: Uint8Array): void =>
+  handleOrder(ctx, data, lendMarketOrderSchema, 'lend market order');
 
-    console.log(`Processing lend limit order: ${order.orderId} at rate ${order.rate}`);
+export const handleLendLimitOrder = (ctx: HandlerContext, data: Uint8Array): void =>
+  handleOrder(ctx, data, lendLimitOrderSchema, 'lend limit order');
 
-    // Submit to matching engine
-    const result = ctx.engine.submitOrder(order);
+export const handleBorrowMarketOrder = (ctx: HandlerContext, data: Uint8Array): void =>
+  handleOrder(ctx, data, borrowMarketOrderSchema, 'borrow market order');
 
-    // Publish order status updates for taker and affected maker orders
-    publishOrderStatusUpdates(ctx, order.orderId, result, {
-      originalAmount: order.originalAmount,
-      settlementFeeAmount: order.settlementFeeAmount,
-      remainingSettlementFeeAmount: (order as any).remainingSettlementFeeAmount,
-      walletAddress: order.walletAddress,
-      assetId: order.assetId,
-      side: order.side,
-      type: order.type,
-      marketIds: order.markets.map((m) => m.marketId),
-    });
-
-    // Publish recent-trade events for each match
-    if (result.matches.length > 0) {
-      publishMatchCreatedEvents(ctx, order.assetId, order.side, result.matches);
-    }
-
-    console.log(
-      `Lend limit order ${order.orderId} processed: ${result.matches.length} matches`
-    );
-  } catch (error) {
-    console.error('Error handling lend limit order:', error);
-    const errorMsg =
-      error instanceof Error ? error.message : 'Unknown error';
-    publishError(
-      ctx,
-      createErrorMessage(ERROR_CODES.INVALID_ORDER, errorMsg)
-    );
-  }
-}
-
-/**
- * Handle borrow market order messages
- *
- * @param ctx - Handler context
- * @param data - Raw message data
- */
-export function handleBorrowMarketOrder(ctx: HandlerContext, data: Uint8Array): void {
-  try {
-    // Parse and validate the order
-    const order = parseMessage(data, borrowMarketOrderSchema);
-    // Initialize remaining settlement fee pool for internal tracking
-    (order as any).remainingSettlementFeeAmount = order.settlementFeeAmount;
-
-    console.log(`Processing borrow market order: ${order.orderId}`);
-
-    // Submit to matching engine
-    const result = ctx.engine.submitOrder(order);
-
-    // Publish order status updates for taker and affected maker orders
-    publishOrderStatusUpdates(ctx, order.orderId, result, {
-      originalAmount: order.originalAmount,
-      settlementFeeAmount: order.settlementFeeAmount,
-      remainingSettlementFeeAmount: (order as any).remainingSettlementFeeAmount,
-      walletAddress: order.walletAddress,
-      assetId: order.assetId,
-      side: order.side,
-      type: order.type,
-      marketIds: order.markets.map((m) => m.marketId),
-    });
-
-    // Publish recent-trade events for each match
-    if (result.matches.length > 0) {
-      publishMatchCreatedEvents(ctx, order.assetId, order.side, result.matches);
-    }
-
-    console.log(
-      `Borrow market order ${order.orderId} processed: ${result.matches.length} matches`
-    );
-  } catch (error) {
-    console.error('Error handling borrow market order:', error);
-    const errorMsg =
-      error instanceof Error ? error.message : 'Unknown error';
-    publishError(
-      ctx,
-      createErrorMessage(ERROR_CODES.INVALID_ORDER, errorMsg)
-    );
-  }
-}
-
-/**
- * Handle borrow limit order messages
- *
- * @param ctx - Handler context
- * @param data - Raw message data
- */
-export function handleBorrowLimitOrder(ctx: HandlerContext, data: Uint8Array): void {
-  try {
-    // Parse and validate the order
-    const order = parseMessage(data, borrowLimitOrderSchema);
-    // Initialize remaining settlement fee pool for internal tracking
-    (order as any).remainingSettlementFeeAmount = order.settlementFeeAmount;
-
-    console.log(`Processing borrow limit order: ${order.orderId} at rate ${order.rate}`);
-
-    // Submit to matching engine
-    const result = ctx.engine.submitOrder(order);
-
-    // Publish order status updates for taker and affected maker orders
-    publishOrderStatusUpdates(ctx, order.orderId, result, {
-      originalAmount: order.originalAmount,
-      settlementFeeAmount: order.settlementFeeAmount,
-      remainingSettlementFeeAmount: (order as any).remainingSettlementFeeAmount,
-      walletAddress: order.walletAddress,
-      assetId: order.assetId,
-      side: order.side,
-      type: order.type,
-      marketIds: order.markets.map((m) => m.marketId),
-    });
-
-    // Publish recent-trade events for each match
-    if (result.matches.length > 0) {
-      publishMatchCreatedEvents(ctx, order.assetId, order.side, result.matches);
-    }
-
-    console.log(
-      `Borrow limit order ${order.orderId} processed: ${result.matches.length} matches`
-    );
-  } catch (error) {
-    console.error('Error handling borrow limit order:', error);
-    const errorMsg =
-      error instanceof Error ? error.message : 'Unknown error';
-    publishError(
-      ctx,
-      createErrorMessage(ERROR_CODES.INVALID_ORDER, errorMsg)
-    );
-  }
-}
+export const handleBorrowLimitOrder = (ctx: HandlerContext, data: Uint8Array): void =>
+  handleOrder(ctx, data, borrowLimitOrderSchema, 'borrow limit order');
 
 /**
  * Handle order cancellation messages
@@ -447,12 +315,15 @@ export function handleCancelOrder(ctx: HandlerContext, data: Uint8Array): void {
     // Parse and validate the cancellation request
     const request = parseMessage(data, cancelOrderMessageSchema);
 
-    console.log(`Processing cancel request for order: ${request.orderId} from wallet: ${request.walletAddress}`);
+    log.debug(
+      { orderId: request.orderId, walletAddress: request.walletAddress },
+      'processing cancel request'
+    );
 
     // Get order info before cancellation (needed for status message)
     const orderInfo = ctx.engine.getOrderInfo(request.orderId);
     if (!orderInfo) {
-      console.warn(`Order ${request.orderId} not found for cancellation`);
+      log.warn({ orderId: request.orderId }, 'order not found for cancellation');
       publishError(
         ctx,
         createErrorMessage(
@@ -468,7 +339,7 @@ export function handleCancelOrder(ctx: HandlerContext, data: Uint8Array): void {
     const success = ctx.engine.cancelOrder(request.orderId, request.walletAddress);
 
     if (success) {
-      console.log(`Order ${request.orderId} cancelled successfully`);
+      log.info({ orderId: request.orderId }, 'order cancelled successfully');
 
       // Publish status update with filled amounts
       const statusMessage = createOrderStatusMessage({
@@ -482,7 +353,7 @@ export function handleCancelOrder(ctx: HandlerContext, data: Uint8Array): void {
       });
       ctx.nc.publish(NATS_TOPICS.ORDERS_STATUS, JSON.stringify(statusMessage));
     } else {
-      console.warn(`Wallet address mismatch for order ${request.orderId}`);
+      log.warn({ orderId: request.orderId }, 'wallet address mismatch for cancel request');
       publishError(
         ctx,
         createErrorMessage(
@@ -493,13 +364,173 @@ export function handleCancelOrder(ctx: HandlerContext, data: Uint8Array): void {
       );
     }
   } catch (error) {
-    console.error('Error handling cancel order:', error);
-    const errorMsg =
-      error instanceof Error ? error.message : 'Unknown error';
-    publishError(
-      ctx,
-      createErrorMessage(ERROR_CODES.INVALID_ORDER, errorMsg)
-    );
+    log.error({ err: error }, 'error handling cancel order');
+    const errorMsg = error instanceof Error ? error.message : 'Unknown error';
+    publishError(ctx, createErrorMessage(ERROR_CODES.INVALID_ORDER, errorMsg));
   }
 }
 
+export function handleUpdateOrder(ctx: HandlerContext, data: Uint8Array): void {
+  try {
+    // Parse and validate the update request
+    const request = parseMessage(data, updateOrderMessageSchema);
+
+    log.debug({ orderId: request.orderId }, 'processing update request');
+
+    // Get order info before update (needed for status message)
+    const orderInfo = ctx.engine.getOrderInfo(request.orderId);
+    if (!orderInfo) {
+      log.warn({ orderId: request.orderId }, 'order not found for update');
+      publishError(
+        ctx,
+        createErrorMessage(
+          ERROR_CODES.ORDER_NOT_FOUND,
+          `Order ${request.orderId} not found`,
+          request.orderId
+        )
+      );
+      return;
+    }
+
+    // Update order in matching engine (removes old order from book)
+    const oldOrder = ctx.engine.updateOrder(request.orderId, request.walletAddress);
+
+    if (typeof oldOrder === 'object') {
+      log.debug({ orderId: request.orderId }, 'order deactivated for update');
+
+      const targetQuantity = request.originalAmount || request.quantity || request.amount;
+      const targetSettlementFee = request.settlementFeeAmount || request.settlementFee;
+
+      // Calculate new amounts
+      let newOriginalAmount = oldOrder.originalAmount;
+      let newRemainingAmount = oldOrder.remainingAmount;
+      let newSettlementFeeAmount = oldOrder.settlementFeeAmount;
+      let newRemainingSettlementFeeAmount =
+        oldOrder.remainingSettlementFeeAmount ?? oldOrder.settlementFeeAmount;
+
+      if (targetQuantity) {
+        const filledAmount = subtractBigNumbers(oldOrder.originalAmount, oldOrder.remainingAmount);
+        newOriginalAmount = targetQuantity;
+
+        // Ensure new total quantity is not less than already filled amount
+        if (BigInt(targetQuantity) < BigInt(filledAmount)) {
+          throw new Error('New total quantity cannot be less than already filled amount');
+        }
+        newRemainingAmount = subtractBigNumbers(targetQuantity, filledAmount);
+
+        // Recalculate settlement fees pro-rata if amount changed but not explicitly provided
+        if (!targetSettlementFee) {
+          newSettlementFeeAmount = calculateProRataSettlementFee(
+            oldOrder.settlementFeeAmount,
+            newOriginalAmount,
+            oldOrder.originalAmount
+          );
+          newRemainingSettlementFeeAmount = calculateProRataSettlementFee(
+            newSettlementFeeAmount,
+            newRemainingAmount,
+            newOriginalAmount
+          );
+        }
+      }
+
+      if (targetSettlementFee) {
+        newSettlementFeeAmount = targetSettlementFee;
+        // Recalculate remaining fee pro-rata based on new total fee
+        newRemainingSettlementFeeAmount = calculateProRataSettlementFee(
+          newSettlementFeeAmount,
+          newRemainingAmount,
+          newOriginalAmount
+        );
+      }
+
+      const oldRate = isLimitOrder(oldOrder) ? oldOrder.rate : undefined;
+      const newRate = request.rate ?? oldRate;
+
+      // Construct updated order (keeping same ID).
+      // We must rebuild via the base fields and re-assign rate only for limit orders,
+      // because the Order union discriminates on rate (undefined for market, number for limit).
+      const baseUpdate = {
+        ...oldOrder,
+        originalAmount: newOriginalAmount,
+        remainingAmount: newRemainingAmount,
+        settlementFeeAmount: newSettlementFeeAmount,
+        remainingSettlementFeeAmount: newRemainingSettlementFeeAmount,
+        timestamp: request.timestamp,
+      };
+
+      const updatedOrder: Order = isLimitOrder(oldOrder)
+        ? ({ ...baseUpdate, rate: newRate ?? oldOrder.rate } as typeof oldOrder)
+        : (baseUpdate as Order);
+
+      // Re-submit to the matching engine
+      const updateResult = ctx.engine.submitOrder(updatedOrder);
+
+      // Publish to orders.updated topic for parameter synchronization
+      const updateEvent = {
+        orderId: request.orderId,
+        originalAmount: newOriginalAmount,
+        remainingAmount: newRemainingAmount,
+        rate: newRate ?? 0,
+        settlementFeeAmount: newSettlementFeeAmount,
+        remainingSettlementFeeAmount: newRemainingSettlementFeeAmount,
+        timestamp: request.timestamp,
+      };
+
+      ctx.nc.publish(NATS_TOPICS.ORDERS_UPDATED, JSON.stringify(updateEvent));
+
+      log.debug(
+        {
+          orderId: request.orderId,
+          oldRate,
+          newRate,
+          oldOriginalAmount: oldOrder.originalAmount,
+          newOriginalAmount,
+        },
+        'order updated'
+      );
+
+      publishOrderStatusUpdates(ctx, request.orderId, updateResult, {
+        originalAmount: newOriginalAmount,
+        settlementFeeAmount: newSettlementFeeAmount,
+        remainingSettlementFeeAmount: newRemainingSettlementFeeAmount,
+        walletAddress: updatedOrder.walletAddress,
+        assetId: updatedOrder.assetId,
+        side: updatedOrder.side,
+        type: updatedOrder.type,
+        marketIds: updatedOrder.markets.map((m) => m.marketId),
+      });
+
+      if (updateResult.matches.length > 0) {
+        publishMatchCreatedEvents(
+          ctx,
+          updatedOrder.assetId,
+          updatedOrder.side,
+          updateResult.matches
+        );
+      }
+
+      log.debug(
+        { orderId: request.orderId, matchCount: updateResult.matches.length },
+        'order re-published'
+      );
+    } else {
+      let errorCode: ErrorCode = ERROR_CODES.VALIDATION_ERROR;
+      let errorMessage = 'Wallet address does not match order owner';
+
+      if (oldOrder === 'NOT_FOUND') {
+        errorCode = ERROR_CODES.ORDER_NOT_FOUND;
+        errorMessage = `Order ${request.orderId} not found`;
+      } else if (oldOrder === 'INVALID_STATUS') {
+        errorCode = ERROR_CODES.INVALID_ORDER_STATUS;
+        errorMessage = `Order ${request.orderId} is in a status that cannot be updated`;
+      }
+
+      log.warn({ orderId: request.orderId, errorMessage }, 'error handling update order');
+      publishError(ctx, createErrorMessage(errorCode, errorMessage, request.orderId));
+    }
+  } catch (error) {
+    log.error({ err: error }, 'error handling update order');
+    const errorMsg = error instanceof Error ? error.message : 'Unknown error';
+    publishError(ctx, createErrorMessage(ERROR_CODES.INVALID_ORDER, errorMsg));
+  }
+}

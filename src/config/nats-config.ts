@@ -114,11 +114,13 @@ export const NATS_TOPICS = {
   ORDERS_BORROW_MARKET: 'orders.borrow.market',
   ORDERS_BORROW_LIMIT: 'orders.borrow.limit',
   ORDERS_CANCEL: 'orders.cancel',
+  ORDERS_UPDATE: 'orders.update',
 
   // Output topics (publish)
   ORDERS_STATUS: 'orders.status',
   ORDERS_CANCELLED_REMAINDER: 'orders.cancelled_remainder',
   MATCHES_CREATED: 'matches.created',
+  ORDERS_UPDATED: 'orders.updated',
   ERRORS: 'errors',
 } as const;
 
