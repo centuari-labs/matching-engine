@@ -1,6 +1,6 @@
 import { generateMatchId, generateOrderId, calculateMakerFee, calculateTakerFee } from '../../utils/helpers';
 import { matchSchema, type Match } from '../../types/matches';
-import { DEFAULT_LOAN_TOKEN, DEFAULT_MATURITY } from './order-factory';
+import { DEFAULT_LOAN_TOKEN, DEFAULT_MATURITY, uuidToBytes32Hex } from './order-factory';
 
 /**
  * Default matched amount used in tests.
@@ -18,7 +18,7 @@ export function createMatch(overrides: Partial<Match> = {}): Match {
 
   const base: Match = {
     matchId: generateMatchId(),
-    marketId: generateMatchId(), // reuse UUID generator for market ID
+    marketId: uuidToBytes32Hex(generateMatchId()), // bytes32 hex (post-C4)
     lendOrderId: generateOrderId(),
     borrowOrderId: generateOrderId(),
     lenderWallet: '0x1111111111111111111111111111111111111111',

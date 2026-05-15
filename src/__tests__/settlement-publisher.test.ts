@@ -15,7 +15,7 @@ import type { BufferEventHandler } from '../types/buffer';
 import { matchSchema, type Match } from '../types/matches';
 import {
   generateOrderId,
-  generateMatchId,
+  generateMarketId,
   calculateMakerFee,
   calculateTakerFee,
 } from '../utils/helpers';
@@ -84,7 +84,7 @@ describe('SettlementPublisher Integration', () => {
     it('should publish match to settlement publisher when recording', async () => {
       const matchedAmount = '1000000';
       const match = executionEngine.recordMatch({
-        marketId: generateMatchId(),
+        marketId: generateMarketId(),
         lendOrderId: generateOrderId(),
         borrowOrderId: generateOrderId(),
         lenderWallet: walletAddress1,
@@ -114,7 +114,7 @@ describe('SettlementPublisher Integration', () => {
       const matchedAmount = '5000000';
 
       executionEngine.recordMatch({
-        marketId: generateMatchId(),
+        marketId: generateMarketId(),
         lendOrderId,
         borrowOrderId,
         lenderWallet: walletAddress1,
@@ -150,7 +150,7 @@ describe('SettlementPublisher Integration', () => {
     it('should remove match from memory after successful publish', async () => {
       const matchedAmount = '1000000';
       const match = executionEngine.recordMatch({
-        marketId: generateMatchId(),
+        marketId: generateMarketId(),
         lendOrderId: generateOrderId(),
         borrowOrderId: generateOrderId(),
         lenderWallet: walletAddress1,
@@ -184,7 +184,7 @@ describe('SettlementPublisher Integration', () => {
 
       const matchedAmount = '1000000';
       const match = executionEngine.recordMatch({
-        marketId: generateMatchId(),
+        marketId: generateMarketId(),
         lendOrderId: generateOrderId(),
         borrowOrderId: generateOrderId(),
         lenderWallet: walletAddress1,
@@ -214,7 +214,7 @@ describe('SettlementPublisher Integration', () => {
 
       const matchedAmount = '1000000';
       const match = executionEngine.recordMatch({
-        marketId: generateMatchId(),
+        marketId: generateMarketId(),
         lendOrderId: generateOrderId(),
         borrowOrderId: generateOrderId(),
         lenderWallet: walletAddress1,
@@ -242,7 +242,7 @@ describe('SettlementPublisher Integration', () => {
     it('should publish multiple matches independently', async () => {
       const matchedAmount1 = '1000000';
       executionEngine.recordMatch({
-        marketId: generateMatchId(),
+        marketId: generateMarketId(),
         lendOrderId: generateOrderId(),
         borrowOrderId: generateOrderId(),
         lenderWallet: walletAddress1,
@@ -261,7 +261,7 @@ describe('SettlementPublisher Integration', () => {
 
       const matchedAmount2 = '2000000';
       executionEngine.recordMatch({
-        marketId: generateMatchId(),
+        marketId: generateMarketId(),
         lendOrderId: generateOrderId(),
         borrowOrderId: generateOrderId(),
         lenderWallet: walletAddress1,
@@ -290,7 +290,7 @@ describe('SettlementPublisher Integration', () => {
       const matchedAmount = '1000000';
 
       executionEngine.recordMatch({
-        marketId: generateMatchId(),
+        marketId: generateMarketId(),
         lendOrderId,
         borrowOrderId,
         lenderWallet: walletAddress1,
@@ -330,7 +330,7 @@ describe('SettlementPublisher Integration', () => {
     it('should work without settlement publisher', () => {
       const matchedAmount = '1000000';
       const match = executionEngine.recordMatch({
-        marketId: generateMatchId(),
+        marketId: generateMarketId(),
         lendOrderId: generateOrderId(),
         borrowOrderId: generateOrderId(),
         lenderWallet: walletAddress1,
@@ -354,7 +354,7 @@ describe('SettlementPublisher Integration', () => {
     it('should keep matches in memory when no publisher', async () => {
       const matchedAmount = '1000000';
       const match = executionEngine.recordMatch({
-        marketId: generateMatchId(),
+        marketId: generateMarketId(),
         lendOrderId: generateOrderId(),
         borrowOrderId: generateOrderId(),
         lenderWallet: walletAddress1,
@@ -526,7 +526,7 @@ describe('SettlementPublisher Integration', () => {
       const matchedAmount = '1000000';
       for (let i = 0; i < 10; i++) {
         executionEngine.recordMatch({
-          marketId: generateMatchId(),
+          marketId: generateMarketId(),
           lendOrderId: generateOrderId(),
           borrowOrderId: generateOrderId(),
           lenderWallet: walletAddress1,
@@ -571,7 +571,7 @@ describe('SettlementPublisher Integration', () => {
       const matchedAmount = '1000000';
       for (let i = 0; i < 10; i++) {
         executionEngine.recordMatch({
-          marketId: generateMatchId(),
+          marketId: generateMarketId(),
           lendOrderId: generateOrderId(),
           borrowOrderId: generateOrderId(),
           lenderWallet: walletAddress1,
@@ -620,7 +620,7 @@ describe('SettlementPublisher Integration', () => {
     it('should call onPublishSucceeded on successful publish', async () => {
       const matchedAmount = '1000000';
       const match = executionEngine.recordMatch({
-        marketId: generateMatchId(),
+        marketId: generateMarketId(),
         lendOrderId: generateOrderId(),
         borrowOrderId: generateOrderId(),
         lenderWallet: walletAddress1,
@@ -648,7 +648,7 @@ describe('SettlementPublisher Integration', () => {
 
       const matchedAmount = '1000000';
       executionEngine.recordMatch({
-        marketId: generateMatchId(),
+        marketId: generateMarketId(),
         lendOrderId: generateOrderId(),
         borrowOrderId: generateOrderId(),
         lenderWallet: walletAddress1,
@@ -676,7 +676,7 @@ describe('SettlementPublisher Integration', () => {
 
       const matchedAmount = '1000000';
       executionEngine.recordMatch({
-        marketId: generateMatchId(),
+        marketId: generateMarketId(),
         lendOrderId: generateOrderId(),
         borrowOrderId: generateOrderId(),
         lenderWallet: walletAddress1,
@@ -711,7 +711,7 @@ describe('SettlementPublisher Integration', () => {
 
       // First match: no threshold
       engine.recordMatch({
-        marketId: generateMatchId(),
+        marketId: generateMarketId(),
         lendOrderId: generateOrderId(),
         borrowOrderId: generateOrderId(),
         lenderWallet: walletAddress1,
@@ -731,7 +731,7 @@ describe('SettlementPublisher Integration', () => {
 
       // Second match: crosses threshold of 2
       engine.recordMatch({
-        marketId: generateMatchId(),
+        marketId: generateMarketId(),
         lendOrderId: generateOrderId(),
         borrowOrderId: generateOrderId(),
         lenderWallet: walletAddress1,
@@ -766,7 +766,7 @@ describe('SettlementPublisher Integration', () => {
       const matchedAmount = '1000000';
 
       const match = executionEngine.recordMatch({
-        marketId: generateMatchId(),
+        marketId: generateMarketId(),
         lendOrderId: generateOrderId(),
         borrowOrderId: generateOrderId(),
         lenderWallet: '0x1111111111111111111111111111111111111111',

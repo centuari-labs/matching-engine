@@ -37,13 +37,21 @@ export const ethereumAddressSchema = z
   .regex(/^0x[a-fA-F0-9]{40}$/, 'Invalid Ethereum address format');
 
 /**
- * Schema for a single market slot: a market UUID and its corresponding maturity timestamp.
+ * Schema for a `marketId` (bytes32 hex). Matches indexer-v3 `market.market_id`
+ * and the on-chain `Centuari.settleMatch` calldata-verbatim value.
+ */
+export const bytes32HexSchema = z
+  .string()
+  .regex(/^0x[0-9a-f]{64}$/i, 'marketId must be 0x + 64 hex chars');
+
+/**
+ * Schema for a single market slot: a market bytes32 hex id and its maturity.
  *
  * Orders specify which markets they participate in via an array of these slots.
  * Each entry must have both a valid market ID and a positive integer maturity.
  */
 export const marketSlotSchema = z.object({
-  marketId: z.string().uuid('Market ID must be a valid UUID'),
+  marketId: bytes32HexSchema,
   maturity: z.number().int().positive('Maturity must be a positive integer'),
 });
 

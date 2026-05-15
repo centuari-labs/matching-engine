@@ -7,7 +7,7 @@
 import { ExecutionEngine } from '../core/execution-engine';
 import { createMatch } from './factories/match-factory';
 import { DEFAULT_LOAN_TOKEN, DEFAULT_MATURITY } from './factories/order-factory';
-import { generateMatchId, generateOrderId } from '../utils/helpers';
+import { generateMarketId, generateOrderId } from '../utils/helpers';
 
 describe('ExecutionEngine Queries', () => {
   let engine: ExecutionEngine;
@@ -264,7 +264,7 @@ describe('ExecutionEngine Queries', () => {
 
   describe('buffer cap (maxBufferSize)', () => {
     const validRecordMatchParams = () => ({
-      marketId: generateMatchId(),
+      marketId: generateMarketId(),
       lendOrderId: generateOrderId(),
       borrowOrderId: generateOrderId(),
       lenderWallet: '0x1111111111111111111111111111111111111111',

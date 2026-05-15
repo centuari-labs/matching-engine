@@ -21,17 +21,28 @@ import { generateOrderId } from '../../utils/helpers';
 const MARKET_MATURITY_NAMESPACE = '6ba7b810-9dad-11d1-80b4-00c04fd430c8';
 
 /**
+ * Format a UUID as bytes32 hex (`0x` + 64 hex chars). Matches the encoding
+ * used end-to-end post-C4 — backend, settlement-engine, matching-engine, and
+ * indexer-v3 all speak this shape. Strips dashes and right-pads the 16-byte
+ * UUID with zeros to 32 bytes.
+ */
+export function uuidToBytes32Hex(uuid: string): `0x${string}` {
+  return `0x${uuid.replace(/-/g, '')}${'0'.repeat(32)}` as `0x${string}`;
+}
+
+/**
  * Build an array of market slots from maturity timestamps.
  *
- * Uses a deterministic UUID v5 per maturity so the same maturity always maps to the same marketId.
- * Use this in tests when you only care about maturities and not specific market IDs.
+ * Uses a deterministic UUID v5 per maturity (formatted as bytes32 hex) so the
+ * same maturity always maps to the same marketId. Use this in tests when you
+ * only care about maturities and not specific market IDs.
  *
  * @param maturities - Array of maturity timestamps.
  * @returns Array of { marketId, maturity } slots.
  */
 export function marketsFromMaturities(maturities: number[]): MarketSlot[] {
   return maturities.map((maturity) => ({
-    marketId: uuidv5(String(maturity), MARKET_MATURITY_NAMESPACE),
+    marketId: uuidToBytes32Hex(uuidv5(String(maturity), MARKET_MATURITY_NAMESPACE)),
     maturity,
   }));
 }

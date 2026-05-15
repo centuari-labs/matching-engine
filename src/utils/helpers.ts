@@ -21,6 +21,20 @@ export function generateMatchId(): string {
 }
 
 /**
+ * Generate a deterministic bytes32 hex marketId for tests / fallback use.
+ *
+ * MarketIds in production are derived from `keccak256(abi.encode(loanToken,
+ * maturity))` truncated to 16 bytes and zero-padded (see backend's
+ * `computeMarketId` + `uuidToBytes32`) — this helper produces a random
+ * 32-byte hex string in the same shape (`0x` + 64 hex chars) for tests that
+ * don't care about determinism. Use the production helper when you need
+ * (loanToken, maturity) ↔ marketId equality.
+ */
+export function generateMarketId(): `0x${string}` {
+  return `0x${uuidv4().replace(/-/g, '')}${'0'.repeat(32)}` as `0x${string}`;
+}
+
+/**
  * Validate Ethereum address format
  *
  * @param address - The address to validate

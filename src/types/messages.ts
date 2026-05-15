@@ -8,7 +8,7 @@
 import { z } from 'zod';
 import { matchSchema } from './matches';
 import type { MatchResult } from './matches';
-import { ethereumAddressSchema, OrderSide, OrderType } from './orders';
+import { bytes32HexSchema, ethereumAddressSchema, OrderSide, OrderType } from './orders';
 
 /**
  * Schema for order cancellation requests
@@ -203,8 +203,8 @@ export const cancelledRemainderMessageSchema = z.object({
   quantity: z.string().regex(/^\d+$/, 'Quantity must be a positive integer string'),
   /** Remaining settlement fee for the unmatched portion */
   settlementFee: z.string().regex(/^\d+$/, 'Settlement fee must be a positive integer string'),
-  /** Market IDs the order participated in */
-  marketIds: z.array(z.string().uuid()).min(1),
+  /** Market IDs (bytes32 hex) the order participated in */
+  marketIds: z.array(bytes32HexSchema).min(1),
   /** Reason for cancellation */
   cancelReason: z.enum(['USER_CANCELLED', 'IOC']).optional(),
   /** Timestamp */
