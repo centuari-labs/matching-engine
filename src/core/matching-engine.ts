@@ -1,6 +1,11 @@
 import { OrderBook } from './order-book';
 import { ExecutionEngine } from './execution-engine';
-import type { Order, LendLimitOrder, BorrowLimitOrder } from '../types/orders';
+import type {
+  Order,
+  LendLimitOrder,
+  BorrowLimitOrder,
+  BorrowMarketOrder,
+} from '../types/orders';
 import { OrderSide, OrderStatus, isLimitOrder } from '../types/orders';
 import type { Match, MatchResult, OrderBookSnapshot, AffectedOrder } from '../types/matches';
 import type { SettlementPublisher } from '../types/settlement';
@@ -234,6 +239,13 @@ export class MatchingEngine {
           borrowerSettlementFeeAmount: takerIsLender
             ? makerFeeResult.actualFee
             : takerFeeResult.actualFee,
+          // Borrower's explicit collateral selection rides on the borrow order
+          // (P1b-explicit, 2026-04-17). Pulled from whichever side is the borrow.
+          borrowerCollateralAssets: takerIsLender
+            ? (makerOrder as BorrowMarketOrder | BorrowLimitOrder)
+                .collateralAssets
+            : (order as BorrowMarketOrder | BorrowLimitOrder)
+                .collateralAssets,
         });
 
         matches.push(match);

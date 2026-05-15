@@ -37,13 +37,21 @@ export const ethereumAddressSchema = z
   .regex(/^0x[a-fA-F0-9]{40}$/, 'Invalid Ethereum address format');
 
 /**
- * Schema for a single market slot: a market UUID and its corresponding maturity timestamp.
+ * Schema for a `marketId` (bytes32 hex). Matches indexer-v3 `market.market_id`
+ * and the on-chain `Centuari.settleMatch` calldata-verbatim value.
+ */
+export const bytes32HexSchema = z
+  .string()
+  .regex(/^0x[0-9a-f]{64}$/i, 'marketId must be 0x + 64 hex chars');
+
+/**
+ * Schema for a single market slot: a market bytes32 hex id and its maturity.
  *
  * Orders specify which markets they participate in via an array of these slots.
  * Each entry must have both a valid market ID and a positive integer maturity.
  */
 export const marketSlotSchema = z.object({
-  marketId: z.string().uuid('Market ID must be a valid UUID'),
+  marketId: bytes32HexSchema,
   maturity: z.number().int().positive('Maturity must be a positive integer'),
 });
 
@@ -131,12 +139,26 @@ export const lendLimitOrderSchema = baseOrderSchema.extend({
 });
 
 /**
+ * Collateral asset list — addresses the borrower has explicitly opted to flag
+ * as collateral when this order settles. Empty array means no flag mutation.
+ *
+ * Wired through to settlement-engine in P3, which encodes it into
+ * `Settlement.MatchData.collateralAssets` for the on-chain `Centuari.settleMatch`
+ * call (per smart-contract-revamp/docs/collateral-loophole-fix-plan.md, P1b-explicit
+ * shipped 2026-04-17).
+ */
+const borrowCollateralAssetsSchema = z
+  .array(ethereumAddressSchema)
+  .default([]);
+
+/**
  * Borrow Market Order schema
  */
 export const borrowMarketOrderSchema = baseOrderSchema.extend({
   side: z.literal(OrderSide.Borrow),
   type: z.literal(OrderType.Market),
-  rate: z.undefined().optional()
+  rate: z.undefined().optional(),
+  collateralAssets: borrowCollateralAssetsSchema,
 });
 
 /**
@@ -150,7 +172,8 @@ export const borrowLimitOrderSchema = baseOrderSchema.extend({
     .number()
     .int('Rate must be an integer')
     .min(0, 'Rate must be non-negative')
-    .max(10000, 'Rate must not exceed 10000 basis points (100%)')
+    .max(10000, 'Rate must not exceed 10000 basis points (100%)'),
+  collateralAssets: borrowCollateralAssetsSchema,
 });
 
 /**

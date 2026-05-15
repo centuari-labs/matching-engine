@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { ethereumAddressSchema } from './orders';
+import { bytes32HexSchema, ethereumAddressSchema } from './orders';
 import type { OrderStatus } from './orders';
 
 /**
@@ -10,7 +10,7 @@ import type { OrderStatus } from './orders';
  */
 export const matchSchema = z.object({
   matchId: z.string().uuid('Match ID must be a valid UUID'),
-  marketId: z.string().uuid('Market ID must be a valid UUID'),
+  marketId: bytes32HexSchema,
   lendOrderId: z.string().uuid('Lend order ID must be a valid UUID'), //@note : should change into order market id
   borrowOrderId: z.string().uuid('Borrow order ID must be a valid UUID'), //@note : should change into order market id
   lenderWallet: ethereumAddressSchema, //@note : later change into account id
@@ -59,6 +59,15 @@ export const matchSchema = z.object({
   borrowerSettlementFeeAmount: z
     .string()
     .regex(/^\d+$/, 'Borrower settlement fee amount must be a positive integer string'),
+  /**
+   * Asset addresses the borrower opted to flag as collateral when submitting
+   * the borrow order. Forwarded verbatim from the borrow-order schema; the
+   * settlement engine (P3) encodes this into `Settlement.MatchData.collateralAssets`
+   * for the on-chain `Centuari.settleMatch` call (P1b-explicit, 2026-04-17).
+   *
+   * Empty array (default) means no flag mutation at settlement.
+   */
+  borrowerCollateralAssets: z.array(ethereumAddressSchema).default([]),
 });
 
 /**

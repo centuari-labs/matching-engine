@@ -12,6 +12,17 @@ import type { Order } from '../../types/orders';
 import { OrderSide, OrderType, OrderStatus } from '../../types/orders';
 
 /**
+ * Convert a `0x`-prefixed hex string into a pg `bytea` buffer. Mirrors the
+ * helper used by indexer-v3 + backend-v2's `BYTEA_HEX.to(...)` so the same
+ * encoding flows through every service.
+ */
+function hexToBytea(hex: string): Buffer {
+  const stripped =
+    hex.startsWith('0x') || hex.startsWith('0X') ? hex.slice(2) : hex;
+  return Buffer.from(stripped, 'hex');
+}
+
+/**
  * Postgres implementation of the DbClient interface.
  *
  * This implementation assumes the following tables (simplified):
@@ -26,6 +37,20 @@ import { OrderSide, OrderType, OrderStatus } from '../../types/orders';
  *   is_borrower_taker BOOLEAN, maker_fee NUMERIC, taker_fee NUMERIC,
  *   lender_settlement_fee NUMERIC, borrower_settlement_fee NUMERIC,
  *   maturity TIMESTAMP, created_at TIMESTAMP, updated_at TIMESTAMP);
+ *   — lend_order_market_id / borrow_order_market_id today store order
+ *     UUIDs (semantically should be order_markets.order_market_id;
+ *     unrelated TODO, not in C4 scope).
+ *
+ * - order_markets(order_market_id UUID PK, order_id UUID, market_id BYTEA,
+ *   created_at TIMESTAMPTZ) — `market_id` migrated UUID → BYTEA in C4
+ *   and now FKs to the shared `market` table (BYTEA-keyed) written by
+ *   indexer-v3 + backend's eager-write path.
+ *
+ * - user_balance(user_address BYTEA, asset BYTEA, available NUMERIC,
+ *   in_orders NUMERIC, in_yield_router NUMERIC, used_as_collateral BOOLEAN,
+ *   flagged_at BIGINT, applied_by_* …, updated_at TIMESTAMPTZ;
+ *   PK (user_address, asset)) — owned by indexer-v3. `in_orders` is the
+ *   post-C4 home for match-time locks (was `portfolio.locked_amount`).
  *
  * Column names can be adjusted later without changing the DbWriterService.
  */
@@ -204,48 +229,58 @@ export class PostgresDbClient implements DbClient {
         ]
       );
 
-      // Lock both lender and borrower balances for pending settlement.
-      // Sort updates by account ID to prevent deadlocks when concurrent
-      // transactions lock the same two accounts in opposite roles.
+      // Lock both lender and borrower balances for pending settlement by
+      // bumping `user_balance.in_orders` on the indexer-v3 schema (was
+      // `portfolio.locked_amount` pre-C4). Sort updates by `user_address`
+      // BYTEA to prevent deadlocks when concurrent transactions lock the
+      // same pair in opposite roles. Mirror this ordering in
+      // settlement-engine's `lock-release.ts`.
       if (insertResult.rowCount && insertResult.rowCount > 0) {
         const lenderTradeFee = event.borrowerIsTaker ? event.makerFeeAmount : event.takerFeeAmount;
         const borrowerTradeFee = event.borrowerIsTaker
           ? event.takerFeeAmount
           : event.makerFeeAmount;
 
+        const lenderUserAddress = hexToBytea(event.lenderWallet);
+        const borrowerUserAddress = hexToBytea(event.borrowerWallet);
+        const assetBytea = hexToBytea(event.loanToken);
+
         const lenderUpdate = {
-          accountId: lenderAccountId,
-          amounts: [event.matchedAmount, event.lenderSettlementFeeAmount, lenderTradeFee],
+          sortKey: event.lenderWallet.toLowerCase(),
           query: `
-            UPDATE portfolio
-            SET locked_amount = locked_amount + ($1::numeric + $2::numeric + $3::numeric),
+            UPDATE user_balance
+            SET in_orders = in_orders + ($1::numeric + $2::numeric + $3::numeric),
                 updated_at = NOW()
-            WHERE account_id = $4 AND asset_id = $5
+            WHERE user_address = $4 AND asset = $5
           `,
           params: [
             event.matchedAmount,
             event.lenderSettlementFeeAmount,
             lenderTradeFee,
-            lenderAccountId,
-            assetId,
+            lenderUserAddress,
+            assetBytea,
           ],
         };
 
         const borrowerUpdate = {
-          accountId: borrowerAccountId,
-          amounts: [event.borrowerSettlementFeeAmount, borrowerTradeFee],
+          sortKey: event.borrowerWallet.toLowerCase(),
           query: `
-            UPDATE portfolio
-            SET locked_amount = locked_amount + ($1::numeric + $2::numeric),
+            UPDATE user_balance
+            SET in_orders = in_orders + ($1::numeric + $2::numeric),
                 updated_at = NOW()
-            WHERE account_id = $3 AND asset_id = $4
+            WHERE user_address = $3 AND asset = $4
           `,
-          params: [event.borrowerSettlementFeeAmount, borrowerTradeFee, borrowerAccountId, assetId],
+          params: [
+            event.borrowerSettlementFeeAmount,
+            borrowerTradeFee,
+            borrowerUserAddress,
+            assetBytea,
+          ],
         };
 
-        // Always lock lower account ID first to prevent deadlocks
+        // Always lock lower user_address (lowercase hex) first to prevent deadlocks
         const ordered =
-          lenderAccountId < borrowerAccountId
+          lenderUpdate.sortKey < borrowerUpdate.sortKey
             ? [lenderUpdate, borrowerUpdate]
             : [borrowerUpdate, lenderUpdate];
 
@@ -306,7 +341,7 @@ export class PostgresDbClient implements DbClient {
           VALUES ($1, $2, to_timestamp($3 / 1000.0))
           ON CONFLICT DO NOTHING
           `,
-          [event.orderId, marketId, event.timestamp]
+          [event.orderId, hexToBytea(marketId), event.timestamp]
         );
       }
 
@@ -363,15 +398,15 @@ export class PostgresDbClient implements DbClient {
           EXTRACT(EPOCH FROM o.created_at)::bigint * 1000 AS timestamp,
           json_agg(
             json_build_object(
-              'marketId', om.market_id,
-              'maturity', EXTRACT(EPOCH FROM m.maturity)::int
+              'marketId', '0x' || encode(om.market_id, 'hex'),
+              'maturity', m.maturity::int
             )
           ) AS markets
         FROM orders o
         JOIN accounts a ON a.id = o.account_id
         JOIN assets t ON t.id = o.asset_id
         JOIN order_markets om ON om.order_id = o.id
-        JOIN markets m ON m.id = om.market_id
+        JOIN market m ON m.market_id = om.market_id
         WHERE o.status IN ('OPEN', 'PARTIALLY_FILLED')
           AND o.type = 'LIMIT'
         GROUP BY o.id, a.user_wallet, t.token_address, o.asset_id,

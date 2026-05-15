@@ -165,6 +165,38 @@ describe('Order Validation', () => {
 
       expect(() => borrowMarketOrderSchema.parse(order)).not.toThrow();
     });
+
+    it('should preserve an explicit collateralAssets list on parse', () => {
+      const usdc = '0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa';
+      const btc = '0xbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb';
+      const order = createBorrowMarketOrder({
+        walletAddress: validWalletAddress,
+        loanToken: validLoanToken,
+        markets: marketsFromMaturities([1704067200]),
+        collateralAssets: [usdc, btc],
+      });
+      const parsed = borrowMarketOrderSchema.parse(order);
+      expect(parsed.collateralAssets).toEqual([usdc, btc]);
+    });
+
+    it('should default collateralAssets to [] when omitted', () => {
+      // Build the input without going through the factory so we can omit the field.
+      const parsed = borrowMarketOrderSchema.parse({
+        orderId: '550e8400-e29b-41d4-a716-446655440000',
+        walletAddress: validWalletAddress,
+        loanToken: validLoanToken,
+        assetId: '550e8400-e29b-41d4-a716-446655440001',
+        markets: marketsFromMaturities([1704067200]),
+        timestamp: Date.now(),
+        side: OrderSide.Borrow,
+        type: OrderType.Market,
+        status: OrderStatus.Open,
+        originalAmount: '1000000',
+        remainingAmount: '1000000',
+        settlementFeeAmount: '10000',
+      });
+      expect(parsed.collateralAssets).toEqual([]);
+    });
   });
 
   describe('Borrow Limit Order', () => {
@@ -195,6 +227,41 @@ describe('Order Validation', () => {
       };
 
       expect(() => borrowLimitOrderSchema.parse(order)).toThrow();
+    });
+
+    it('should reject malformed addresses in collateralAssets', () => {
+      // Factory parses through the schema, so the throw originates there.
+      expect(() =>
+        createBorrowLimitOrder({
+          walletAddress: validWalletAddress,
+          loanToken: validLoanToken,
+          markets: marketsFromMaturities([1704067200]),
+          rate: 750,
+          collateralAssets: ['0xnotahexaddress'],
+        }),
+      ).toThrow();
+    });
+
+    it('should not carry collateralAssets on lend orders (stripped, not present)', () => {
+      // Lend schema has no collateralAssets field; with Zod's default `strip` mode,
+      // an extra key in the input is dropped silently rather than rejected.
+      const parsed = lendLimitOrderSchema.parse({
+        orderId: '550e8400-e29b-41d4-a716-446655440000',
+        walletAddress: validWalletAddress,
+        loanToken: validLoanToken,
+        assetId: '550e8400-e29b-41d4-a716-446655440001',
+        markets: marketsFromMaturities([1704067200]),
+        timestamp: Date.now(),
+        side: OrderSide.Lend,
+        type: OrderType.Limit,
+        status: OrderStatus.Open,
+        originalAmount: '1000000',
+        remainingAmount: '1000000',
+        settlementFeeAmount: '10000',
+        rate: 500,
+        collateralAssets: ['0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa'],
+      });
+      expect((parsed as Record<string, unknown>).collateralAssets).toBeUndefined();
     });
   });
 

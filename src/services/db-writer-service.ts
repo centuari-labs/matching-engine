@@ -535,6 +535,25 @@ export class DbWriterService {
       takerFeeAmount: obj.takerFeeAmount ?? '0',
       lenderSettlementFeeAmount: obj.lenderSettlementFeeAmount ?? '0',
       borrowerSettlementFeeAmount: obj.borrowerSettlementFeeAmount ?? '0',
+      borrowerCollateralAssets: parseCollateralAssets(
+        obj.borrowerCollateralAssets,
+      ),
     };
+  }
+}
+
+/**
+ * Decode the JSON-serialized collateral asset list from a Redis hash field.
+ * Returns [] for missing or malformed input — symmetric with the schema's default.
+ */
+function parseCollateralAssets(raw: string | undefined): string[] {
+  if (!raw) return [];
+  try {
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed)
+      ? parsed.filter((v): v is string => typeof v === 'string')
+      : [];
+  } catch {
+    return [];
   }
 }

@@ -135,6 +135,7 @@ describe('Message Helpers', () => {
         takerFeeAmount: '2000',
         lenderSettlementFeeAmount: '5000',
         borrowerSettlementFeeAmount: '5000',
+        borrowerCollateralAssets: [],
       };
       const result: MatchResult = {
         matches: [mockMatch],

@@ -18,7 +18,7 @@ import {
   DEFAULT_LOAN_TOKEN,
   DEFAULT_MATURITY,
 } from './factories/order-factory';
-import { generateOrderId, generateMatchId } from '../utils/helpers';
+import { generateOrderId, generateMarketId } from '../utils/helpers';
 
 describe('SnapshotService', () => {
   const testSnapshotDir = path.join(__dirname, '../../test-snapshots');
@@ -120,7 +120,7 @@ describe('SnapshotService', () => {
 
       // Record a match
       executionEngine.recordMatch({
-        marketId: generateMatchId(),
+        marketId: generateMarketId(),
         lendOrderId,
         borrowOrderId,
         lenderWallet: '0x1111111111111111111111111111111111111111',
@@ -134,6 +134,7 @@ describe('SnapshotService', () => {
         takerFeeAmount: '2000',
         lenderSettlementFeeAmount: '5000',
         borrowerSettlementFeeAmount: '5000',
+        borrowerCollateralAssets: [],
       });
 
       await snapshotService.saveSnapshot(orderBook, executionEngine);
@@ -263,7 +264,7 @@ describe('SnapshotService', () => {
       const borrowOrderId = generateOrderId();
 
       executionEngine.recordMatch({
-        marketId: generateMatchId(),
+        marketId: generateMarketId(),
         lendOrderId,
         borrowOrderId,
         lenderWallet: '0x1111111111111111111111111111111111111111',
@@ -277,6 +278,7 @@ describe('SnapshotService', () => {
         takerFeeAmount: '2000',
         lenderSettlementFeeAmount: '5000',
         borrowerSettlementFeeAmount: '5000',
+        borrowerCollateralAssets: [],
       });
 
       await snapshotService.saveSnapshot(orderBook, executionEngine);
@@ -389,7 +391,7 @@ describe('SnapshotService', () => {
       const borrowOrderId = generateOrderId();
 
       executionEngine.recordMatch({
-        marketId: generateMatchId(),
+        marketId: generateMarketId(),
         lendOrderId,
         borrowOrderId,
         lenderWallet: '0x1111111111111111111111111111111111111111',
@@ -403,6 +405,7 @@ describe('SnapshotService', () => {
         takerFeeAmount: '2000',
         lenderSettlementFeeAmount: '5000',
         borrowerSettlementFeeAmount: '5000',
+        borrowerCollateralAssets: [],
       });
 
       await snapshotService.saveSnapshot(orderBook, executionEngine);
