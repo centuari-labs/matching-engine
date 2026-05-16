@@ -98,11 +98,10 @@ export class SnapshotService {
         },
       };
 
-      // Validate snapshot data
-      snapshotDataSchema.parse(snapshotData);
-
-      // Serialize to JSON
-      const jsonData = JSON.stringify(snapshotData, null, 2);
+      // Serialize to JSON. No pretty-printing and no Zod re-validation here:
+      // the data is built from already-typed in-memory orders, and this runs
+      // on a timer over the whole book — validation belongs on the load path.
+      const jsonData = JSON.stringify(snapshotData);
 
       // Get file paths
       const filePaths = this.getFilePaths();

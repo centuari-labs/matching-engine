@@ -55,8 +55,8 @@ describe('Snapshot Integration', () => {
 
       engine1.submitOrder(lendOrder);
 
-      // Wait a bit for async snapshot (if triggered)
-      await new Promise((resolve) => setTimeout(resolve, 100));
+      // Mutations mark state dirty; the periodic timer is simulated here.
+      await engine1.saveSnapshotIfDirty();
 
       // Create new engine and restore
       const engine2 = new MatchingEngine(undefined, snapshotService);
@@ -80,8 +80,8 @@ describe('Snapshot Integration', () => {
       engine1.submitOrder(lendOrder);
       engine1.cancelOrder(lendOrder.orderId, walletAddress1);
 
-      // Wait for async snapshot
-      await new Promise((resolve) => setTimeout(resolve, 100));
+      // Mutations mark state dirty; the periodic timer is simulated here.
+      await engine1.saveSnapshotIfDirty();
 
       // Create new engine and restore
       const engine2 = new MatchingEngine(undefined, snapshotService);
