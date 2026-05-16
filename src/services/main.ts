@@ -23,6 +23,7 @@ let redisService: RedisService | null = null;
 let matchingEngine: MatchingEngine | null = null;
 let snapshotService: SnapshotService | null = null;
 let snapshotTimer: NodeJS.Timeout | null = null;
+let pruneTimer: NodeJS.Timeout | null = null;
 let isShuttingDown = false;
 
 /**
@@ -44,6 +45,12 @@ async function handleShutdown(signal: string): Promise<void> {
     if (snapshotTimer) {
       clearInterval(snapshotTimer);
       snapshotTimer = null;
+    }
+
+    // Stop periodic prune timer
+    if (pruneTimer) {
+      clearInterval(pruneTimer);
+      pruneTimer = null;
     }
 
     // Save final snapshot before shutdown
@@ -180,6 +187,13 @@ async function main(): Promise<void> {
       console.log();
     }
 
+    // Prune any orders that have already matured before accepting traffic.
+    // Open limit orders that never match would otherwise accumulate forever.
+    const prunedOnStartup = matchingEngine.pruneExpiredOrders();
+    if (prunedOnStartup > 0) {
+      console.log(`✓ Pruned ${prunedOnStartup} expired orders on startup\n`);
+    }
+
     // Initialize NATS service
     console.log('Initializing NATS service...');
     natsService = new NatsService(matchingEngine);
@@ -219,11 +233,28 @@ async function main(): Promise<void> {
       );
       if (snapshotIntervalSeconds > 0) {
         snapshotTimer = setInterval(() => {
-          matchingEngine!.saveSnapshot().catch((error) => {
+          matchingEngine!.saveSnapshotIfDirty().catch((error) => {
             console.warn('Periodic snapshot failed:', error);
           });
         }, snapshotIntervalSeconds * 1000);
         console.log(`  Periodic snapshots: Every ${snapshotIntervalSeconds} seconds`);
+      }
+    }
+
+    // Start periodic prune timer to evict matured orders from the book
+    if (matchingEngine) {
+      const pruneIntervalSeconds = parseInt(
+        process.env.PRUNE_INTERVAL_SECONDS || '300',
+        10
+      );
+      if (pruneIntervalSeconds > 0) {
+        pruneTimer = setInterval(() => {
+          const pruned = matchingEngine!.pruneExpiredOrders();
+          if (pruned > 0) {
+            console.log(`Pruned ${pruned} expired orders`);
+          }
+        }, pruneIntervalSeconds * 1000);
+        console.log(`  Periodic prune: Every ${pruneIntervalSeconds} seconds`);
       }
     }
 

@@ -31,6 +31,9 @@ export class MatchingEngine {
   /** Serializes snapshot saves to avoid concurrent writes racing on the same files. */
   private saveSnapshotQueue: Promise<void> = Promise.resolve();
 
+  /** Set when in-memory state diverges from the last persisted snapshot. */
+  private snapshotDirty = false;
+
   /**
    * Create a new MatchingEngine instance
    *
@@ -116,8 +119,9 @@ export class MatchingEngine {
       };
     }
 
-    // Save snapshot after order submission (non-blocking)
-    this.saveSnapshotAsync();
+    // Mark state dirty — the periodic timer persists the snapshot.
+    // Keeping I/O off the hot path avoids re-serializing the whole book per order.
+    this.markSnapshotDirty();
 
     return {
       matches,
@@ -636,8 +640,8 @@ export class MatchingEngine {
     // Remove from order book
     this.orderBook.removeOrder(orderId);
 
-    // Save snapshot after order cancellation (non-blocking)
-    this.saveSnapshotAsync();
+    // Mark state dirty — the periodic timer persists the snapshot.
+    this.markSnapshotDirty();
 
     return true;
   }
@@ -766,20 +770,32 @@ export class MatchingEngine {
   }
 
   /**
-   * Save snapshot asynchronously (fire-and-forget)
+   * Mark in-memory state as diverged from the last persisted snapshot.
    *
-   * Non-blocking version of saveSnapshot for use after critical operations.
+   * Mutating operations call this instead of writing a snapshot directly.
+   * The periodic timer (see `saveSnapshotIfDirty`) does the actual write,
+   * keeping expensive full-book serialization off the order hot path.
    */
-  private saveSnapshotAsync(): void {
-    if (!this.snapshotService) {
+  private markSnapshotDirty(): void {
+    this.snapshotDirty = true;
+  }
+
+  /**
+   * Persist a snapshot only if state changed since the last save.
+   *
+   * Intended to be called on a fixed interval. The dirty flag is cleared
+   * before the async write begins, so mutations that happen during the
+   * write correctly re-mark state as dirty for the next interval.
+   *
+   * @returns Promise that resolves when the save completes (or is skipped)
+   */
+  async saveSnapshotIfDirty(): Promise<void> {
+    if (!this.snapshotService || !this.snapshotDirty) {
       return;
     }
 
-    // Fire-and-forget - don't await
-    this.saveSnapshot().catch((error) => {
-      // Already logged in saveSnapshot, but catch to prevent unhandled rejection
-      console.warn('Async snapshot save failed:', error);
-    });
+    this.snapshotDirty = false;
+    await this.saveSnapshot();
   }
 
   /**
@@ -844,7 +860,28 @@ export class MatchingEngine {
       }
     }
 
+    if (added > 0) {
+      this.markSnapshotDirty();
+    }
+
     return { added, skipped };
+  }
+
+  /**
+   * Remove all expired (fully matured) orders from the order book.
+   *
+   * Delegates to `OrderBook.pruneExpiredOrders`. Bounds memory growth: open
+   * limit orders that never match would otherwise accumulate forever.
+   *
+   * @param nowSeconds - Current time as a Unix timestamp in seconds
+   * @returns Number of orders pruned
+   */
+  pruneExpiredOrders(nowSeconds: number = Math.floor(Date.now() / 1000)): number {
+    const pruned = this.orderBook.pruneExpiredOrders(nowSeconds);
+    if (pruned > 0) {
+      this.markSnapshotDirty();
+    }
+    return pruned;
   }
 }
 

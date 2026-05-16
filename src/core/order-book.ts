@@ -274,6 +274,35 @@ export class OrderBook {
   }
 
   /**
+   * Remove all expired orders from the order book.
+   *
+   * An order is expired only when every market slot it participates in has a
+   * maturity at or before `nowSeconds`. Orders are collected first, then
+   * removed, to avoid mutating `orderIndex` while iterating it.
+   *
+   * @param nowSeconds - Current time as a Unix timestamp in seconds
+   * @returns Number of orders pruned
+   */
+  pruneExpiredOrders(nowSeconds: number): number {
+    const expiredIds: string[] = [];
+
+    for (const [orderId, metadata] of this.orderIndex) {
+      const allMatured = metadata.markets.every(
+        (market) => market.maturity <= nowSeconds
+      );
+      if (allMatured) {
+        expiredIds.push(orderId);
+      }
+    }
+
+    for (const orderId of expiredIds) {
+      this.removeOrder(orderId);
+    }
+
+    return expiredIds.length;
+  }
+
+  /**
    * Get all orders from the order book
    *
    * Used for snapshot serialization. Returns all orders with their current state.
