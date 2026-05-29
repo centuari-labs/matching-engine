@@ -5,7 +5,13 @@
  * matching engine service.
  */
 
-import { connect, type NatsConnection, type ConnectionOptions, type Subscription } from 'nats';
+import {
+  connect,
+  type Msg,
+  type NatsConnection,
+  type ConnectionOptions,
+  type Subscription,
+} from 'nats';
 import type { MatchingEngine } from '../core/matching-engine';
 import { loadNatsConfig, NATS_TOPICS, type NatsConfig } from '../config/nats-config';
 import {
@@ -14,6 +20,7 @@ import {
   handleBorrowMarketOrder,
   handleBorrowLimitOrder,
   handleCancelOrder,
+  handleCancelOrderRequest,
   handleUpdateOrder,
   type HandlerContext,
 } from './message-handlers';
@@ -158,6 +165,13 @@ export class NatsService {
     this.processSubscription(cancelSub, (data) => handleCancelOrder(ctx, data));
     log.info({ topic: NATS_TOPICS.ORDERS_CANCEL }, 'subscribed');
 
+    // Subscribe to cancel requests (request/reply). The handler receives the
+    // full message so it can reply the authoritative outcome to the requester.
+    const cancelRequestSub = this.nc.subscribe(NATS_TOPICS.ORDERS_CANCEL_REQUEST);
+    this.subscriptions.push(cancelRequestSub);
+    this.processRequestSubscription(cancelRequestSub, (msg) => handleCancelOrderRequest(ctx, msg));
+    log.info({ topic: NATS_TOPICS.ORDERS_CANCEL_REQUEST }, 'subscribed');
+
     // Subscribe to update orders
     const updateSub = this.nc.subscribe(NATS_TOPICS.ORDERS_UPDATE);
     this.subscriptions.push(updateSub);
@@ -186,6 +200,32 @@ export class NatsService {
       }
     })().catch((error) => {
       log.error({ err: error }, 'subscription processing error');
+    });
+  }
+
+  /**
+   * Process messages from a request/reply subscription.
+   *
+   * Identical to {@link processSubscription} except the handler receives the
+   * full `Msg` (not just `msg.data`) so it can call `msg.respond(...)`.
+   *
+   * @param subscription - NATS subscription to process
+   * @param handler - Handler function that receives the full message
+   */
+  private async processRequestSubscription(
+    subscription: Subscription,
+    handler: (msg: Msg) => void
+  ): Promise<void> {
+    (async () => {
+      for await (const msg of subscription) {
+        try {
+          handler(msg);
+        } catch (error) {
+          log.error({ err: error }, 'error processing request message');
+        }
+      }
+    })().catch((error) => {
+      log.error({ err: error }, 'request subscription processing error');
     });
   }
 
