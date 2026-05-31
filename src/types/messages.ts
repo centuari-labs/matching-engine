@@ -91,6 +91,41 @@ export type OrderUpdatedMessage = z.infer<typeof orderUpdatedMessageSchema>;
 export type CancelOrderMessage = z.infer<typeof cancelOrderMessageSchema>;
 
 /**
+ * Authoritative reply the engine sends back on the `orders.cancel.request`
+ * request/reply subject (C1 engine-coordinated cancel). The requester (backend)
+ * persists CANCELLED only on a `CANCELLED` outcome.
+ *
+ * Outcomes the engine can actually distinguish from its order book:
+ * - `CANCELLED`  — order was resting (OPEN/PARTIALLY_FILLED), owner matched, removed.
+ * - `NOT_OWNER`  — order is in the book but the wallet does not own it.
+ * - `NOT_FOUND`  — order is not in the book. This covers both "never existed" and
+ *                  "already fully matched and removed" — the engine cannot tell them
+ *                  apart, because filled orders leave the book. The backend only sends
+ *                  a request for an order its DB still shows OPEN/PARTIALLY_FILLED, so
+ *                  in practice NOT_FOUND means the order was matched in the race window.
+ */
+export const cancelReplySchema = z.discriminatedUnion('outcome', [
+  z.object({
+    outcome: z.literal('CANCELLED'),
+    orderId: z.string().uuid(),
+    remainingAmount: z.string(),
+  }),
+  z.object({
+    outcome: z.literal('NOT_OWNER'),
+    orderId: z.string().uuid(),
+  }),
+  z.object({
+    outcome: z.literal('NOT_FOUND'),
+    orderId: z.string().uuid(),
+  }),
+]);
+
+/**
+ * Type for cancel request replies
+ */
+export type CancelReply = z.infer<typeof cancelReplySchema>;
+
+/**
  * Schema for match creation notifications
  *
  * Published when orders are matched successfully.

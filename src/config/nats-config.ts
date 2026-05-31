@@ -114,6 +114,10 @@ export const NATS_TOPICS = {
   ORDERS_BORROW_MARKET: 'orders.borrow.market',
   ORDERS_BORROW_LIMIT: 'orders.borrow.limit',
   ORDERS_CANCEL: 'orders.cancel',
+  // Request/reply subject: backend sends a cancel and awaits an authoritative
+  // verdict before persisting CANCELLED (C1 engine-coordinated cancel). The
+  // legacy fire-and-forget ORDERS_CANCEL subscription stays during transition.
+  ORDERS_CANCEL_REQUEST: 'orders.cancel.request',
   ORDERS_UPDATE: 'orders.update',
 
   // Output topics (publish)
