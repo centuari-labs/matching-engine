@@ -17,8 +17,7 @@ import { OrderSide, OrderType, OrderStatus } from '../../types/orders';
  * encoding flows through every service.
  */
 function hexToBytea(hex: string): Buffer {
-  const stripped =
-    hex.startsWith('0x') || hex.startsWith('0X') ? hex.slice(2) : hex;
+  const stripped = hex.startsWith('0x') || hex.startsWith('0X') ? hex.slice(2) : hex;
   return Buffer.from(stripped, 'hex');
 }
 
@@ -212,8 +211,8 @@ export class PostgresDbClient implements DbClient {
         `,
         [
           event.matchId,
-          event.lendOrderId, //@note : later change into order market id
-          event.borrowOrderId, //@note : later change into order market id
+          event.lendOrderId,
+          event.borrowOrderId,
           assetId,
           lenderAccountId,
           borrowerAccountId,
