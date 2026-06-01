@@ -11,17 +11,17 @@ import type { OrderStatus } from './orders';
 export const matchSchema = z.object({
   matchId: z.string().uuid('Match ID must be a valid UUID'),
   marketId: bytes32HexSchema,
-  lendOrderId: z.string().uuid('Lend order ID must be a valid UUID'), //@note : should change into order market id
-  borrowOrderId: z.string().uuid('Borrow order ID must be a valid UUID'), //@note : should change into order market id
-  lenderWallet: ethereumAddressSchema, //@note : later change into account id
-  borrowerWallet: ethereumAddressSchema, //@note : later change into account id
+  lendOrderId: z.string().uuid('Lend order ID must be a valid UUID'),
+  borrowOrderId: z.string().uuid('Borrow order ID must be a valid UUID'),
+  lenderWallet: ethereumAddressSchema,
+  borrowerWallet: ethereumAddressSchema,
   matchedAmount: z.string().regex(/^\d+$/, 'Matched amount must be a positive integer string'),
   rate: z
     .number()
     .int('Rate must be an integer')
     .min(0, 'Rate must be non-negative')
     .max(10000, 'Rate must not exceed 10000 basis points (100%)'),
-  loanToken: ethereumAddressSchema, //@note : later change into asset id
+  loanToken: ethereumAddressSchema,
   maturity: z.number().int().positive('Maturity must be a positive integer'),
   timestamp: z.number().int().positive('Timestamp must be a positive integer'),
   borrowerIsTaker: z.boolean(),
@@ -146,4 +146,3 @@ export interface OrderBookSnapshot {
     timestamp: number;
   }>;
 }
-

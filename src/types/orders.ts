@@ -69,12 +69,10 @@ export type MarketSlot = z.infer<typeof marketSlotSchema>;
  */
 const baseOrderSchema = z.object({
   orderId: z.string().uuid('Order ID must be a valid UUID'),
-  walletAddress: ethereumAddressSchema, //@note : later change into account id
-  loanToken: ethereumAddressSchema, //@note : later change into asset id
+  walletAddress: ethereumAddressSchema,
+  loanToken: ethereumAddressSchema,
   assetId: z.string().uuid('Asset ID must be a valid UUID'),
-  markets: z
-    .array(marketSlotSchema)
-    .min(1, 'At least one market slot is required'),
+  markets: z.array(marketSlotSchema).min(1, 'At least one market slot is required'),
   timestamp: z.number().int().positive('Timestamp must be a positive integer'),
   side: z.nativeEnum(OrderSide),
   type: z.nativeEnum(OrderType),
@@ -147,9 +145,7 @@ export const lendLimitOrderSchema = baseOrderSchema.extend({
  * call (per smart-contract-revamp/docs/collateral-loophole-fix-plan.md, P1b-explicit
  * shipped 2026-04-17).
  */
-const borrowCollateralAssetsSchema = z
-  .array(ethereumAddressSchema)
-  .default([]);
+const borrowCollateralAssetsSchema = z.array(ethereumAddressSchema).default([]);
 
 /**
  * Borrow Market Order schema
@@ -238,4 +234,3 @@ export interface OrderMetadata {
   side: OrderSide;
   type: OrderType;
 }
-
