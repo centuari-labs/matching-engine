@@ -1,8 +1,5 @@
 import createRBTree from 'functional-red-black-tree';
-import type {
-  Order,
-  OrderMetadata,
-} from '../types/orders';
+import type { Order, OrderMetadata } from '../types/orders';
 import { OrderStatus, OrderSide } from '../types/orders';
 import { createOrderComparator, isZero } from '../utils/helpers';
 
@@ -87,8 +84,7 @@ export class OrderBook {
       return false;
     }
 
-    const orderMap =
-      metadata.side === OrderSide.Lend ? this.lendOrders : this.borrowOrders;
+    const orderMap = metadata.side === OrderSide.Lend ? this.lendOrders : this.borrowOrders;
 
     // Remove from all market (maturity) trees
     const tokenMap = orderMap.get(metadata.loanToken);
@@ -217,7 +213,11 @@ export class OrderBook {
    * @param depth - Maximum number of orders to return per side
    * @returns Order book snapshot
    */
-  getOrderBookSnapshot(loanToken: string, maturity: number, depth: number = 10): {
+  getOrderBookSnapshot(
+    loanToken: string,
+    maturity: number,
+    depth: number = 10
+  ): {
     loanToken: string;
     maturity: number;
     lendOrders: Array<{
@@ -249,7 +249,7 @@ export class OrderBook {
           orderId: order.orderId,
           rate: 'rate' in order ? order.rate : undefined,
           amount: order.remainingAmount,
-          timestamp: order.timestamp
+          timestamp: order.timestamp,
         };
       });
 
@@ -291,6 +291,34 @@ export class OrderBook {
   }
 
   /**
+   * Remove every resting order whose market(s) have all passed maturity, and
+   * return the removed orders.
+   *
+   * A resting order in a matured market can never validly match, so it would
+   * otherwise sit on the book forever locking the user's spendable balance. The
+   * maturity-expiry sweep calls this, then publishes a CANCELLED status per
+   * returned order. An order is only removed when *every* market slot is matured
+   * — a multi-maturity order with at least one still-live leg stays on the book.
+   *
+   * @param nowSeconds - Current time as a unix timestamp in seconds.
+   * @returns The orders that were removed (may be empty).
+   */
+  removeMaturedOrders(nowSeconds: number): Order[] {
+    const matured: Order[] = [];
+    // Collect first (orderIndex dedupes multi-slot orders), then remove — never
+    // mutate the index while iterating it.
+    for (const metadata of this.orderIndex.values()) {
+      if (metadata.markets.every((market) => market.maturity <= nowSeconds)) {
+        matured.push(metadata.order);
+      }
+    }
+    for (const order of matured) {
+      this.removeOrder(order.orderId);
+    }
+    return matured;
+  }
+
+  /**
    * Restore order book from serialized orders
    *
    * Rebuilds the order book structure (Red-Black Trees) from a list of orders.
@@ -311,4 +339,3 @@ export class OrderBook {
     }
   }
 }
-

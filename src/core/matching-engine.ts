@@ -1,11 +1,6 @@
 import { OrderBook } from './order-book';
 import { ExecutionEngine } from './execution-engine';
-import type {
-  Order,
-  LendLimitOrder,
-  BorrowLimitOrder,
-  BorrowMarketOrder,
-} from '../types/orders';
+import type { Order, LendLimitOrder, BorrowLimitOrder, BorrowMarketOrder } from '../types/orders';
 import { OrderSide, OrderStatus, isLimitOrder } from '../types/orders';
 import type { Match, MatchResult, OrderBookSnapshot, AffectedOrder } from '../types/matches';
 import type { SettlementPublisher } from '../types/settlement';
@@ -242,10 +237,8 @@ export class MatchingEngine {
           // Borrower's explicit collateral selection rides on the borrow order
           // (P1b-explicit, 2026-04-17). Pulled from whichever side is the borrow.
           borrowerCollateralAssets: takerIsLender
-            ? (makerOrder as BorrowMarketOrder | BorrowLimitOrder)
-                .collateralAssets
-            : (order as BorrowMarketOrder | BorrowLimitOrder)
-                .collateralAssets,
+            ? (makerOrder as BorrowMarketOrder | BorrowLimitOrder).collateralAssets
+            : (order as BorrowMarketOrder | BorrowLimitOrder).collateralAssets,
         });
 
         matches.push(match);
@@ -326,7 +319,10 @@ export class MatchingEngine {
     return true;
   }
 
-  updateOrder(orderId: string, walletAddress: string): Order | 'NOT_FOUND' | 'WALLET_MISMATCH' | 'INVALID_STATUS' {
+  updateOrder(
+    orderId: string,
+    walletAddress: string
+  ): Order | 'NOT_FOUND' | 'WALLET_MISMATCH' | 'INVALID_STATUS' {
     const order = this.orderBook.getOrder(orderId);
     if (!order) {
       return 'NOT_FOUND';
@@ -391,6 +387,24 @@ export class MatchingEngine {
       settlementFeeAmount: order.settlementFeeAmount,
       remainingSettlementFeeAmount: order.remainingSettlementFeeAmount ?? order.settlementFeeAmount,
     };
+  }
+
+  /**
+   * Expire all resting orders whose market(s) have passed maturity, removing
+   * them from the book and returning them so the caller can publish a CANCELLED
+   * (cancel_reason=MARKET_MATURED) status for each. Pure with respect to I/O —
+   * the only side effect is the (non-blocking) snapshot, mirroring cancelOrder.
+   *
+   * @param nowSeconds - Current time as a unix timestamp in seconds.
+   * @returns The orders that were expired (may be empty).
+   */
+  expireMaturedOrders(nowSeconds: number): Order[] {
+    const expired = this.orderBook.removeMaturedOrders(nowSeconds);
+    if (expired.length > 0) {
+      // Persist the book without the expired orders (non-blocking).
+      this.saveSnapshotAsync();
+    }
+    return expired;
   }
 
   /**

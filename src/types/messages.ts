@@ -197,9 +197,11 @@ export const orderStatusMessageSchema = z.object({
   filledSettlementFeeAmount: z.string(),
 
   /**
-   * Reason why the order was cancelled (only present when status is CANCELLED)
+   * Reason why the order was cancelled (only present when status is CANCELLED).
+   * MARKET_MATURED is stamped by the maturity-expiry sweep when a resting order's
+   * market passes maturity (the db-writer persists it as cancel_reason).
    */
-  cancelReason: z.enum(['USER_CANCELLED', 'IOC']).optional(),
+  cancelReason: z.enum(['USER_CANCELLED', 'IOC', 'MARKET_MATURED']).optional(),
 
   /**
    * Timestamp of the status update
@@ -241,7 +243,7 @@ export const cancelledRemainderMessageSchema = z.object({
   /** Market IDs (bytes32 hex) the order participated in */
   marketIds: z.array(bytes32HexSchema).min(1),
   /** Reason for cancellation */
-  cancelReason: z.enum(['USER_CANCELLED', 'IOC']).optional(),
+  cancelReason: z.enum(['USER_CANCELLED', 'IOC', 'MARKET_MATURED']).optional(),
   /** Timestamp */
   timestamp: z.number().int().positive(),
 });
@@ -420,7 +422,7 @@ export interface OrderStatusSource {
   /** Remaining settlement fee pool (may be lazily initialized) */
   remainingSettlementFeeAmount?: string;
   /** Reason for cancellation (only when status is CANCELLED) */
-  cancelReason?: 'USER_CANCELLED' | 'IOC';
+  cancelReason?: 'USER_CANCELLED' | 'IOC' | 'MARKET_MATURED';
 }
 
 /**
