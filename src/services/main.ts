@@ -13,6 +13,7 @@ import { RetryService } from './retry-service';
 import { DiskPersistenceService } from './disk-persistence-service';
 import { PostgresDbClient } from './db/postgres-db-client';
 import { loadBufferConfig } from '../config/buffer-config';
+import { expireMaturedOrders } from './order-expiry';
 import { createLogger } from '../utils/logger';
 import * as dotenv from 'dotenv';
 
@@ -31,6 +32,7 @@ let snapshotService: SnapshotService | null = null;
 let retryService: RetryService | null = null;
 let diskPersistenceService: DiskPersistenceService | null = null;
 let snapshotTimer: NodeJS.Timeout | null = null;
+let expirySweepTimer: NodeJS.Timeout | null = null;
 let isShuttingDown = false;
 
 /**
@@ -52,6 +54,12 @@ async function handleShutdown(signal: string): Promise<void> {
     if (snapshotTimer) {
       clearInterval(snapshotTimer);
       snapshotTimer = null;
+    }
+
+    // Stop periodic maturity-expiry sweep timer
+    if (expirySweepTimer) {
+      clearInterval(expirySweepTimer);
+      expirySweepTimer = null;
     }
 
     // Save final snapshot before shutdown
@@ -288,6 +296,33 @@ async function main(): Promise<void> {
           });
         }, snapshotIntervalSeconds * 1000);
         log.info({ intervalSeconds: snapshotIntervalSeconds }, 'periodic snapshots enabled');
+      }
+    }
+
+    // Start periodic maturity-expiry sweep (default 60s; 0 disables). Removes
+    // resting orders whose market has passed maturity and publishes CANCELLED
+    // (MARKET_MATURED) so the db-writer releases the user's locked balance.
+    if (matchingEngine && natsService) {
+      const expirySweepIntervalSeconds = parseInt(
+        process.env.ORDER_EXPIRY_SWEEP_INTERVAL_SECONDS || '60',
+        10
+      );
+      if (expirySweepIntervalSeconds > 0) {
+        expirySweepTimer = setInterval(() => {
+          const nc = natsService!.getConnection();
+          if (!nc) {
+            return;
+          }
+          try {
+            expireMaturedOrders(matchingEngine!, nc, Math.floor(Date.now() / 1000));
+          } catch (error) {
+            log.warn({ err: error }, 'periodic maturity-expiry sweep failed');
+          }
+        }, expirySweepIntervalSeconds * 1000);
+        log.info(
+          { intervalSeconds: expirySweepIntervalSeconds },
+          'periodic maturity-expiry sweep enabled'
+        );
       }
     }
 

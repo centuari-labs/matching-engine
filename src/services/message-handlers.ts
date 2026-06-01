@@ -264,6 +264,19 @@ function handleOrder<T extends Order>(
   try {
     const order = parseMessage(data, schema);
 
+    // Backstop: never let an order into a market that has already passed
+    // maturity — it can never validly match and would only lock the user's
+    // balance until the sweep removes it. The backend is the authoritative
+    // placement guard; this defends the engine if anything bypasses it.
+    const nowSeconds = Math.floor(Date.now() / 1000);
+    const maturedSlot = order.markets.find((m) => m.maturity <= nowSeconds);
+    if (maturedSlot) {
+      throw new Error(
+        `Cannot place order in a matured market (marketId=${maturedSlot.marketId}, ` +
+          `maturity=${maturedSlot.maturity})`
+      );
+    }
+
     log.debug({ orderId: order.orderId, type: label }, 'processing order');
 
     const result = ctx.engine.submitOrder(order);
