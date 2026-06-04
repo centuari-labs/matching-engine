@@ -18,8 +18,10 @@ jobs:
       compose_cmd: ${{ steps.set.outputs.compose_cmd }}
     steps:
       - id: set
+        env:
+          REF_NAME: ${{ github.ref_name }}
         run: |
-          case "${{ github.ref_name }}" in
+          case "$REF_NAME" in
             staging)
               echo "env=staging" >> $GITHUB_OUTPUT
               echo "namespace=centuari-staging" >> $GITHUB_OUTPUT
@@ -31,7 +33,7 @@ jobs:
               echo "compose_cmd=docker compose -f compose.testing.yml -p centuari-testing" >> $GITHUB_OUTPUT
               ;;
             *)
-              echo "Unknown branch ${{ github.ref_name }}" >&2
+              echo "Unknown branch $REF_NAME" >&2
               exit 1
               ;;
           esac
