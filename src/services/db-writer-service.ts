@@ -16,6 +16,26 @@ import { createLogger } from '../utils/logger';
 
 const log = createLogger('db-writer-service');
 
+const REDIS_MATCH_FIELD_KEYS = new Set([
+  'matchId',
+  'marketId',
+  'lendOrderId',
+  'borrowOrderId',
+  'lenderWallet',
+  'borrowerWallet',
+  'matchedAmount',
+  'rate',
+  'loanToken',
+  'maturity',
+  'timestamp',
+  'borrowerIsTaker',
+  'makerFeeAmount',
+  'takerFeeAmount',
+  'lenderSettlementFeeAmount',
+  'borrowerSettlementFeeAmount',
+  'borrowerCollateralAssets',
+]);
+
 const DB_WRITER_DEFAULTS = {
   MAX_CONCURRENCY: 10,
   REDIS_BLOCK_TIMEOUT_MS: 5000,
@@ -511,10 +531,15 @@ export class DbWriterService {
    * Convert flat Redis field array into a Match-like object.
    */
   private fieldsToMatch(fields: string[]): Partial<Match> {
-    const obj: Record<string, string> = {};
+    const obj: Record<string, string> = Object.create(null);
     for (let i = 0; i < fields.length; i += 2) {
       const key = fields[i];
       const value = fields[i + 1];
+
+      if (!key || value === undefined || !REDIS_MATCH_FIELD_KEYS.has(key)) {
+        continue;
+      }
+
       obj[key] = value;
     }
 
@@ -535,9 +560,7 @@ export class DbWriterService {
       takerFeeAmount: obj.takerFeeAmount ?? '0',
       lenderSettlementFeeAmount: obj.lenderSettlementFeeAmount ?? '0',
       borrowerSettlementFeeAmount: obj.borrowerSettlementFeeAmount ?? '0',
-      borrowerCollateralAssets: parseCollateralAssets(
-        obj.borrowerCollateralAssets,
-      ),
+      borrowerCollateralAssets: parseCollateralAssets(obj.borrowerCollateralAssets),
     };
   }
 }
@@ -550,9 +573,7 @@ function parseCollateralAssets(raw: string | undefined): string[] {
   if (!raw) return [];
   try {
     const parsed = JSON.parse(raw);
-    return Array.isArray(parsed)
-      ? parsed.filter((v): v is string => typeof v === 'string')
-      : [];
+    return Array.isArray(parsed) ? parsed.filter((v): v is string => typeof v === 'string') : [];
   } catch {
     return [];
   }
