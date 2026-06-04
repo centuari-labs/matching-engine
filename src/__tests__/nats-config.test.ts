@@ -122,9 +122,12 @@ describe('NATS Configuration', () => {
       expect(NATS_TOPICS.ORDERS_BORROW_MARKET).toBe('orders.borrow.market');
       expect(NATS_TOPICS.ORDERS_BORROW_LIMIT).toBe('orders.borrow.limit');
       expect(NATS_TOPICS.ORDERS_CANCEL).toBe('orders.cancel');
+      expect(NATS_TOPICS.ORDERS_CANCEL_REQUEST).toBe('orders.cancel.request');
+      expect(NATS_TOPICS.ORDERS_UPDATE).toBe('orders.update');
       expect(NATS_TOPICS.ORDERS_STATUS).toBe('orders.status');
       expect(NATS_TOPICS.ORDERS_CANCELLED_REMAINDER).toBe('orders.cancelled_remainder');
       expect(NATS_TOPICS.MATCHES_CREATED).toBe('matches.created');
+      expect(NATS_TOPICS.ORDERS_UPDATED).toBe('orders.updated');
       expect(NATS_TOPICS.ERRORS).toBe('errors');
     });
 
@@ -132,7 +135,7 @@ describe('NATS Configuration', () => {
       const { NATS_TOPICS } = require('../config/nats-config');
 
       expect(typeof NATS_TOPICS).toBe('object');
-      expect(Object.keys(NATS_TOPICS).length).toBe(11);
+      expect(Object.keys(NATS_TOPICS).length).toBe(12);
     });
   });
 
