@@ -148,7 +148,13 @@ export class SnapshotService {
         });
       }
 
-      log.info({ orderCount: snapshotData.metadata.orderCount, matchCount: snapshotData.metadata.matchCount }, 'snapshot saved');
+      log.info(
+        {
+          orderCount: snapshotData.metadata.orderCount,
+          matchCount: snapshotData.metadata.matchCount,
+        },
+        'snapshot saved'
+      );
     } catch (error) {
       // Log error but don't throw - snapshot failures shouldn't block operations
       log.error({ err: error }, 'failed to save snapshot');
@@ -162,10 +168,7 @@ export class SnapshotService {
    * @param snapshotData - Snapshot data to save
    * @param metadata - Snapshot metadata
    */
-  private async saveToRedis(
-    snapshotData: SnapshotData,
-    metadata: SnapshotMetadata
-  ): Promise<void> {
+  private async saveToRedis(snapshotData: SnapshotData, metadata: SnapshotMetadata): Promise<void> {
     if (!this.redisService || !this.redisService.isServiceConnected()) {
       return;
     }
@@ -207,15 +210,37 @@ export class SnapshotService {
 
       // Validate with Zod
       const validated = snapshotDataSchema.parse(snapshotData);
-      log.info({ orderCount: validated.metadata.orderCount, matchCount: validated.metadata.matchCount, source: 'filesystem' }, 'snapshot loaded');
+      log.info(
+        {
+          orderCount: validated.metadata.orderCount,
+          matchCount: validated.metadata.matchCount,
+          source: 'filesystem',
+        },
+        'snapshot loaded'
+      );
       return validated;
     } catch (error) {
+      // primary `latest.json` failed (missing or corrupt). If it was corrupt
+      // (not ENOENT) surface it so we don't mistake a corrupted book for a
+      // clean first startup.
+      const latestMissing = (error as NodeJS.ErrnoException).code === 'ENOENT';
+      if (!latestMissing) {
+        log.warn({ err: error }, 'primary snapshot (latest.json) unreadable, trying fallbacks');
+      }
+
       // Filesystem failed, try Redis fallback if enabled
       if (this.redisEnabled && this.redisService?.isServiceConnected()) {
         try {
           const snapshotData = await this.loadFromRedis();
           if (snapshotData) {
-            log.info({ orderCount: snapshotData.metadata.orderCount, matchCount: snapshotData.metadata.matchCount, source: 'redis' }, 'snapshot loaded');
+            log.info(
+              {
+                orderCount: snapshotData.metadata.orderCount,
+                matchCount: snapshotData.metadata.matchCount,
+                source: 'redis',
+              },
+              'snapshot loaded'
+            );
             return snapshotData;
           }
         } catch (redisError) {
@@ -223,11 +248,52 @@ export class SnapshotService {
         }
       }
 
+      // On-disk backup fallback. `latest.json` rotates to `backup.json` on every
+      // successful save, so when `latest.json` is corrupt the previous good book
+      // usually survives here. Without this, a corrupted `latest.json` (with
+      // Redis disabled or empty) would silently start with an empty order book.
+      const backupData = await this.loadFromBackupFile();
+      if (backupData) {
+        log.info(
+          {
+            orderCount: backupData.metadata.orderCount,
+            matchCount: backupData.metadata.matchCount,
+            source: 'backup-file',
+          },
+          'snapshot loaded'
+        );
+        return backupData;
+      }
+
       // No snapshot found or all sources failed
-      if ((error as NodeJS.ErrnoException).code === 'ENOENT') {
+      if (latestMissing) {
         log.info('no snapshot found, first startup');
       } else {
-        log.warn({ err: error }, 'failed to load snapshot');
+        log.warn({ err: error }, 'failed to load snapshot from all sources');
+      }
+      return null;
+    }
+  }
+
+  /**
+   * Load snapshot from the on-disk `backup.json` rotation (fallback only).
+   *
+   * `saveSnapshot` rotates the previous `latest.json` to `backup.json` before
+   * each write, so this holds the last-known-good book when `latest.json` is
+   * corrupt. Returns null when the backup is missing or itself unreadable/
+   * invalid — never throws, so it can be used as a terminal fallback.
+   *
+   * @returns Snapshot data if a valid backup exists, null otherwise
+   */
+  private async loadFromBackupFile(): Promise<SnapshotData | null> {
+    const filePaths = this.getFilePaths();
+    try {
+      const data = await fs.readFile(filePaths.backup, 'utf-8');
+      const parsed = JSON.parse(data) as SnapshotData;
+      return snapshotDataSchema.parse(parsed);
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code !== 'ENOENT') {
+        log.warn({ err: error }, 'failed to load snapshot from backup.json fallback');
       }
       return null;
     }

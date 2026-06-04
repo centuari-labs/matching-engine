@@ -19,6 +19,11 @@ export class OrderBook {
   // Order metadata for O(1) lookups by orderId
   private orderIndex: Map<string, OrderMetadata & { order: Order }>;
 
+  // Per-wallet open-order count (key = lowercased wallet address). Kept in sync
+  // with `orderIndex` on every add/remove/clear so the unbounded-book guard
+  // (per-wallet cap) is O(1).
+  private walletOrderCounts: Map<string, number>;
+
   // Comparators for tree ordering
   private lendComparator: (a: Order, b: Order) => number;
   private borrowComparator: (a: Order, b: Order) => number;
@@ -27,6 +32,7 @@ export class OrderBook {
     this.lendOrders = new Map();
     this.borrowOrders = new Map();
     this.orderIndex = new Map();
+    this.walletOrderCounts = new Map();
     this.lendComparator = createOrderComparator(OrderSide.Lend);
     this.borrowComparator = createOrderComparator(OrderSide.Borrow);
   }
@@ -37,6 +43,14 @@ export class OrderBook {
    * @param order - The order to add
    */
   addOrder(order: Order): void {
+    // Maintain the per-wallet count, but only for genuinely new orderIds — a
+    // re-add of an existing id (e.g. updateOrderAmount remove→re-add) must not
+    // double-count.
+    if (!this.orderIndex.has(order.orderId)) {
+      const walletKey = order.walletAddress.toLowerCase();
+      this.walletOrderCounts.set(walletKey, (this.walletOrderCounts.get(walletKey) ?? 0) + 1);
+    }
+
     // Store order metadata for quick lookups
     this.orderIndex.set(order.orderId, {
       orderId: order.orderId,
@@ -108,8 +122,15 @@ export class OrderBook {
       }
     }
 
-    // Remove from index
+    // Remove from index and decrement the per-wallet count.
     this.orderIndex.delete(orderId);
+    const walletKey = metadata.walletAddress.toLowerCase();
+    const nextCount = (this.walletOrderCounts.get(walletKey) ?? 1) - 1;
+    if (nextCount <= 0) {
+      this.walletOrderCounts.delete(walletKey);
+    } else {
+      this.walletOrderCounts.set(walletKey, nextCount);
+    }
     return true;
   }
 
@@ -268,6 +289,17 @@ export class OrderBook {
     this.lendOrders.clear();
     this.borrowOrders.clear();
     this.orderIndex.clear();
+    this.walletOrderCounts.clear();
+  }
+
+  /**
+   * Get the number of open orders currently resting in the book for a wallet.
+   *
+   * @param walletAddress - Wallet address (case-insensitive)
+   * @returns Open-order count for the wallet (0 if none)
+   */
+  getWalletOrderCount(walletAddress: string): number {
+    return this.walletOrderCounts.get(walletAddress.toLowerCase()) ?? 0;
   }
 
   /**

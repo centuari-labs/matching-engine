@@ -15,6 +15,7 @@ import { PostgresDbClient } from './db/postgres-db-client';
 import { loadBufferConfig } from '../config/buffer-config';
 import { expireMaturedOrders } from './order-expiry';
 import { createLogger } from '../utils/logger';
+import { maskUrl } from '../utils/mask-url';
 import * as dotenv from 'dotenv';
 
 const log = createLogger('main');
@@ -129,11 +130,12 @@ async function main(): Promise<void> {
   try {
     log.info('matching engine service starting');
 
-    // Display configuration
+    // Display configuration. Mask connection URLs so embedded credentials
+    // (e.g. redis://:pass@host) never reach the log sink.
     log.info(
       {
-        natsUrl: process.env.NATS_URL || 'nats://localhost:4222',
-        redisUrl: process.env.REDIS_URL || 'redis://localhost:6379',
+        natsHost: maskUrl(process.env.NATS_URL || 'nats://localhost:4222'),
+        redisHost: maskUrl(process.env.REDIS_URL || 'redis://localhost:6379'),
         nodeEnv: process.env.NODE_ENV || 'development',
       },
       'configuration'
@@ -262,7 +264,7 @@ async function main(): Promise<void> {
       {
         natsConnected: natsStats.connected,
         subscriptions: natsStats.subscriptions,
-        natsServer: natsStats.config.url,
+        natsHost: maskUrl(natsStats.config.url),
         natsAuth: natsStats.config.hasAuth,
       },
       'NATS status'
@@ -275,7 +277,7 @@ async function main(): Promise<void> {
       log.info(
         {
           redisConnected: redisStats.connected,
-          redisServer: redisStats.config.url,
+          redisHost: maskUrl(redisStats.config.url),
           redisDb: redisStats.config.db,
           streamLength: streamInfo?.length ?? 0,
           consumerGroups: streamInfo?.groups ?? 0,
