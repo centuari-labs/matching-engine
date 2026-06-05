@@ -119,6 +119,49 @@ describe('updateOrderMessageSchema', () => {
     });
     expect(result.success).toBe(true);
   });
+
+  // L2: the update path must enforce the same [1, 10000] bps cap the placement
+  // path enforces (backend create-order.dto.ts), otherwise an update can push
+  // rate above the placement-time bound.
+  it('should reject rate above the 10000-bps cap', () => {
+    const result = updateOrderMessageSchema.safeParse({
+      orderId: generateOrderId(),
+      walletAddress: validWallet,
+      rate: 10001,
+      timestamp: Date.now(),
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it('should reject rate below the minimum of 1 bps', () => {
+    const result = updateOrderMessageSchema.safeParse({
+      orderId: generateOrderId(),
+      walletAddress: validWallet,
+      rate: 0,
+      timestamp: Date.now(),
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it('should accept rate at the 10000-bps cap boundary', () => {
+    const result = updateOrderMessageSchema.safeParse({
+      orderId: generateOrderId(),
+      walletAddress: validWallet,
+      rate: 10000,
+      timestamp: Date.now(),
+    });
+    expect(result.success).toBe(true);
+  });
+
+  it('should accept an update that omits rate entirely', () => {
+    const result = updateOrderMessageSchema.safeParse({
+      orderId: generateOrderId(),
+      walletAddress: validWallet,
+      originalAmount: '2000000',
+      timestamp: Date.now(),
+    });
+    expect(result.success).toBe(true);
+  });
 });
 
 describe('orderUpdatedMessageSchema', () => {

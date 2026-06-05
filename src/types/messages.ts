@@ -42,7 +42,10 @@ export const updateOrderMessageSchema = z
     amount: digitStringSchema,
     quantity: digitStringSchema,
     originalAmount: digitStringSchema,
-    rate: z.number().int().positive().optional(),
+    // Interest rate in bps. Bounded to the same [1, 10000] range the placement
+    // path enforces (backend create-order.dto.ts) so an update cannot push the
+    // rate above the placement-time cap (security audit L2).
+    rate: z.number().int().min(1).max(10000).optional(),
     settlementFee: digitStringSchema,
     settlementFeeAmount: digitStringSchema,
     timestamp: z

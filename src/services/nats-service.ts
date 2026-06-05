@@ -19,7 +19,6 @@ import {
   handleLendLimitOrder,
   handleBorrowMarketOrder,
   handleBorrowLimitOrder,
-  handleCancelOrder,
   handleCancelOrderRequest,
   handleUpdateOrder,
   type HandlerContext,
@@ -192,12 +191,6 @@ export class NatsService {
     this.subscriptions.push(borrowLimitSub);
     this.processSubscription(borrowLimitSub, (data) => handleBorrowLimitOrder(ctx, data));
     log.info({ topic: NATS_TOPICS.ORDERS_BORROW_LIMIT }, 'subscribed');
-
-    // Subscribe to cancel orders
-    const cancelSub = this.nc.subscribe(NATS_TOPICS.ORDERS_CANCEL);
-    this.subscriptions.push(cancelSub);
-    this.processSubscription(cancelSub, (data) => handleCancelOrder(ctx, data));
-    log.info({ topic: NATS_TOPICS.ORDERS_CANCEL }, 'subscribed');
 
     // Subscribe to cancel requests (request/reply). The handler receives the
     // full message so it can reply the authoritative outcome to the requester.
