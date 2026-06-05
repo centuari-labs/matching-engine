@@ -328,11 +328,10 @@ export const handleBorrowLimitOrder = (ctx: HandlerContext, data: Uint8Array): v
  * is what makes the request/reply verdict trustworthy.
  *
  * Side effect: on `CANCELLED`, publishes `orders.status: CANCELLED` so the
- * orderbook/WebSocket consumers and the (idempotent) DB writer stay in sync —
- * the same status the legacy fire-and-forget path emitted.
+ * orderbook/WebSocket consumers and the (idempotent) DB writer stay in sync.
  *
- * Shared by both `handleCancelOrder` (legacy fire-and-forget) and
- * `handleCancelOrderRequest` (request/reply) so the verdict logic lives once.
+ * Used by `handleCancelOrderRequest` (request/reply) so the verdict logic lives
+ * in one place.
  */
 function computeCancelOutcome(ctx: HandlerContext, request: CancelOrderMessage): CancelReply {
   // Get order info before cancellation (needed for status message)
@@ -366,57 +365,6 @@ function computeCancelOutcome(ctx: HandlerContext, request: CancelOrderMessage):
     orderId: request.orderId,
     remainingAmount: orderInfo.remainingAmount,
   };
-}
-
-/**
- * Handle order cancellation messages (legacy fire-and-forget `orders.cancel`).
- *
- * Kept during the C1 transition for any publisher still on the old subject.
- * New cancels should use the request/reply path (`handleCancelOrderRequest`).
- *
- * @param ctx - Handler context
- * @param data - Raw message data
- */
-export function handleCancelOrder(ctx: HandlerContext, data: Uint8Array): void {
-  try {
-    // Parse and validate the cancellation request
-    const request = parseMessage(data, cancelOrderMessageSchema);
-
-    log.debug(
-      { orderId: request.orderId, walletAddress: request.walletAddress },
-      'processing cancel request'
-    );
-
-    const reply = computeCancelOutcome(ctx, request);
-
-    if (reply.outcome === 'CANCELLED') {
-      log.info({ orderId: request.orderId }, 'order cancelled successfully');
-    } else if (reply.outcome === 'NOT_FOUND') {
-      log.warn({ orderId: request.orderId }, 'order not found for cancellation');
-      publishError(
-        ctx,
-        createErrorMessage(
-          ERROR_CODES.ORDER_NOT_FOUND,
-          `Order ${request.orderId} not found`,
-          request.orderId
-        )
-      );
-    } else {
-      log.warn({ orderId: request.orderId }, 'wallet address mismatch for cancel request');
-      publishError(
-        ctx,
-        createErrorMessage(
-          ERROR_CODES.VALIDATION_ERROR,
-          `Wallet address does not match order owner`,
-          request.orderId
-        )
-      );
-    }
-  } catch (error) {
-    log.error({ err: error }, 'error handling cancel order');
-    const errorMsg = error instanceof Error ? error.message : 'Unknown error';
-    publishError(ctx, createErrorMessage(ERROR_CODES.INVALID_ORDER, errorMsg));
-  }
 }
 
 /**

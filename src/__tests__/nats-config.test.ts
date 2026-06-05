@@ -121,7 +121,6 @@ describe('NATS Configuration', () => {
       expect(NATS_TOPICS.ORDERS_LEND_LIMIT).toBe('orders.lend.limit');
       expect(NATS_TOPICS.ORDERS_BORROW_MARKET).toBe('orders.borrow.market');
       expect(NATS_TOPICS.ORDERS_BORROW_LIMIT).toBe('orders.borrow.limit');
-      expect(NATS_TOPICS.ORDERS_CANCEL).toBe('orders.cancel');
       expect(NATS_TOPICS.ORDERS_CANCEL_REQUEST).toBe('orders.cancel.request');
       expect(NATS_TOPICS.ORDERS_UPDATE).toBe('orders.update');
       expect(NATS_TOPICS.ORDERS_STATUS).toBe('orders.status');
@@ -135,7 +134,7 @@ describe('NATS Configuration', () => {
       const { NATS_TOPICS } = require('../config/nats-config');
 
       expect(typeof NATS_TOPICS).toBe('object');
-      expect(Object.keys(NATS_TOPICS).length).toBe(12);
+      expect(Object.keys(NATS_TOPICS).length).toBe(11);
     });
   });
 

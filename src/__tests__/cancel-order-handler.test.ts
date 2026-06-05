@@ -1,9 +1,5 @@
 import { MatchingEngine } from '../core/matching-engine';
-import {
-  handleCancelOrder,
-  handleCancelOrderRequest,
-  type HandlerContext,
-} from '../services/message-handlers';
+import { handleCancelOrderRequest, type HandlerContext } from '../services/message-handlers';
 import { NATS_TOPICS } from '../config/nats-config';
 import { cancelReplySchema, type CancelReply } from '../types/messages';
 import { createLendLimitOrder, marketsFromMaturities } from './factories/order-factory';
@@ -149,51 +145,18 @@ describe('handleCancelOrderRequest (request/reply)', () => {
   });
 });
 
-describe('handleCancelOrder (legacy fire-and-forget)', () => {
-  let engine: MatchingEngine;
-  let mockNc: ReturnType<typeof createMockNatsConnection>;
-  let ctx: HandlerContext;
-
-  const loanToken = '0x1234567890123456789012345678901234567890';
-  const owner = '0x1111111111111111111111111111111111111111';
-  const maturity = 1704067200;
-
-  beforeEach(() => {
-    engine = new MatchingEngine();
-    mockNc = createMockNatsConnection();
-    ctx = { nc: mockNc as unknown as HandlerContext['nc'], engine };
+// L1: the legacy fire-and-forget `orders.cancel` subject and its handler were
+// retired (the backend publishes cancels only to `orders.cancel.request`). Guard
+// against accidental reintroduction.
+describe('legacy fire-and-forget cancel path retired', () => {
+  it('no longer exports handleCancelOrder', () => {
+    const handlers = require('../services/message-handlers');
+    expect(handlers.handleCancelOrder).toBeUndefined();
   });
 
-  it('still cancels and publishes orders.status on the legacy subject', () => {
-    const order = createLendLimitOrder({
-      walletAddress: owner,
-      loanToken,
-      markets: marketsFromMaturities([maturity]),
-      originalAmount: '1000000',
-      remainingAmount: '1000000',
-      settlementFeeAmount: '10000',
-      rate: 500,
-    });
-    engine.submitOrder(order);
-
-    handleCancelOrder(
-      ctx,
-      toBytes({ orderId: order.orderId, walletAddress: owner, timestamp: Date.now() })
-    );
-
-    expect(engine.hasOrder(order.orderId)).toBe(false);
-    const statusMsgs = mockNc.getMessagesForTopic(NATS_TOPICS.ORDERS_STATUS);
-    expect(statusMsgs.length).toBe(1);
-    expect(JSON.parse(statusMsgs[0].data).status).toBe('CANCELLED');
-  });
-
-  it('publishes an error to the errors topic when the order is not found', () => {
-    handleCancelOrder(
-      ctx,
-      toBytes({ orderId: generateOrderId(), walletAddress: owner, timestamp: Date.now() })
-    );
-
-    const errorMsgs = mockNc.getMessagesForTopic(NATS_TOPICS.ERRORS);
-    expect(errorMsgs.length).toBe(1);
+  it('no longer defines a legacy ORDERS_CANCEL topic constant', () => {
+    expect((NATS_TOPICS as Record<string, string>).ORDERS_CANCEL).toBeUndefined();
+    // The request/reply subject is the only cancel subject that remains.
+    expect(NATS_TOPICS.ORDERS_CANCEL_REQUEST).toBe('orders.cancel.request');
   });
 });
