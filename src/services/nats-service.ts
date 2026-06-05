@@ -25,8 +25,36 @@ import {
   type HandlerContext,
 } from './message-handlers';
 import { createLogger } from '../utils/logger';
+import { maskUrl } from '../utils/mask-url';
 
 const log = createLogger('nats-service');
+
+/**
+ * Assert that NATS authentication is configured when running in production.
+ *
+ * The matching engine ingresses orders over NATS; an unauthenticated bus lets
+ * any local peer inject/replay orders. In `NODE_ENV==='production'` we require
+ * either user+password or a token and fail fast otherwise. Non-production
+ * environments are unaffected so local dev keeps working without auth.
+ *
+ * @param config - Resolved NATS configuration
+ * @throws {Error} If production and no credentials are present
+ */
+export function assertNatsAuthConfigured(config: NatsConfig): void {
+  if (process.env.NODE_ENV !== 'production') {
+    return;
+  }
+
+  const hasUserPass = Boolean(config.user && config.password);
+  const hasToken = Boolean(config.token);
+
+  if (!hasUserPass && !hasToken) {
+    throw new Error(
+      'NATS authentication is required in production: set NATS_USER + NATS_PASSWORD, ' +
+        'or NATS_TOKEN. Refusing to connect to an unauthenticated message bus.'
+    );
+  }
+}
 
 /**
  * NATS Service class for managing connections and subscriptions
@@ -60,8 +88,14 @@ export class NatsService {
       return;
     }
 
+    // In production the message bus must be authenticated at the app layer.
+    // Fail fast on startup if neither user+password nor a token is configured,
+    // rather than silently connecting to an open NATS server. Dev/test keep
+    // the existing optional-auth behaviour.
+    assertNatsAuthConfigured(this.config);
+
     try {
-      log.info({ url: this.config.url }, 'connecting to NATS');
+      log.info({ host: maskUrl(this.config.url) }, 'connecting to NATS');
 
       // Build connection options
       const options: ConnectionOptions = {

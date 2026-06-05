@@ -10,6 +10,9 @@ import type { DbConfig } from '../../config/db-config';
 import { loadDbConfig } from '../../config/db-config';
 import type { Order } from '../../types/orders';
 import { OrderSide, OrderType, OrderStatus } from '../../types/orders';
+import { createLogger } from '../../utils/logger';
+
+const log = createLogger('postgres-db-client');
 
 /**
  * Convert a `0x`-prefixed hex string into a pg `bytea` buffer. Mirrors the
@@ -68,13 +71,26 @@ export class PostgresDbClient implements DbClient {
     this.pool = new Pool(poolConfig);
   }
 
+  /**
+   * Persist an order status transition.
+   *
+   * Guards against the cancel-during-match race: a cancel arriving between
+   * engine-publishes-match and db-writer-flushes-`status=FILLED` (or the
+   * reverse) must not overwrite an already-terminal row. The `WHERE` clause
+   * therefore excludes rows already in a terminal status (`FILLED` /
+   * `CANCELLED`); when `rowCount === 0` the write was a no-op (race detected
+   * or the row is missing) and we log a warning rather than silently dropping
+   * it.
+   *
+   * @param event - Order status event to persist
+   */
   async updateOrderStatus(event: OrderStatusEvent): Promise<void> {
     const client = await this.pool.connect();
 
     try {
       await client.query('BEGIN');
 
-      await client.query(
+      const result = await client.query(
         `
         UPDATE orders
         SET
@@ -84,6 +100,7 @@ export class PostgresDbClient implements DbClient {
           cancel_reason = $6,
           updated_at = to_timestamp($5 / 1000.0)
         WHERE id = $1
+          AND status NOT IN ('FILLED', 'CANCELLED')
         `,
         [
           event.orderId,
@@ -94,6 +111,17 @@ export class PostgresDbClient implements DbClient {
           event.cancelReason ?? null,
         ]
       );
+
+      if (result.rowCount === 0) {
+        // The row is either already terminal (FILLED/CANCELLED) — i.e. a
+        // concurrent write won the race — or it does not exist. Either way the
+        // update was a no-op; surface it for observability instead of dropping
+        // it silently (last-write-wins).
+        log.warn(
+          { orderId: event.orderId, attemptedStatus: event.status },
+          'updateOrderStatus no-op: order already terminal or missing (race detected)'
+        );
+      }
 
       await client.query('COMMIT');
     } catch (error) {
@@ -245,6 +273,7 @@ export class PostgresDbClient implements DbClient {
         const assetBytea = hexToBytea(event.loanToken);
 
         const lenderUpdate = {
+          role: 'lender' as const,
           sortKey: event.lenderWallet.toLowerCase(),
           query: `
             UPDATE user_balance
@@ -262,6 +291,7 @@ export class PostgresDbClient implements DbClient {
         };
 
         const borrowerUpdate = {
+          role: 'borrower' as const,
           sortKey: event.borrowerWallet.toLowerCase(),
           query: `
             UPDATE user_balance
@@ -284,7 +314,17 @@ export class PostgresDbClient implements DbClient {
             : [borrowerUpdate, lenderUpdate];
 
         for (const update of ordered) {
-          await client.query(update.query, update.params);
+          const updateResult = await client.query(update.query, update.params);
+          if (updateResult.rowCount === 0) {
+            // The balance row is absent for this (wallet, asset). If we let the
+            // match commit anyway, the in_orders lock is silently skipped and
+            // the user's spendable balance is overstated. Throw to roll back
+            // the whole match so the missing-row case is never silent.
+            throw new Error(
+              `Cannot lock balance: user_balance row missing for ${update.role} ` +
+                `(asset=${event.loanToken}). Match ${event.matchId} rolled back.`
+            );
+          }
         }
       }
 

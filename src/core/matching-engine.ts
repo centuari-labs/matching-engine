@@ -19,6 +19,16 @@ import { createLogger } from '../utils/logger';
 const log = createLogger('matching-engine');
 
 /**
+ * Hard cap on the number of open orders a single wallet may rest in the book.
+ *
+ * The in-memory order book is otherwise unbounded — a single wallet could
+ * spam limit orders and exhaust process memory (DoS). Only limit orders that
+ * rest count against this cap; market orders are IOC and never rest. Matched
+ * orders that fully fill do not occupy a slot.
+ */
+export const MAX_OPEN_ORDERS_PER_WALLET = 1000;
+
+/**
  * MatchingEngine is the core component that matches lend and borrow orders
  */
 export class MatchingEngine {
@@ -108,6 +118,24 @@ export class MatchingEngine {
    * @returns Match result containing matches, remaining order info, and affected maker orders
    */
   submitOrder(order: Order): MatchResult {
+    // Per-wallet open-order cap. Only limit orders can rest and grow the book;
+    // market orders are IOC. A re-submit of an order already in the book (the
+    // update path) replaces an existing slot, so it is exempt. Reject before
+    // any matching side effects are recorded.
+    if (isLimitOrder(order) && this.orderBook.getOrder(order.orderId) === null) {
+      const walletCount = this.orderBook.getWalletOrderCount(order.walletAddress);
+      if (walletCount >= MAX_OPEN_ORDERS_PER_WALLET) {
+        log.warn(
+          { walletAddress: order.walletAddress, walletCount, max: MAX_OPEN_ORDERS_PER_WALLET },
+          'rejecting order: per-wallet open-order limit reached'
+        );
+        throw new Error(
+          `Per-wallet open-order limit reached (${MAX_OPEN_ORDERS_PER_WALLET}); ` +
+            'cancel existing orders before placing more'
+        );
+      }
+    }
+
     const matches: Match[] = [];
     const affectedMakerOrders: AffectedOrder[] = [];
 
