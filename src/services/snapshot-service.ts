@@ -178,22 +178,17 @@ export class SnapshotService {
       return;
     }
 
-    try {
-      // Rotate backup
-      const backupData = await client.get('matching-engine:snapshot:backup');
-      if (backupData) {
-        await client.set('matching-engine:snapshot:backup', backupData);
-      }
-
-      // Save latest snapshot
-      await client.set('matching-engine:snapshot:latest', JSON.stringify(snapshotData));
-
-      // Save metadata
-      await client.set('matching-engine:snapshot:metadata', JSON.stringify(metadata));
-    } catch (error) {
-      // Silent failure - Redis is optional
-      throw error;
+    // Rotate backup
+    const backupData = await client.get('matching-engine:snapshot:backup');
+    if (backupData) {
+      await client.set('matching-engine:snapshot:backup', backupData);
     }
+
+    // Save latest snapshot
+    await client.set('matching-engine:snapshot:latest', JSON.stringify(snapshotData));
+
+    // Save metadata
+    await client.set('matching-engine:snapshot:metadata', JSON.stringify(metadata));
   }
 
   /**
