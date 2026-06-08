@@ -40,8 +40,13 @@ function hexToBytea(hex: string): Buffer {
  *   lender_settlement_fee NUMERIC, borrower_settlement_fee NUMERIC,
  *   maturity TIMESTAMP, created_at TIMESTAMP, updated_at TIMESTAMP);
  *   — lend_order_market_id / borrow_order_market_id today store order
- *     UUIDs (semantically should be order_markets.order_market_id;
- *     unrelated TODO, not in C4 scope).
+ *     UUIDs (semantically should be order_markets.order_market_id).
+ *     DEFERRED (noted 2026-06-08, audit-prep): repointing these columns is a
+ *     schema migration that also touches settlement-engine's match reader and
+ *     the shared `matches` table; it is out of the hub-only audit scope and
+ *     not required for correctness today — the order UUIDs resolve
+ *     consistently across the DB writer and every reader. Revisit under
+ *     post-audit schema cleanup, not in C4 scope.
  *
  * - order_markets(order_market_id UUID PK, order_id UUID, market_id BYTEA,
  *   created_at TIMESTAMPTZ) — `market_id` migrated UUID → BYTEA in C4
