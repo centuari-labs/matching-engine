@@ -41,7 +41,9 @@ describe('handleUpdateOrder', () => {
   const loanToken = '0x1234567890123456789012345678901234567890';
   const walletAddress1 = '0x1111111111111111111111111111111111111111';
   const walletAddress2 = '0x2222222222222222222222222222222222222222';
-  const maturity = 1704067200;
+  // Far-future maturity so the handleOrder matured-market backstop accepts these
+  // placements (a past maturity is rejected as a matured market).
+  const maturity = 4102444800; // 2100-01-01
 
   beforeEach(() => {
     engine = new MatchingEngine();

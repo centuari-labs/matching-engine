@@ -10,6 +10,19 @@ import type { DbConfig } from '../../config/db-config';
 import { loadDbConfig } from '../../config/db-config';
 import type { Order } from '../../types/orders';
 import { OrderSide, OrderType, OrderStatus } from '../../types/orders';
+import { createLogger } from '../../utils/logger';
+
+const log = createLogger('postgres-db-client');
+
+/**
+ * Convert a `0x`-prefixed hex string into a pg `bytea` buffer. Mirrors the
+ * helper used by indexer-v3 + backend-v2's `BYTEA_HEX.to(...)` so the same
+ * encoding flows through every service.
+ */
+function hexToBytea(hex: string): Buffer {
+  const stripped = hex.startsWith('0x') || hex.startsWith('0X') ? hex.slice(2) : hex;
+  return Buffer.from(stripped, 'hex');
+}
 
 /**
  * Postgres implementation of the DbClient interface.
@@ -26,6 +39,25 @@ import { OrderSide, OrderType, OrderStatus } from '../../types/orders';
  *   is_borrower_taker BOOLEAN, maker_fee NUMERIC, taker_fee NUMERIC,
  *   lender_settlement_fee NUMERIC, borrower_settlement_fee NUMERIC,
  *   maturity TIMESTAMP, created_at TIMESTAMP, updated_at TIMESTAMP);
+ *   — lend_order_market_id / borrow_order_market_id today store order
+ *     UUIDs (semantically should be order_markets.order_market_id).
+ *     DEFERRED (noted 2026-06-08, audit-prep): repointing these columns is a
+ *     schema migration that also touches settlement-engine's match reader and
+ *     the shared `matches` table; it is out of the hub-only audit scope and
+ *     not required for correctness today — the order UUIDs resolve
+ *     consistently across the DB writer and every reader. Revisit under
+ *     post-audit schema cleanup, not in C4 scope.
+ *
+ * - order_markets(order_market_id UUID PK, order_id UUID, market_id BYTEA,
+ *   created_at TIMESTAMPTZ) — `market_id` migrated UUID → BYTEA in C4
+ *   and now FKs to the shared `market` table (BYTEA-keyed) written by
+ *   indexer-v3 + backend's eager-write path.
+ *
+ * - user_balance(user_address BYTEA, asset BYTEA, available NUMERIC,
+ *   in_orders NUMERIC, in_yield_router NUMERIC, used_as_collateral BOOLEAN,
+ *   flagged_at BIGINT, applied_by_* …, updated_at TIMESTAMPTZ;
+ *   PK (user_address, asset)) — owned by indexer-v3. `in_orders` is the
+ *   post-C4 home for match-time locks (was `portfolio.locked_amount`).
  *
  * Column names can be adjusted later without changing the DbWriterService.
  */
@@ -44,13 +76,26 @@ export class PostgresDbClient implements DbClient {
     this.pool = new Pool(poolConfig);
   }
 
+  /**
+   * Persist an order status transition.
+   *
+   * Guards against the cancel-during-match race: a cancel arriving between
+   * engine-publishes-match and db-writer-flushes-`status=FILLED` (or the
+   * reverse) must not overwrite an already-terminal row. The `WHERE` clause
+   * therefore excludes rows already in a terminal status (`FILLED` /
+   * `CANCELLED`); when `rowCount === 0` the write was a no-op (race detected
+   * or the row is missing) and we log a warning rather than silently dropping
+   * it.
+   *
+   * @param event - Order status event to persist
+   */
   async updateOrderStatus(event: OrderStatusEvent): Promise<void> {
     const client = await this.pool.connect();
 
     try {
       await client.query('BEGIN');
 
-      await client.query(
+      const result = await client.query(
         `
         UPDATE orders
         SET
@@ -60,6 +105,7 @@ export class PostgresDbClient implements DbClient {
           cancel_reason = $6,
           updated_at = to_timestamp($5 / 1000.0)
         WHERE id = $1
+          AND status NOT IN ('FILLED', 'CANCELLED')
         `,
         [
           event.orderId,
@@ -70,6 +116,17 @@ export class PostgresDbClient implements DbClient {
           event.cancelReason ?? null,
         ]
       );
+
+      if (result.rowCount === 0) {
+        // The row is either already terminal (FILLED/CANCELLED) — i.e. a
+        // concurrent write won the race — or it does not exist. Either way the
+        // update was a no-op; surface it for observability instead of dropping
+        // it silently (last-write-wins).
+        log.warn(
+          { orderId: event.orderId, attemptedStatus: event.status },
+          'updateOrderStatus no-op: order already terminal or missing (race detected)'
+        );
+      }
 
       await client.query('COMMIT');
     } catch (error) {
@@ -187,8 +244,8 @@ export class PostgresDbClient implements DbClient {
         `,
         [
           event.matchId,
-          event.lendOrderId, //@note : later change into order market id
-          event.borrowOrderId, //@note : later change into order market id
+          event.lendOrderId,
+          event.borrowOrderId,
           assetId,
           lenderAccountId,
           borrowerAccountId,
@@ -204,53 +261,75 @@ export class PostgresDbClient implements DbClient {
         ]
       );
 
-      // Lock both lender and borrower balances for pending settlement.
-      // Sort updates by account ID to prevent deadlocks when concurrent
-      // transactions lock the same two accounts in opposite roles.
+      // Lock both lender and borrower balances for pending settlement by
+      // bumping `user_balance.in_orders` on the indexer-v3 schema (was
+      // `portfolio.locked_amount` pre-C4). Sort updates by `user_address`
+      // BYTEA to prevent deadlocks when concurrent transactions lock the
+      // same pair in opposite roles. Mirror this ordering in
+      // settlement-engine's `lock-release.ts`.
       if (insertResult.rowCount && insertResult.rowCount > 0) {
         const lenderTradeFee = event.borrowerIsTaker ? event.makerFeeAmount : event.takerFeeAmount;
         const borrowerTradeFee = event.borrowerIsTaker
           ? event.takerFeeAmount
           : event.makerFeeAmount;
 
+        const lenderUserAddress = hexToBytea(event.lenderWallet);
+        const borrowerUserAddress = hexToBytea(event.borrowerWallet);
+        const assetBytea = hexToBytea(event.loanToken);
+
         const lenderUpdate = {
-          accountId: lenderAccountId,
-          amounts: [event.matchedAmount, event.lenderSettlementFeeAmount, lenderTradeFee],
+          role: 'lender' as const,
+          sortKey: event.lenderWallet.toLowerCase(),
           query: `
-            UPDATE portfolio
-            SET locked_amount = locked_amount + ($1::numeric + $2::numeric + $3::numeric),
+            UPDATE user_balance
+            SET in_orders = in_orders + ($1::numeric + $2::numeric + $3::numeric),
                 updated_at = NOW()
-            WHERE account_id = $4 AND asset_id = $5
+            WHERE user_address = $4 AND asset = $5
           `,
           params: [
             event.matchedAmount,
             event.lenderSettlementFeeAmount,
             lenderTradeFee,
-            lenderAccountId,
-            assetId,
+            lenderUserAddress,
+            assetBytea,
           ],
         };
 
         const borrowerUpdate = {
-          accountId: borrowerAccountId,
-          amounts: [event.borrowerSettlementFeeAmount, borrowerTradeFee],
+          role: 'borrower' as const,
+          sortKey: event.borrowerWallet.toLowerCase(),
           query: `
-            UPDATE portfolio
-            SET locked_amount = locked_amount + ($1::numeric + $2::numeric),
+            UPDATE user_balance
+            SET in_orders = in_orders + ($1::numeric + $2::numeric),
                 updated_at = NOW()
-            WHERE account_id = $3 AND asset_id = $4
+            WHERE user_address = $3 AND asset = $4
           `,
-          params: [event.borrowerSettlementFeeAmount, borrowerTradeFee, borrowerAccountId, assetId],
+          params: [
+            event.borrowerSettlementFeeAmount,
+            borrowerTradeFee,
+            borrowerUserAddress,
+            assetBytea,
+          ],
         };
 
-        // Always lock lower account ID first to prevent deadlocks
+        // Always lock lower user_address (lowercase hex) first to prevent deadlocks
         const ordered =
-          lenderAccountId < borrowerAccountId
+          lenderUpdate.sortKey < borrowerUpdate.sortKey
             ? [lenderUpdate, borrowerUpdate]
             : [borrowerUpdate, lenderUpdate];
 
         for (const update of ordered) {
-          await client.query(update.query, update.params);
+          const updateResult = await client.query(update.query, update.params);
+          if (updateResult.rowCount === 0) {
+            // The balance row is absent for this (wallet, asset). If we let the
+            // match commit anyway, the in_orders lock is silently skipped and
+            // the user's spendable balance is overstated. Throw to roll back
+            // the whole match so the missing-row case is never silent.
+            throw new Error(
+              `Cannot lock balance: user_balance row missing for ${update.role} ` +
+                `(asset=${event.loanToken}). Match ${event.matchId} rolled back.`
+            );
+          }
         }
       }
 
@@ -306,7 +385,7 @@ export class PostgresDbClient implements DbClient {
           VALUES ($1, $2, to_timestamp($3 / 1000.0))
           ON CONFLICT DO NOTHING
           `,
-          [event.orderId, marketId, event.timestamp]
+          [event.orderId, hexToBytea(marketId), event.timestamp]
         );
       }
 
@@ -363,15 +442,15 @@ export class PostgresDbClient implements DbClient {
           EXTRACT(EPOCH FROM o.created_at)::bigint * 1000 AS timestamp,
           json_agg(
             json_build_object(
-              'marketId', om.market_id,
-              'maturity', EXTRACT(EPOCH FROM m.maturity)::int
+              'marketId', '0x' || encode(om.market_id, 'hex'),
+              'maturity', m.maturity::int
             )
           ) AS markets
         FROM orders o
         JOIN accounts a ON a.id = o.account_id
         JOIN assets t ON t.id = o.asset_id
         JOIN order_markets om ON om.order_id = o.id
-        JOIN markets m ON m.id = om.market_id
+        JOIN market m ON m.market_id = om.market_id
         WHERE o.status IN ('OPEN', 'PARTIALLY_FILLED')
           AND o.type = 'LIMIT'
         GROUP BY o.id, a.user_wallet, t.token_address, o.asset_id,

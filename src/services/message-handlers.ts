@@ -5,7 +5,7 @@
  * with the matching engine.
  */
 
-import type { NatsConnection } from 'nats';
+import type { Msg, NatsConnection } from 'nats';
 import type { MatchingEngine } from '../core/matching-engine';
 import {
   lendMarketOrderSchema,
@@ -21,6 +21,8 @@ import {
   ERROR_CODES,
   type ErrorMessage,
   type CancelledRemainderMessage,
+  type CancelOrderMessage,
+  type CancelReply,
   type ErrorCode,
 } from '../types/messages';
 import type { Match, MatchResult } from '../types/matches';
@@ -262,6 +264,19 @@ function handleOrder<T extends Order>(
   try {
     const order = parseMessage(data, schema);
 
+    // Backstop: never let an order into a market that has already passed
+    // maturity — it can never validly match and would only lock the user's
+    // balance until the sweep removes it. The backend is the authoritative
+    // placement guard; this defends the engine if anything bypasses it.
+    const nowSeconds = Math.floor(Date.now() / 1000);
+    const maturedSlot = order.markets.find((m) => m.maturity <= nowSeconds);
+    if (maturedSlot) {
+      throw new Error(
+        `Cannot place order in a matured market (marketId=${maturedSlot.marketId}, ` +
+          `maturity=${maturedSlot.maturity})`
+      );
+    }
+
     log.debug({ orderId: order.orderId, type: label }, 'processing order');
 
     const result = ctx.engine.submitOrder(order);
@@ -305,68 +320,99 @@ export const handleBorrowLimitOrder = (ctx: HandlerContext, data: Uint8Array): v
   handleOrder(ctx, data, borrowLimitOrderSchema, 'borrow limit order');
 
 /**
- * Handle order cancellation messages
+ * Compute the authoritative cancel outcome and apply its side effects.
+ *
+ * The engine's NATS handlers are synchronous and run to completion on the
+ * single-threaded event loop, so this check-and-remove is atomic: nothing else
+ * can match the order between `getOrderInfo` and `cancelOrder`. That atomicity
+ * is what makes the request/reply verdict trustworthy.
+ *
+ * Side effect: on `CANCELLED`, publishes `orders.status: CANCELLED` so the
+ * orderbook/WebSocket consumers and the (idempotent) DB writer stay in sync.
+ *
+ * Used by `handleCancelOrderRequest` (request/reply) so the verdict logic lives
+ * in one place.
+ */
+function computeCancelOutcome(ctx: HandlerContext, request: CancelOrderMessage): CancelReply {
+  // Get order info before cancellation (needed for status message)
+  const orderInfo = ctx.engine.getOrderInfo(request.orderId);
+  if (!orderInfo) {
+    return { outcome: 'NOT_FOUND', orderId: request.orderId };
+  }
+
+  // Cancel order in matching engine. The order is in the book (orderInfo was
+  // found), so it is OPEN/PARTIALLY_FILLED — the only reason this returns false
+  // is a wallet-owner mismatch.
+  const success = ctx.engine.cancelOrder(request.orderId, request.walletAddress);
+  if (!success) {
+    return { outcome: 'NOT_OWNER', orderId: request.orderId };
+  }
+
+  // Publish status update with filled amounts (orderbook/WS + DB writer persist)
+  const statusMessage = createOrderStatusMessage({
+    orderId: request.orderId,
+    status: 'CANCELLED',
+    remainingAmount: orderInfo.remainingAmount,
+    originalAmount: orderInfo.originalAmount,
+    settlementFeeAmount: orderInfo.settlementFeeAmount,
+    remainingSettlementFeeAmount: orderInfo.remainingSettlementFeeAmount,
+    cancelReason: 'USER_CANCELLED',
+  });
+  ctx.nc.publish(NATS_TOPICS.ORDERS_STATUS, JSON.stringify(statusMessage));
+
+  return {
+    outcome: 'CANCELLED',
+    orderId: request.orderId,
+    remainingAmount: orderInfo.remainingAmount,
+  };
+}
+
+/**
+ * Handle order cancellation requests on the request/reply `orders.cancel.request`
+ * subject (C1 engine-coordinated cancel).
+ *
+ * Computes the authoritative outcome and replies it to the requester, which
+ * persists CANCELLED only on a `CANCELLED` reply. If the message can't be parsed
+ * we deliberately do not reply — the requester's timeout then surfaces as a
+ * "service unavailable" rather than a spurious cancel.
  *
  * @param ctx - Handler context
- * @param data - Raw message data
+ * @param msg - Full NATS message (carries the reply subject)
  */
-export function handleCancelOrder(ctx: HandlerContext, data: Uint8Array): void {
+export function handleCancelOrderRequest(ctx: HandlerContext, msg: Msg): void {
+  let request: CancelOrderMessage;
   try {
-    // Parse and validate the cancellation request
-    const request = parseMessage(data, cancelOrderMessageSchema);
+    request = parseMessage(msg.data, cancelOrderMessageSchema);
+  } catch (error) {
+    // Can't trust the orderId, so we can't form a valid reply — let the
+    // requester time out (→ rejects the cancel) instead of guessing.
+    log.error({ err: error }, 'error parsing cancel request');
+    return;
+  }
 
+  try {
     log.debug(
       { orderId: request.orderId, walletAddress: request.walletAddress },
-      'processing cancel request'
+      'processing cancel request (request/reply)'
     );
 
-    // Get order info before cancellation (needed for status message)
-    const orderInfo = ctx.engine.getOrderInfo(request.orderId);
-    if (!orderInfo) {
-      log.warn({ orderId: request.orderId }, 'order not found for cancellation');
-      publishError(
-        ctx,
-        createErrorMessage(
-          ERROR_CODES.ORDER_NOT_FOUND,
-          `Order ${request.orderId} not found`,
-          request.orderId
-        )
-      );
-      return;
+    const reply = computeCancelOutcome(ctx, request);
+
+    if (reply.outcome === 'CANCELLED') {
+      log.info({ orderId: request.orderId }, 'order cancelled successfully (request/reply)');
+    } else {
+      log.warn({ orderId: request.orderId, outcome: reply.outcome }, 'cancel request not actioned');
     }
 
-    // Cancel order in matching engine
-    const success = ctx.engine.cancelOrder(request.orderId, request.walletAddress);
-
-    if (success) {
-      log.info({ orderId: request.orderId }, 'order cancelled successfully');
-
-      // Publish status update with filled amounts
-      const statusMessage = createOrderStatusMessage({
-        orderId: request.orderId,
-        status: 'CANCELLED',
-        remainingAmount: orderInfo.remainingAmount,
-        originalAmount: orderInfo.originalAmount,
-        settlementFeeAmount: orderInfo.settlementFeeAmount,
-        remainingSettlementFeeAmount: orderInfo.remainingSettlementFeeAmount,
-        cancelReason: 'USER_CANCELLED',
-      });
-      ctx.nc.publish(NATS_TOPICS.ORDERS_STATUS, JSON.stringify(statusMessage));
+    if (msg.reply) {
+      msg.respond(JSON.stringify(reply));
     } else {
-      log.warn({ orderId: request.orderId }, 'wallet address mismatch for cancel request');
-      publishError(
-        ctx,
-        createErrorMessage(
-          ERROR_CODES.VALIDATION_ERROR,
-          `Wallet address does not match order owner`,
-          request.orderId
-        )
-      );
+      log.warn({ orderId: request.orderId }, 'cancel request has no reply subject');
     }
   } catch (error) {
-    log.error({ err: error }, 'error handling cancel order');
-    const errorMsg = error instanceof Error ? error.message : 'Unknown error';
-    publishError(ctx, createErrorMessage(ERROR_CODES.INVALID_ORDER, errorMsg));
+    // Internal error after a valid parse — do not reply so the requester rejects
+    // the cancel on timeout rather than receiving a malformed/partial verdict.
+    log.error({ err: error, orderId: request.orderId }, 'error handling cancel request');
   }
 }
 

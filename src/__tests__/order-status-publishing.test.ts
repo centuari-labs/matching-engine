@@ -29,8 +29,7 @@ function createMockNatsConnection() {
       publishedMessages.push({ topic, data });
     }),
     getPublishedMessages: () => publishedMessages,
-    getMessagesForTopic: (topic: string) =>
-      publishedMessages.filter((m) => m.topic === topic),
+    getMessagesForTopic: (topic: string) => publishedMessages.filter((m) => m.topic === topic),
   };
 }
 
@@ -49,7 +48,9 @@ describe('Order Status Publishing', () => {
   const loanToken = '0x1234567890123456789012345678901234567890';
   const walletAddress1 = '0x1111111111111111111111111111111111111111';
   const walletAddress2 = '0x2222222222222222222222222222222222222222';
-  const maturity = 1704067200;
+  // Far-future maturity so the handleOrder matured-market backstop accepts these
+  // placements (a past maturity is rejected as a matured market).
+  const maturity = 4102444800; // 2100-01-01
 
   beforeEach(() => {
     engine = new MatchingEngine();
@@ -87,10 +88,7 @@ describe('Order Status Publishing', () => {
         rate: 500,
       });
 
-      handleLendLimitOrder(
-        ctx,
-        createOrderBytes(JSON.parse(JSON.stringify(lendOrder))),
-      );
+      handleLendLimitOrder(ctx, createOrderBytes(JSON.parse(JSON.stringify(lendOrder))));
 
       // Check that order status was published
       const statusMessages = mockNc.getMessagesForTopic(NATS_TOPICS.ORDERS_STATUS);
@@ -136,10 +134,7 @@ describe('Order Status Publishing', () => {
         rate: 500,
       });
 
-      handleLendLimitOrder(
-        ctx,
-        createOrderBytes(JSON.parse(JSON.stringify(lendOrder))),
-      );
+      handleLendLimitOrder(ctx, createOrderBytes(JSON.parse(JSON.stringify(lendOrder))));
 
       // Check that order status was published
       const statusMessages = mockNc.getMessagesForTopic(NATS_TOPICS.ORDERS_STATUS);
@@ -171,10 +166,7 @@ describe('Order Status Publishing', () => {
         rate: 500,
       });
 
-      handleLendLimitOrder(
-        ctx,
-        createOrderBytes(JSON.parse(JSON.stringify(lendOrder))),
-      );
+      handleLendLimitOrder(ctx, createOrderBytes(JSON.parse(JSON.stringify(lendOrder))));
 
       // Check that order status was published with OPEN status
       const statusMessages = mockNc.getMessagesForTopic(NATS_TOPICS.ORDERS_STATUS);
@@ -216,10 +208,7 @@ describe('Order Status Publishing', () => {
         rate: 600,
       });
 
-      handleBorrowLimitOrder(
-        ctx,
-        createOrderBytes(JSON.parse(JSON.stringify(borrowOrder))),
-      );
+      handleBorrowLimitOrder(ctx, createOrderBytes(JSON.parse(JSON.stringify(borrowOrder))));
 
       // Check that maker order status was published
       const statusMessages = mockNc.getMessagesForTopic(NATS_TOPICS.ORDERS_STATUS);
@@ -262,10 +251,7 @@ describe('Order Status Publishing', () => {
         rate: 600,
       });
 
-      handleBorrowLimitOrder(
-        ctx,
-        createOrderBytes(JSON.parse(JSON.stringify(borrowOrder))),
-      );
+      handleBorrowLimitOrder(ctx, createOrderBytes(JSON.parse(JSON.stringify(borrowOrder))));
 
       // Check that maker order status was published
       const statusMessages = mockNc.getMessagesForTopic(NATS_TOPICS.ORDERS_STATUS);
@@ -321,10 +307,7 @@ describe('Order Status Publishing', () => {
         rate: 600,
       });
 
-      handleBorrowLimitOrder(
-        ctx,
-        createOrderBytes(JSON.parse(JSON.stringify(borrowOrder))),
-      );
+      handleBorrowLimitOrder(ctx, createOrderBytes(JSON.parse(JSON.stringify(borrowOrder))));
 
       // Check that all maker order statuses were published
       const statusMessages = mockNc.getMessagesForTopic(NATS_TOPICS.ORDERS_STATUS);
@@ -377,10 +360,7 @@ describe('Order Status Publishing', () => {
         settlementFeeAmount: '10000',
       });
 
-      handleLendMarketOrder(
-        ctx,
-        createOrderBytes(JSON.parse(JSON.stringify(lendMarketOrder))),
-      );
+      handleLendMarketOrder(ctx, createOrderBytes(JSON.parse(JSON.stringify(lendMarketOrder))));
 
       // Check that taker (market order) status was published
       const statusMessages = mockNc.getMessagesForTopic(NATS_TOPICS.ORDERS_STATUS);
@@ -420,10 +400,7 @@ describe('Order Status Publishing', () => {
         settlementFeeAmount: '10000',
       });
 
-      handleBorrowMarketOrder(
-        ctx,
-        createOrderBytes(JSON.parse(JSON.stringify(borrowMarketOrder))),
-      );
+      handleBorrowMarketOrder(ctx, createOrderBytes(JSON.parse(JSON.stringify(borrowMarketOrder))));
 
       // Check that maker order status was published
       const statusMessages = mockNc.getMessagesForTopic(NATS_TOPICS.ORDERS_STATUS);
@@ -463,10 +440,7 @@ describe('Order Status Publishing', () => {
         settlementFeeAmount: '10000',
       });
 
-      handleLendMarketOrder(
-        ctx,
-        createOrderBytes(JSON.parse(JSON.stringify(lendMarketOrder))),
-      );
+      handleLendMarketOrder(ctx, createOrderBytes(JSON.parse(JSON.stringify(lendMarketOrder))));
 
       // Check taker status
       const statusMessages = mockNc.getMessagesForTopic(NATS_TOPICS.ORDERS_STATUS);
@@ -507,15 +481,10 @@ describe('Order Status Publishing', () => {
         settlementFeeAmount: '10000',
       });
 
-      handleLendMarketOrder(
-        ctx,
-        createOrderBytes(JSON.parse(JSON.stringify(lendMarketOrder))),
-      );
+      handleLendMarketOrder(ctx, createOrderBytes(JSON.parse(JSON.stringify(lendMarketOrder))));
 
       // Check cancelled remainder message was published
-      const cancelledMessages = mockNc.getMessagesForTopic(
-        NATS_TOPICS.ORDERS_CANCELLED_REMAINDER,
-      );
+      const cancelledMessages = mockNc.getMessagesForTopic(NATS_TOPICS.ORDERS_CANCELLED_REMAINDER);
       expect(cancelledMessages).toHaveLength(1);
 
       const cancelled: CancelledRemainderMessage = JSON.parse(cancelledMessages[0].data);
@@ -551,15 +520,10 @@ describe('Order Status Publishing', () => {
         settlementFeeAmount: '10000',
       });
 
-      handleLendMarketOrder(
-        ctx,
-        createOrderBytes(JSON.parse(JSON.stringify(lendMarketOrder))),
-      );
+      handleLendMarketOrder(ctx, createOrderBytes(JSON.parse(JSON.stringify(lendMarketOrder))));
 
       // No cancelled remainder should be published
-      const cancelledMessages = mockNc.getMessagesForTopic(
-        NATS_TOPICS.ORDERS_CANCELLED_REMAINDER,
-      );
+      const cancelledMessages = mockNc.getMessagesForTopic(NATS_TOPICS.ORDERS_CANCELLED_REMAINDER);
       expect(cancelledMessages).toHaveLength(0);
 
       // Status should be FILLED with full amount
@@ -600,10 +564,7 @@ describe('Order Status Publishing', () => {
         settlementFeeAmount: '10000',
       });
 
-      handleBorrowMarketOrder(
-        ctx,
-        createOrderBytes(JSON.parse(JSON.stringify(borrowMarketOrder))),
-      );
+      handleBorrowMarketOrder(ctx, createOrderBytes(JSON.parse(JSON.stringify(borrowMarketOrder))));
 
       // Check taker status
       const statusMessages = mockNc.getMessagesForTopic(NATS_TOPICS.ORDERS_STATUS);
@@ -619,9 +580,7 @@ describe('Order Status Publishing', () => {
       expect(parsedTakerStatus.remainingAmount).toBe('800000');
 
       // Check cancelled remainder
-      const cancelledMessages = mockNc.getMessagesForTopic(
-        NATS_TOPICS.ORDERS_CANCELLED_REMAINDER,
-      );
+      const cancelledMessages = mockNc.getMessagesForTopic(NATS_TOPICS.ORDERS_CANCELLED_REMAINDER);
       expect(cancelledMessages).toHaveLength(1);
 
       const cancelled: CancelledRemainderMessage = JSON.parse(cancelledMessages[0].data);

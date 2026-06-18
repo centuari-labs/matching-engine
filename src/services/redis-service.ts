@@ -14,8 +14,34 @@ import {
 } from '../config/redis-config';
 import type { SettlementMatch, SettlementPublisher } from '../types/settlement';
 import { createLogger } from '../utils/logger';
+import { maskUrl } from '../utils/mask-url';
 
 const log = createLogger('redis-service');
+
+/**
+ * Assert that Redis authentication is configured when running in production.
+ *
+ * The matching engine publishes settlement matches to Redis Streams; an
+ * unauthenticated Redis lets any local peer read or inject matches. In
+ * `NODE_ENV==='production'` we require a password and fail fast otherwise.
+ * Non-production environments are unaffected so local dev keeps working
+ * without auth.
+ *
+ * @param config - Resolved Redis configuration
+ * @throws {Error} If production and no password is present
+ */
+export function assertRedisAuthConfigured(config: RedisConfig): void {
+  if (process.env.NODE_ENV !== 'production') {
+    return;
+  }
+
+  if (!config.password) {
+    throw new Error(
+      'Redis authentication is required in production: set REDIS_PASSWORD. ' +
+        'Refusing to connect to an unauthenticated Redis instance.'
+    );
+  }
+}
 
 /**
  * Redis Service class for managing connection and Stream operations
@@ -47,15 +73,23 @@ export class RedisService implements SettlementPublisher {
       return;
     }
 
+    // In production the settlement-match stream must be authenticated at the
+    // app layer. Fail fast on startup if no password is configured. Dev/test
+    // keep the existing optional-auth behaviour.
+    assertRedisAuthConfigured(this.config);
+
     try {
-      log.info({ url: this.config.url }, 'connecting to Redis');
+      log.info({ host: maskUrl(this.config.url) }, 'connecting to Redis');
 
       // Parse URL and build options
       const options: RedisOptions = {
         maxRetriesPerRequest: this.config.maxReconnectAttempts,
         retryStrategy: (times: number) => {
           if (times > this.config.maxReconnectAttempts) {
-            log.error({ maxAttempts: this.config.maxReconnectAttempts }, 'max reconnect attempts exceeded');
+            log.error(
+              { maxAttempts: this.config.maxReconnectAttempts },
+              'max reconnect attempts exceeded'
+            );
             return null; // Stop retrying
           }
           return this.config.reconnectTimeWait;
@@ -143,11 +177,20 @@ export class RedisService implements SettlementPublisher {
         '0',
         'MKSTREAM'
       );
-      log.info({ group: REDIS_CONSUMER_GROUPS.SETTLEMENT_ENGINE, stream: REDIS_STREAMS.SETTLEMENT_MATCHES }, 'created consumer group');
+      log.info(
+        {
+          group: REDIS_CONSUMER_GROUPS.SETTLEMENT_ENGINE,
+          stream: REDIS_STREAMS.SETTLEMENT_MATCHES,
+        },
+        'created consumer group'
+      );
     } catch (error) {
       // BUSYGROUP error means the group already exists, which is fine
       if (error instanceof Error && error.message.includes('BUSYGROUP')) {
-        log.info({ group: REDIS_CONSUMER_GROUPS.SETTLEMENT_ENGINE }, 'consumer group already exists');
+        log.info(
+          { group: REDIS_CONSUMER_GROUPS.SETTLEMENT_ENGINE },
+          'consumer group already exists'
+        );
       } else {
         log.warn({ err: error }, 'could not create consumer group');
       }
@@ -164,7 +207,10 @@ export class RedisService implements SettlementPublisher {
    */
   async publishSettlementMatch(match: SettlementMatch): Promise<string | null> {
     if (!this.client || !this.isConnected) {
-      log.warn({ matchId: match.matchId }, 'redis not connected, skipping settlement match publish');
+      log.warn(
+        { matchId: match.matchId },
+        'redis not connected, skipping settlement match publish'
+      );
       return null;
     }
 
@@ -173,13 +219,12 @@ export class RedisService implements SettlementPublisher {
       const fields = this.matchToFields(match);
 
       // XADD to the stream with auto-generated ID (*)
-      const messageId = await this.client.xadd(
-        REDIS_STREAMS.SETTLEMENT_MATCHES,
-        '*',
-        ...fields
-      );
+      const messageId = await this.client.xadd(REDIS_STREAMS.SETTLEMENT_MATCHES, '*', ...fields);
 
-      log.debug({ matchId: match.matchId, messageId }, 'published settlement match to redis stream');
+      log.debug(
+        { matchId: match.matchId, messageId },
+        'published settlement match to redis stream'
+      );
 
       return messageId;
     } catch (error) {
@@ -229,6 +274,10 @@ export class RedisService implements SettlementPublisher {
       match.lenderSettlementFeeAmount,
       'borrowerSettlementFeeAmount',
       match.borrowerSettlementFeeAmount,
+      // Redis hash fields are flat strings; collateral list is JSON-encoded.
+      // Settlement engine (P3) decodes this back into MatchData.collateralAssets.
+      'borrowerCollateralAssets',
+      JSON.stringify(match.borrowerCollateralAssets),
     ];
   }
 
@@ -289,10 +338,7 @@ export class RedisService implements SettlementPublisher {
       const length = await this.client.xlen(REDIS_STREAMS.SETTLEMENT_MATCHES);
 
       // Get consumer groups info
-      const groups = await this.client.xinfo(
-        'GROUPS',
-        REDIS_STREAMS.SETTLEMENT_MATCHES
-      );
+      const groups = await this.client.xinfo('GROUPS', REDIS_STREAMS.SETTLEMENT_MATCHES);
 
       return {
         length,

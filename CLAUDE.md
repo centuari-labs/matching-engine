@@ -67,6 +67,26 @@ NATS message → Zod parse → Validate → Match against order book → Record 
                                              → On failure: keep in memory as buffer
 ```
 
+## Order Lock Lifecycle
+
+### DB-writer locks at match time, settlement-engine releases at settlement
+
+On every match the DB-writer increments `portfolio.locked_amount` for both lender and borrower in [postgres-db-client.ts:216-254](src/services/db/postgres-db-client.ts) inside the same transaction that INSERTs the `matches` row. The lock is released by settlement-engine's `writebackSettledMatches` once the on-chain settlement lands — see [settlement-engine/src/settlement/database/lock-release.ts](../settlement-engine/src/settlement/database/lock-release.ts).
+
+Decomposition the engine-side increment uses (mirrored exactly by the release):
+
+- **lender:** `matchedAmount + lenderSettlementFeeAmount + lenderTradeFee`
+- **borrower:** `borrowerSettlementFeeAmount + borrowerTradeFee`
+- **trade-fee split:** `borrowerTradeFee = takerFeeAmount` if `borrowerIsTaker`, else `makerFeeAmount`. Lender pays the opposite.
+
+The `UPDATE` order is sorted by `account_id` ascending to avoid deadlocks with concurrent transactions touching the same rows. Settlement-engine mirrors this ordering.
+
+Backend reads `portfolio.locked_amount` for its available-balance formula but never writes it — see [../backend-v2/CLAUDE.md](../backend-v2/CLAUDE.md) "Order Lock Lifecycle" section for the read-side semantics.
+
+### Known cancel race window (unfixed in Phase 1)
+
+For the cancel-during-match race window (a cancel arriving between engine-publishes-match and db-writer-flushes-`status=FILLED` is silently overwritten because [`updateOrderStatus` at postgres-db-client.ts:53-72](src/services/db/postgres-db-client.ts) has no `WHERE status = ?` guard) and the planned engine-coordinated-cancel fix, see [../dev-docs/architecture-html/launches/hub-only.html](../dev-docs/architecture-html/launches/hub-only.html) Track C (deep reference in [archive/order-lock-lifecycle-followups.md](../smart-contract-revamp/docs/archive/order-lock-lifecycle-followups.md)).
+
 ## Code Standards
 
 ### Naming

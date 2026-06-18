@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { ethereumAddressSchema } from './orders';
+import { bytes32HexSchema, ethereumAddressSchema } from './orders';
 import type { OrderStatus } from './orders';
 
 /**
@@ -10,18 +10,18 @@ import type { OrderStatus } from './orders';
  */
 export const matchSchema = z.object({
   matchId: z.string().uuid('Match ID must be a valid UUID'),
-  marketId: z.string().uuid('Market ID must be a valid UUID'),
-  lendOrderId: z.string().uuid('Lend order ID must be a valid UUID'), //@note : should change into order market id
-  borrowOrderId: z.string().uuid('Borrow order ID must be a valid UUID'), //@note : should change into order market id
-  lenderWallet: ethereumAddressSchema, //@note : later change into account id
-  borrowerWallet: ethereumAddressSchema, //@note : later change into account id
+  marketId: bytes32HexSchema,
+  lendOrderId: z.string().uuid('Lend order ID must be a valid UUID'),
+  borrowOrderId: z.string().uuid('Borrow order ID must be a valid UUID'),
+  lenderWallet: ethereumAddressSchema,
+  borrowerWallet: ethereumAddressSchema,
   matchedAmount: z.string().regex(/^\d+$/, 'Matched amount must be a positive integer string'),
   rate: z
     .number()
     .int('Rate must be an integer')
     .min(0, 'Rate must be non-negative')
     .max(10000, 'Rate must not exceed 10000 basis points (100%)'),
-  loanToken: ethereumAddressSchema, //@note : later change into asset id
+  loanToken: ethereumAddressSchema,
   maturity: z.number().int().positive('Maturity must be a positive integer'),
   timestamp: z.number().int().positive('Timestamp must be a positive integer'),
   borrowerIsTaker: z.boolean(),
@@ -59,6 +59,15 @@ export const matchSchema = z.object({
   borrowerSettlementFeeAmount: z
     .string()
     .regex(/^\d+$/, 'Borrower settlement fee amount must be a positive integer string'),
+  /**
+   * Asset addresses the borrower opted to flag as collateral when submitting
+   * the borrow order. Forwarded verbatim from the borrow-order schema; the
+   * settlement engine (P3) encodes this into `Settlement.MatchData.collateralAssets`
+   * for the on-chain `Centuari.settleMatch` call (P1b-explicit, 2026-04-17).
+   *
+   * Empty array (default) means no flag mutation at settlement.
+   */
+  borrowerCollateralAssets: z.array(ethereumAddressSchema).default([]),
 });
 
 /**
@@ -137,4 +146,3 @@ export interface OrderBookSnapshot {
     timestamp: number;
   }>;
 }
-

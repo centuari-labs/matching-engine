@@ -13,7 +13,9 @@ import { RetryService } from './retry-service';
 import { DiskPersistenceService } from './disk-persistence-service';
 import { PostgresDbClient } from './db/postgres-db-client';
 import { loadBufferConfig } from '../config/buffer-config';
+import { expireMaturedOrders } from './order-expiry';
 import { createLogger } from '../utils/logger';
+import { maskUrl } from '../utils/mask-url';
 import * as dotenv from 'dotenv';
 
 const log = createLogger('main');
@@ -31,6 +33,7 @@ let snapshotService: SnapshotService | null = null;
 let retryService: RetryService | null = null;
 let diskPersistenceService: DiskPersistenceService | null = null;
 let snapshotTimer: NodeJS.Timeout | null = null;
+let expirySweepTimer: NodeJS.Timeout | null = null;
 let isShuttingDown = false;
 
 /**
@@ -52,6 +55,12 @@ async function handleShutdown(signal: string): Promise<void> {
     if (snapshotTimer) {
       clearInterval(snapshotTimer);
       snapshotTimer = null;
+    }
+
+    // Stop periodic maturity-expiry sweep timer
+    if (expirySweepTimer) {
+      clearInterval(expirySweepTimer);
+      expirySweepTimer = null;
     }
 
     // Save final snapshot before shutdown
@@ -121,11 +130,12 @@ async function main(): Promise<void> {
   try {
     log.info('matching engine service starting');
 
-    // Display configuration
+    // Display configuration. Mask connection URLs so embedded credentials
+    // (e.g. redis://:pass@host) never reach the log sink.
     log.info(
       {
-        natsUrl: process.env.NATS_URL || 'nats://localhost:4222',
-        redisUrl: process.env.REDIS_URL || 'redis://localhost:6379',
+        natsHost: maskUrl(process.env.NATS_URL || 'nats://localhost:4222'),
+        redisHost: maskUrl(process.env.REDIS_URL || 'redis://localhost:6379'),
         nodeEnv: process.env.NODE_ENV || 'development',
       },
       'configuration'
@@ -254,7 +264,7 @@ async function main(): Promise<void> {
       {
         natsConnected: natsStats.connected,
         subscriptions: natsStats.subscriptions,
-        natsServer: natsStats.config.url,
+        natsHost: maskUrl(natsStats.config.url),
         natsAuth: natsStats.config.hasAuth,
       },
       'NATS status'
@@ -267,7 +277,7 @@ async function main(): Promise<void> {
       log.info(
         {
           redisConnected: redisStats.connected,
-          redisServer: redisStats.config.url,
+          redisHost: maskUrl(redisStats.config.url),
           redisDb: redisStats.config.db,
           streamLength: streamInfo?.length ?? 0,
           consumerGroups: streamInfo?.groups ?? 0,
@@ -288,6 +298,33 @@ async function main(): Promise<void> {
           });
         }, snapshotIntervalSeconds * 1000);
         log.info({ intervalSeconds: snapshotIntervalSeconds }, 'periodic snapshots enabled');
+      }
+    }
+
+    // Start periodic maturity-expiry sweep (default 60s; 0 disables). Removes
+    // resting orders whose market has passed maturity and publishes CANCELLED
+    // (MARKET_MATURED) so the db-writer releases the user's locked balance.
+    if (matchingEngine && natsService) {
+      const expirySweepIntervalSeconds = parseInt(
+        process.env.ORDER_EXPIRY_SWEEP_INTERVAL_SECONDS || '60',
+        10
+      );
+      if (expirySweepIntervalSeconds > 0) {
+        expirySweepTimer = setInterval(() => {
+          const nc = natsService!.getConnection();
+          if (!nc) {
+            return;
+          }
+          try {
+            expireMaturedOrders(matchingEngine!, nc, Math.floor(Date.now() / 1000));
+          } catch (error) {
+            log.warn({ err: error }, 'periodic maturity-expiry sweep failed');
+          }
+        }, expirySweepIntervalSeconds * 1000);
+        log.info(
+          { intervalSeconds: expirySweepIntervalSeconds },
+          'periodic maturity-expiry sweep enabled'
+        );
       }
     }
 

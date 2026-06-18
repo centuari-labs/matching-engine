@@ -8,7 +8,7 @@
 import { z } from 'zod';
 import { matchSchema } from './matches';
 import type { MatchResult } from './matches';
-import { ethereumAddressSchema, OrderSide, OrderType } from './orders';
+import { bytes32HexSchema, ethereumAddressSchema, OrderSide, OrderType } from './orders';
 
 /**
  * Schema for order cancellation requests
@@ -42,7 +42,10 @@ export const updateOrderMessageSchema = z
     amount: digitStringSchema,
     quantity: digitStringSchema,
     originalAmount: digitStringSchema,
-    rate: z.number().int().positive().optional(),
+    // Interest rate in bps. Bounded to the same [1, 10000] range the placement
+    // path enforces (backend create-order.dto.ts) so an update cannot push the
+    // rate above the placement-time cap (security audit L2).
+    rate: z.number().int().min(1).max(10000).optional(),
     settlementFee: digitStringSchema,
     settlementFeeAmount: digitStringSchema,
     timestamp: z
@@ -89,6 +92,41 @@ export type OrderUpdatedMessage = z.infer<typeof orderUpdatedMessageSchema>;
  * Type for order cancellation messages
  */
 export type CancelOrderMessage = z.infer<typeof cancelOrderMessageSchema>;
+
+/**
+ * Authoritative reply the engine sends back on the `orders.cancel.request`
+ * request/reply subject (C1 engine-coordinated cancel). The requester (backend)
+ * persists CANCELLED only on a `CANCELLED` outcome.
+ *
+ * Outcomes the engine can actually distinguish from its order book:
+ * - `CANCELLED`  — order was resting (OPEN/PARTIALLY_FILLED), owner matched, removed.
+ * - `NOT_OWNER`  — order is in the book but the wallet does not own it.
+ * - `NOT_FOUND`  — order is not in the book. This covers both "never existed" and
+ *                  "already fully matched and removed" — the engine cannot tell them
+ *                  apart, because filled orders leave the book. The backend only sends
+ *                  a request for an order its DB still shows OPEN/PARTIALLY_FILLED, so
+ *                  in practice NOT_FOUND means the order was matched in the race window.
+ */
+export const cancelReplySchema = z.discriminatedUnion('outcome', [
+  z.object({
+    outcome: z.literal('CANCELLED'),
+    orderId: z.string().uuid(),
+    remainingAmount: z.string(),
+  }),
+  z.object({
+    outcome: z.literal('NOT_OWNER'),
+    orderId: z.string().uuid(),
+  }),
+  z.object({
+    outcome: z.literal('NOT_FOUND'),
+    orderId: z.string().uuid(),
+  }),
+]);
+
+/**
+ * Type for cancel request replies
+ */
+export type CancelReply = z.infer<typeof cancelReplySchema>;
 
 /**
  * Schema for match creation notifications
@@ -162,9 +200,11 @@ export const orderStatusMessageSchema = z.object({
   filledSettlementFeeAmount: z.string(),
 
   /**
-   * Reason why the order was cancelled (only present when status is CANCELLED)
+   * Reason why the order was cancelled (only present when status is CANCELLED).
+   * MARKET_MATURED is stamped by the maturity-expiry sweep when a resting order's
+   * market passes maturity (the db-writer persists it as cancel_reason).
    */
-  cancelReason: z.enum(['USER_CANCELLED', 'IOC']).optional(),
+  cancelReason: z.enum(['USER_CANCELLED', 'IOC', 'MARKET_MATURED']).optional(),
 
   /**
    * Timestamp of the status update
@@ -203,10 +243,10 @@ export const cancelledRemainderMessageSchema = z.object({
   quantity: z.string().regex(/^\d+$/, 'Quantity must be a positive integer string'),
   /** Remaining settlement fee for the unmatched portion */
   settlementFee: z.string().regex(/^\d+$/, 'Settlement fee must be a positive integer string'),
-  /** Market IDs the order participated in */
-  marketIds: z.array(z.string().uuid()).min(1),
+  /** Market IDs (bytes32 hex) the order participated in */
+  marketIds: z.array(bytes32HexSchema).min(1),
   /** Reason for cancellation */
-  cancelReason: z.enum(['USER_CANCELLED', 'IOC']).optional(),
+  cancelReason: z.enum(['USER_CANCELLED', 'IOC', 'MARKET_MATURED']).optional(),
   /** Timestamp */
   timestamp: z.number().int().positive(),
 });
@@ -385,7 +425,7 @@ export interface OrderStatusSource {
   /** Remaining settlement fee pool (may be lazily initialized) */
   remainingSettlementFeeAmount?: string;
   /** Reason for cancellation (only when status is CANCELLED) */
-  cancelReason?: 'USER_CANCELLED' | 'IOC';
+  cancelReason?: 'USER_CANCELLED' | 'IOC' | 'MARKET_MATURED';
 }
 
 /**

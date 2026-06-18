@@ -13,6 +13,9 @@ build/
 .env.local
 .env.*.local
 
+# Backups
+*.bak*
+
 # IDE
 .vscode/
 .idea/

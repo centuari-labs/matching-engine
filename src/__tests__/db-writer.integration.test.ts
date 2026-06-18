@@ -1,4 +1,4 @@
-/** 
+/**
  * DB Writer Integration Tests
  *
  * These tests exercise the DbWriterService against real Postgres, Redis and NATS
@@ -119,6 +119,10 @@ describe('DbWriterService Integration (requires Postgres, Redis, NATS)', () => {
   const matchIdsToCleanup: string[] = [];
   const assetIdsToCleanup: string[] = [];
   const accountIdsToCleanup: string[] = [];
+  // user_balance rows seeded for match-lock tests, as { wallet, asset } hex
+  // pairs (0x-prefixed). insertMatch now requires these rows to exist (M4
+  // guard), so tests must seed and clean them up.
+  const balanceKeysToCleanup: Array<{ wallet: string; asset: string }> = [];
 
   beforeAll(async () => {
     // Create and verify Postgres connection.
@@ -218,9 +222,7 @@ describe('DbWriterService Integration (requires Postgres, Redis, NATS)', () => {
     // Clean up only rows created by these tests.
     if (matchIdsToCleanup.length > 0) {
       try {
-        await dbPool.query('DELETE FROM matches WHERE id = ANY($1)', [
-          matchIdsToCleanup,
-        ]);
+        await dbPool.query('DELETE FROM matches WHERE id = ANY($1)', [matchIdsToCleanup]);
       } catch {
         // Ignore if table does not exist in the configured schema.
       }
@@ -229,9 +231,7 @@ describe('DbWriterService Integration (requires Postgres, Redis, NATS)', () => {
 
     if (accountIdsToCleanup.length > 0) {
       try {
-        await dbPool.query('DELETE FROM accounts WHERE id = ANY($1)', [
-          accountIdsToCleanup,
-        ]);
+        await dbPool.query('DELETE FROM accounts WHERE id = ANY($1)', [accountIdsToCleanup]);
       } catch {
         // Ignore if table does not exist in the configured schema.
       }
@@ -240,9 +240,7 @@ describe('DbWriterService Integration (requires Postgres, Redis, NATS)', () => {
 
     if (assetIdsToCleanup.length > 0) {
       try {
-        await dbPool.query('DELETE FROM assets WHERE id = ANY($1)', [
-          assetIdsToCleanup,
-        ]);
+        await dbPool.query('DELETE FROM assets WHERE id = ANY($1)', [assetIdsToCleanup]);
       } catch {
         // Ignore if table does not exist in the configured schema.
       }
@@ -251,13 +249,26 @@ describe('DbWriterService Integration (requires Postgres, Redis, NATS)', () => {
 
     if (orderIdsToCleanup.length > 0) {
       try {
-        await dbPool.query('DELETE FROM orders WHERE id = ANY($1)', [
-          orderIdsToCleanup,
-        ]);
+        await dbPool.query('DELETE FROM orders WHERE id = ANY($1)', [orderIdsToCleanup]);
       } catch {
         // Ignore if table does not exist in the configured schema.
       }
       orderIdsToCleanup.length = 0;
+    }
+
+    if (balanceKeysToCleanup.length > 0) {
+      try {
+        for (const { wallet, asset } of balanceKeysToCleanup) {
+          await dbPool.query(
+            `DELETE FROM user_balance
+             WHERE user_address = decode($1, 'hex') AND asset = decode($2, 'hex')`,
+            [wallet.replace(/^0x/i, ''), asset.replace(/^0x/i, '')]
+          );
+        }
+      } catch {
+        // Ignore if table does not exist in the configured schema.
+      }
+      balanceKeysToCleanup.length = 0;
     }
   });
 
@@ -321,10 +332,7 @@ describe('DbWriterService Integration (requires Postgres, Redis, NATS)', () => {
       const statusMessage = createOrderStatusMessage(updatedOrder);
 
       // Publish status message to NATS.
-      natsConnection.publish(
-        NATS_TOPICS.ORDERS_STATUS,
-        Buffer.from(JSON.stringify(statusMessage))
-      );
+      natsConnection.publish(NATS_TOPICS.ORDERS_STATUS, Buffer.from(JSON.stringify(statusMessage)));
 
       // Wait until the order row is updated.
       await waitForCondition(async () => {
@@ -361,10 +369,7 @@ describe('DbWriterService Integration (requires Postgres, Redis, NATS)', () => {
 
     it('should ignore invalid JSON messages and continue processing', async () => {
       // Publish an invalid (non-JSON) payload.
-      natsConnection.publish(
-        NATS_TOPICS.ORDERS_STATUS,
-        Buffer.from('not-json')
-      );
+      natsConnection.publish(NATS_TOPICS.ORDERS_STATUS, Buffer.from('not-json'));
 
       // Give the subscription loop time to process.
       await new Promise((resolve) => setTimeout(resolve, 500));
@@ -398,15 +403,7 @@ describe('DbWriterService Integration (requires Postgres, Redis, NATS)', () => {
           )
           VALUES ($1, $2, $3, $4, $5, $6, $7, NOW(), NOW())
         `,
-        [
-          assetId,
-          'Test Token',
-          'TT',
-          1,
-          match.loanToken,
-          true,
-          0,
-        ]
+        [assetId, 'Test Token', 'TT', 1, match.loanToken, true, 0]
       );
 
       await dbPool.query(
@@ -473,6 +470,27 @@ describe('DbWriterService Integration (requires Postgres, Redis, NATS)', () => {
       );
 
       orderIdsToCleanup.push(match.lendOrderId, match.borrowOrderId);
+
+      // Seed user_balance rows for both wallets so insertMatch's in_orders lock
+      // UPDATEs find a row (M4 guard rolls back the match if a row is missing).
+      await dbPool.query(
+        `
+          INSERT INTO user_balance (user_address, asset, available, in_orders)
+          VALUES
+            (decode($1, 'hex'), decode($3, 'hex'), 1000000000, 0),
+            (decode($2, 'hex'), decode($3, 'hex'), 1000000000, 0)
+          ON CONFLICT (user_address, asset) DO NOTHING
+        `,
+        [
+          match.lenderWallet.replace(/^0x/i, ''),
+          match.borrowerWallet.replace(/^0x/i, ''),
+          match.loanToken.replace(/^0x/i, ''),
+        ]
+      );
+      balanceKeysToCleanup.push(
+        { wallet: match.lenderWallet, asset: match.loanToken },
+        { wallet: match.borrowerWallet, asset: match.loanToken }
+      );
 
       const fields: string[] = [
         'matchId',
@@ -548,9 +566,7 @@ describe('DbWriterService Integration (requires Postgres, Redis, NATS)', () => {
       expect(row.maker_fee).toBe(match.makerFeeAmount);
       expect(row.taker_fee).toBe(match.takerFeeAmount);
       expect(row.lender_settlement_fee).toBe(match.lenderSettlementFeeAmount);
-      expect(row.borrower_settlement_fee).toBe(
-        match.borrowerSettlementFeeAmount
-      );
+      expect(row.borrower_settlement_fee).toBe(match.borrowerSettlementFeeAmount);
     });
 
     it('should acknowledge and skip invalid match entries', async () => {
@@ -588,4 +604,3 @@ describe('DbWriterService Integration (requires Postgres, Redis, NATS)', () => {
     });
   });
 });
-

@@ -36,7 +36,12 @@ COPY --from=builder /app/package.json /app/pnpm-lock.yaml ./
 COPY --from=builder /app/dist ./dist
 COPY docker-entrypoint.sh ./
 
-RUN pnpm install --frozen-lockfile --prod && chmod +x docker-entrypoint.sh
+RUN pnpm install --frozen-lockfile --prod \
+  && chmod +x docker-entrypoint.sh \
+  && mkdir -p snapshots \
+  && chown -R node:node /app
+
+USER node
 
 # Default: run both matching engine and DB writer. Override CMD to run one:
 #   node dist/services/main.js

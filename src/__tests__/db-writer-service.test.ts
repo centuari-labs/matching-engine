@@ -12,11 +12,36 @@ import { createMatch } from './factories/match-factory';
  * Standalone re-implementation of fieldsToMatch for unit testing.
  * Mirrors db-writer-service.ts lines 371-397 exactly.
  */
+const REDIS_MATCH_FIELD_KEYS = new Set([
+  'matchId',
+  'marketId',
+  'lendOrderId',
+  'borrowOrderId',
+  'lenderWallet',
+  'borrowerWallet',
+  'matchedAmount',
+  'rate',
+  'loanToken',
+  'maturity',
+  'timestamp',
+  'borrowerIsTaker',
+  'makerFeeAmount',
+  'takerFeeAmount',
+  'lenderSettlementFeeAmount',
+  'borrowerSettlementFeeAmount',
+  'borrowerCollateralAssets',
+]);
+
 function fieldsToMatch(fields: string[]): Record<string, unknown> {
-  const obj: Record<string, string> = {};
+  const obj: Record<string, string> = Object.create(null);
   for (let i = 0; i < fields.length; i += 2) {
     const key = fields[i];
     const value = fields[i + 1];
+
+    if (!key || value === undefined || !REDIS_MATCH_FIELD_KEYS.has(key)) {
+      continue;
+    }
+
     obj[key] = value;
   }
 
@@ -37,6 +62,18 @@ function fieldsToMatch(fields: string[]): Record<string, unknown> {
     takerFeeAmount: obj.takerFeeAmount ?? '0',
     lenderSettlementFeeAmount: obj.lenderSettlementFeeAmount ?? '0',
     borrowerSettlementFeeAmount: obj.borrowerSettlementFeeAmount ?? '0',
+    borrowerCollateralAssets: obj.borrowerCollateralAssets
+      ? (() => {
+          try {
+            const parsed = JSON.parse(obj.borrowerCollateralAssets);
+            return Array.isArray(parsed)
+              ? parsed.filter((v: unknown): v is string => typeof v === 'string')
+              : [];
+          } catch {
+            return [];
+          }
+        })()
+      : [],
   };
 }
 
@@ -77,6 +114,8 @@ function matchToFields(match: ReturnType<typeof createMatch>): string[] {
     match.lenderSettlementFeeAmount,
     'borrowerSettlementFeeAmount',
     match.borrowerSettlementFeeAmount,
+    'borrowerCollateralAssets',
+    JSON.stringify(match.borrowerCollateralAssets),
   ];
 }
 
@@ -113,6 +152,16 @@ describe('fieldsToMatch conversion', () => {
 
     const result = fieldsToMatch(fields);
     expect(result.borrowerIsTaker).toBe(false);
+  });
+
+  it('should ignore dangerous Redis field names', () => {
+    const match = createMatch();
+    const fields = ['__proto__', '{"polluted":true}', ...matchToFields(match)];
+
+    const result = fieldsToMatch(fields);
+
+    expect(result.matchId).toBe(match.matchId);
+    expect(({} as Record<string, unknown>).polluted).toBeUndefined();
   });
 
   it('should default missing fee fields to "0"', () => {

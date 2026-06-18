@@ -91,6 +91,7 @@ describe('RetryService', () => {
         takerFeeAmount: match.takerFeeAmount,
         lenderSettlementFeeAmount: match.lenderSettlementFeeAmount,
         borrowerSettlementFeeAmount: match.borrowerSettlementFeeAmount,
+        borrowerCollateralAssets: [],
       });
 
       const spy = jest.spyOn(executionEngine, 'retryPublish');

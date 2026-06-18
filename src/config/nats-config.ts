@@ -86,9 +86,7 @@ export function loadNatsConfig(): NatsConfig {
     reconnectTimeWait: process.env.NATS_RECONNECT_TIME_WAIT
       ? parseInt(process.env.NATS_RECONNECT_TIME_WAIT, 10)
       : 2000,
-    timeout: process.env.NATS_TIMEOUT
-      ? parseInt(process.env.NATS_TIMEOUT, 10)
-      : 10000,
+    timeout: process.env.NATS_TIMEOUT ? parseInt(process.env.NATS_TIMEOUT, 10) : 10000,
   };
 
   // Validate configuration
@@ -113,7 +111,11 @@ export const NATS_TOPICS = {
   ORDERS_LEND_LIMIT: 'orders.lend.limit',
   ORDERS_BORROW_MARKET: 'orders.borrow.market',
   ORDERS_BORROW_LIMIT: 'orders.borrow.limit',
-  ORDERS_CANCEL: 'orders.cancel',
+  // Request/reply subject: backend sends a cancel and awaits an authoritative
+  // verdict before persisting CANCELLED (C1 engine-coordinated cancel). This is
+  // the only cancel subject — the legacy fire-and-forget `orders.cancel` path
+  // was retired (security audit L1).
+  ORDERS_CANCEL_REQUEST: 'orders.cancel.request',
   ORDERS_UPDATE: 'orders.update',
 
   // Output topics (publish)
@@ -133,4 +135,3 @@ export type NatsTopicKey = keyof typeof NATS_TOPICS;
  * Type for NATS topic values
  */
 export type NatsTopic = (typeof NATS_TOPICS)[NatsTopicKey];
-

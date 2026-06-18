@@ -1,8 +1,5 @@
 import createRBTree from 'functional-red-black-tree';
-import type {
-  Order,
-  OrderMetadata,
-} from '../types/orders';
+import type { Order, OrderMetadata } from '../types/orders';
 import { OrderStatus, OrderSide } from '../types/orders';
 import { createOrderComparator, isZero } from '../utils/helpers';
 
@@ -22,6 +19,11 @@ export class OrderBook {
   // Order metadata for O(1) lookups by orderId
   private orderIndex: Map<string, OrderMetadata & { order: Order }>;
 
+  // Per-wallet open-order count (key = lowercased wallet address). Kept in sync
+  // with `orderIndex` on every add/remove/clear so the unbounded-book guard
+  // (per-wallet cap) is O(1).
+  private walletOrderCounts: Map<string, number>;
+
   // Comparators for tree ordering
   private lendComparator: (a: Order, b: Order) => number;
   private borrowComparator: (a: Order, b: Order) => number;
@@ -30,6 +32,7 @@ export class OrderBook {
     this.lendOrders = new Map();
     this.borrowOrders = new Map();
     this.orderIndex = new Map();
+    this.walletOrderCounts = new Map();
     this.lendComparator = createOrderComparator(OrderSide.Lend);
     this.borrowComparator = createOrderComparator(OrderSide.Borrow);
   }
@@ -40,6 +43,14 @@ export class OrderBook {
    * @param order - The order to add
    */
   addOrder(order: Order): void {
+    // Maintain the per-wallet count, but only for genuinely new orderIds — a
+    // re-add of an existing id (e.g. updateOrderAmount remove→re-add) must not
+    // double-count.
+    if (!this.orderIndex.has(order.orderId)) {
+      const walletKey = order.walletAddress.toLowerCase();
+      this.walletOrderCounts.set(walletKey, (this.walletOrderCounts.get(walletKey) ?? 0) + 1);
+    }
+
     // Store order metadata for quick lookups
     this.orderIndex.set(order.orderId, {
       orderId: order.orderId,
@@ -87,8 +98,7 @@ export class OrderBook {
       return false;
     }
 
-    const orderMap =
-      metadata.side === OrderSide.Lend ? this.lendOrders : this.borrowOrders;
+    const orderMap = metadata.side === OrderSide.Lend ? this.lendOrders : this.borrowOrders;
 
     // Remove from all market (maturity) trees
     const tokenMap = orderMap.get(metadata.loanToken);
@@ -112,8 +122,15 @@ export class OrderBook {
       }
     }
 
-    // Remove from index
+    // Remove from index and decrement the per-wallet count.
     this.orderIndex.delete(orderId);
+    const walletKey = metadata.walletAddress.toLowerCase();
+    const nextCount = (this.walletOrderCounts.get(walletKey) ?? 1) - 1;
+    if (nextCount <= 0) {
+      this.walletOrderCounts.delete(walletKey);
+    } else {
+      this.walletOrderCounts.set(walletKey, nextCount);
+    }
     return true;
   }
 
@@ -217,7 +234,11 @@ export class OrderBook {
    * @param depth - Maximum number of orders to return per side
    * @returns Order book snapshot
    */
-  getOrderBookSnapshot(loanToken: string, maturity: number, depth: number = 10): {
+  getOrderBookSnapshot(
+    loanToken: string,
+    maturity: number,
+    depth: number = 10
+  ): {
     loanToken: string;
     maturity: number;
     lendOrders: Array<{
@@ -249,7 +270,7 @@ export class OrderBook {
           orderId: order.orderId,
           rate: 'rate' in order ? order.rate : undefined,
           amount: order.remainingAmount,
-          timestamp: order.timestamp
+          timestamp: order.timestamp,
         };
       });
 
@@ -268,6 +289,17 @@ export class OrderBook {
     this.lendOrders.clear();
     this.borrowOrders.clear();
     this.orderIndex.clear();
+    this.walletOrderCounts.clear();
+  }
+
+  /**
+   * Get the number of open orders currently resting in the book for a wallet.
+   *
+   * @param walletAddress - Wallet address (case-insensitive)
+   * @returns Open-order count for the wallet (0 if none)
+   */
+  getWalletOrderCount(walletAddress: string): number {
+    return this.walletOrderCounts.get(walletAddress.toLowerCase()) ?? 0;
   }
 
   /**
@@ -291,6 +323,34 @@ export class OrderBook {
   }
 
   /**
+   * Remove every resting order whose market(s) have all passed maturity, and
+   * return the removed orders.
+   *
+   * A resting order in a matured market can never validly match, so it would
+   * otherwise sit on the book forever locking the user's spendable balance. The
+   * maturity-expiry sweep calls this, then publishes a CANCELLED status per
+   * returned order. An order is only removed when *every* market slot is matured
+   * — a multi-maturity order with at least one still-live leg stays on the book.
+   *
+   * @param nowSeconds - Current time as a unix timestamp in seconds.
+   * @returns The orders that were removed (may be empty).
+   */
+  removeMaturedOrders(nowSeconds: number): Order[] {
+    const matured: Order[] = [];
+    // Collect first (orderIndex dedupes multi-slot orders), then remove — never
+    // mutate the index while iterating it.
+    for (const metadata of this.orderIndex.values()) {
+      if (metadata.markets.every((market) => market.maturity <= nowSeconds)) {
+        matured.push(metadata.order);
+      }
+    }
+    for (const order of matured) {
+      this.removeOrder(order.orderId);
+    }
+    return matured;
+  }
+
+  /**
    * Restore order book from serialized orders
    *
    * Rebuilds the order book structure (Red-Black Trees) from a list of orders.
@@ -311,4 +371,3 @@ export class OrderBook {
     }
   }
 }
-

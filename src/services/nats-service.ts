@@ -5,7 +5,13 @@
  * matching engine service.
  */
 
-import { connect, type NatsConnection, type ConnectionOptions, type Subscription } from 'nats';
+import {
+  connect,
+  type Msg,
+  type NatsConnection,
+  type ConnectionOptions,
+  type Subscription,
+} from 'nats';
 import type { MatchingEngine } from '../core/matching-engine';
 import { loadNatsConfig, NATS_TOPICS, type NatsConfig } from '../config/nats-config';
 import {
@@ -13,13 +19,41 @@ import {
   handleLendLimitOrder,
   handleBorrowMarketOrder,
   handleBorrowLimitOrder,
-  handleCancelOrder,
+  handleCancelOrderRequest,
   handleUpdateOrder,
   type HandlerContext,
 } from './message-handlers';
 import { createLogger } from '../utils/logger';
+import { maskUrl } from '../utils/mask-url';
 
 const log = createLogger('nats-service');
+
+/**
+ * Assert that NATS authentication is configured when running in production.
+ *
+ * The matching engine ingresses orders over NATS; an unauthenticated bus lets
+ * any local peer inject/replay orders. In `NODE_ENV==='production'` we require
+ * either user+password or a token and fail fast otherwise. Non-production
+ * environments are unaffected so local dev keeps working without auth.
+ *
+ * @param config - Resolved NATS configuration
+ * @throws {Error} If production and no credentials are present
+ */
+export function assertNatsAuthConfigured(config: NatsConfig): void {
+  if (process.env.NODE_ENV !== 'production') {
+    return;
+  }
+
+  const hasUserPass = Boolean(config.user && config.password);
+  const hasToken = Boolean(config.token);
+
+  if (!hasUserPass && !hasToken) {
+    throw new Error(
+      'NATS authentication is required in production: set NATS_USER + NATS_PASSWORD, ' +
+        'or NATS_TOKEN. Refusing to connect to an unauthenticated message bus.'
+    );
+  }
+}
 
 /**
  * NATS Service class for managing connections and subscriptions
@@ -53,8 +87,14 @@ export class NatsService {
       return;
     }
 
+    // In production the message bus must be authenticated at the app layer.
+    // Fail fast on startup if neither user+password nor a token is configured,
+    // rather than silently connecting to an open NATS server. Dev/test keep
+    // the existing optional-auth behaviour.
+    assertNatsAuthConfigured(this.config);
+
     try {
-      log.info({ url: this.config.url }, 'connecting to NATS');
+      log.info({ host: maskUrl(this.config.url) }, 'connecting to NATS');
 
       // Build connection options
       const options: ConnectionOptions = {
@@ -152,11 +192,12 @@ export class NatsService {
     this.processSubscription(borrowLimitSub, (data) => handleBorrowLimitOrder(ctx, data));
     log.info({ topic: NATS_TOPICS.ORDERS_BORROW_LIMIT }, 'subscribed');
 
-    // Subscribe to cancel orders
-    const cancelSub = this.nc.subscribe(NATS_TOPICS.ORDERS_CANCEL);
-    this.subscriptions.push(cancelSub);
-    this.processSubscription(cancelSub, (data) => handleCancelOrder(ctx, data));
-    log.info({ topic: NATS_TOPICS.ORDERS_CANCEL }, 'subscribed');
+    // Subscribe to cancel requests (request/reply). The handler receives the
+    // full message so it can reply the authoritative outcome to the requester.
+    const cancelRequestSub = this.nc.subscribe(NATS_TOPICS.ORDERS_CANCEL_REQUEST);
+    this.subscriptions.push(cancelRequestSub);
+    this.processRequestSubscription(cancelRequestSub, (msg) => handleCancelOrderRequest(ctx, msg));
+    log.info({ topic: NATS_TOPICS.ORDERS_CANCEL_REQUEST }, 'subscribed');
 
     // Subscribe to update orders
     const updateSub = this.nc.subscribe(NATS_TOPICS.ORDERS_UPDATE);
@@ -186,6 +227,32 @@ export class NatsService {
       }
     })().catch((error) => {
       log.error({ err: error }, 'subscription processing error');
+    });
+  }
+
+  /**
+   * Process messages from a request/reply subscription.
+   *
+   * Identical to {@link processSubscription} except the handler receives the
+   * full `Msg` (not just `msg.data`) so it can call `msg.respond(...)`.
+   *
+   * @param subscription - NATS subscription to process
+   * @param handler - Handler function that receives the full message
+   */
+  private async processRequestSubscription(
+    subscription: Subscription,
+    handler: (msg: Msg) => void
+  ): Promise<void> {
+    (async () => {
+      for await (const msg of subscription) {
+        try {
+          handler(msg);
+        } catch (error) {
+          log.error({ err: error }, 'error processing request message');
+        }
+      }
+    })().catch((error) => {
+      log.error({ err: error }, 'request subscription processing error');
     });
   }
 
