@@ -2,6 +2,33 @@
 
 A high-performance matching engine for Web3 lending and borrowing built with TypeScript and Red-Black Trees.
 
+This is one of nine services in the [Centuari](https://github.com/centuari-labs/centuari) decentralized lending protocol. It receives orders from the backend over NATS, matches them in-memory with price-time priority, and streams the resulting matches to the settlement engine over Redis.
+
+## Where this fits
+
+```mermaid
+flowchart TD
+    BE[Backend API] -->|NATS request/reply| ME[Matching Engine<br/>hot path · in-memory order books]
+    ME -->|Redis stream<br/>settlement:matches| SE[Settlement Engine]
+    ME -->|NATS orders.status| DBW[DB Writer<br/>cold path · same codebase]
+    DBW -->|locks + status| PG[(PostgreSQL)]
+    SE -->|on-chain settlement| CHAIN[Arbitrum Sepolia]
+```
+
+The service runs as **two processes from one codebase**: the **matching engine**
+(hot path — maintains order books, matches, publishes to Redis; no DB writes) and
+the **DB writer** (cold path — subscribes to NATS + Redis and persists state to
+Postgres, keeping DB I/O off the matching loop). Order books are
+`functional-red-black-tree` structures giving O(log n) insert/match/cancel, keyed
+`Map<loanToken, Map<maturity, RedBlackTree>>` with an `orderId` index for O(1)
+lookups. See [CLAUDE.md](CLAUDE.md) for the full module map, order-lock lifecycle,
+and engineering conventions.
+
+## Tech stack
+
+Node.js · TypeScript (strict) · functional-red-black-tree · NATS 2 · ioredis
+(Streams) · PostgreSQL (raw `pg`) · Zod · Jest 29 · ESLint + Prettier
+
 ## Overview
 
 This matching engine efficiently matches lend and borrow orders for decentralized lending protocols. It supports:
